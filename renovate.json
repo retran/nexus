@@ -30,7 +30,6 @@
       "extends": [
         ":dependencyDashboard",
         ":semanticCommits",
-        ":autodetectPinVersions",
         ":prHourlyLimit2",
         ":prConcurrentLimit10",
         ":ignoreModulesAndTests"
@@ -106,7 +105,7 @@
     },
     {
       "description": "Database migrations tooling",
-      "matchPaths": ["postgres/**"],
+      "matchFileNames": ["postgres/**"],
       "groupName": "postgres tooling",
       "schedule": ["before 6am on Monday"],
       "semanticCommitType": "build",
@@ -137,49 +136,51 @@
     },
     {
       "description": "High Severity Security updates - immediate",
-      "vulnerabilitySeverity": "high",
+      "matchDatasources": ["go", "npm", "osv"],
+      "vulnerabilityAlerts": {
+        "enabled": true
+      },
       "groupName": "high security updates",
       "schedule": ["at any time"],
       "automerge": false,
       "labels": ["security", "dependencies"],
       "matchUpdateTypes": ["patch", "minor", "major"],
-      "matchCurrentVersion": "!/^0/",
-      "priority": 100
+      "matchCurrentVersion": "!/^0/"
     }
   ],
   "vulnerabilityAlerts": {
     "labels": ["security", "dependencies"],
     "assignees": ["retran"],
-    "baseBranch": "dev",
+    "baseBranches": ["dev"],
     "enabled": true
   },
-  "regexManagers": [
+  "customManagers": [
     {
+      "customType": "regex",
       "description": "Update Golang version in Dockerfile.dev",
       "fileMatch": ["(^|/)Dockerfile.dev$"],
       "matchStrings": ["FROM golang:(?<currentValue>.*?)-alpine"],
       "depNameTemplate": "golang",
       "datasourceTemplate": "docker",
-      "versioningTemplate": "docker",
-      "groupName": "docker images"
+      "versioningTemplate": "docker"
     },
     {
+      "customType": "regex",
       "description": "Update Node version in Dockerfile.dev",
       "fileMatch": ["(^|/)Dockerfile.dev$"],
       "matchStrings": ["FROM node:(?<currentValue>.*?)-alpine"],
       "depNameTemplate": "node",
       "datasourceTemplate": "docker",
-      "versioningTemplate": "docker",
-      "groupName": "docker images"
+      "versioningTemplate": "docker"
     },
     {
+      "customType": "regex",
       "description": "Update PostgreSQL version in docker-compose",
       "fileMatch": ["(^|/)docker-compose.*\\.ya?ml$"],
       "matchStrings": ["image: postgres:(?<currentValue>.*?)-alpine"],
       "depNameTemplate": "postgres",
       "datasourceTemplate": "docker",
-      "versioningTemplate": "docker",
-      "groupName": "docker images"
+      "versioningTemplate": "docker"
     }
   ]
 }
