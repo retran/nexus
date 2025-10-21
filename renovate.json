@@ -136,6 +136,10 @@
     },
     {
       "description": "High Severity Security updates - immediate",
+      "matchDatasources": ["go", "npm", "osv"],
+      "vulnerabilityAlerts": {
+        "enabled": true
+      },
       "groupName": "high security updates",
       "schedule": ["at any time"],
       "automerge": false,
