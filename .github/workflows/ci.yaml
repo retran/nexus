@@ -235,6 +235,10 @@ jobs:
   security-backend:
     name: Backend Security
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -287,6 +291,10 @@ jobs:
   security-docker:
     name: Docker Security
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
