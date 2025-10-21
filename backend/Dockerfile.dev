@@ -3,7 +3,7 @@
 
 FROM golang:1.25.3-alpine3.22
 
-RUN go install github.com/cosmtrek/air@latest
+RUN go install github.com/air-verse/air@latest
 
 WORKDIR /app
 
