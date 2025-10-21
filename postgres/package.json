@@ -1,0 +1,17 @@
+{
+  "name": "postgres",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PostgreSQL migrations and SQL tooling for Nexus",
+  "scripts": {
+    "format": "prettier --write 'migrations/**/*.sql'",
+    "format:check": "prettier --check 'migrations/**/*.sql'",
+    "lint": "sqlfluff lint migrations/",
+    "lint:fix": "sqlfluff fix migrations/",
+    "lint:check": "sqlfluff lint migrations/ --format github-annotation"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "prettier-plugin-sql": "^0.18.1"
+  }
+}

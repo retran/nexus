@@ -1,0 +1,62 @@
+{
+  "build": {
+    "buildFlags": [],
+    "env": {},
+    "directoryFilters": [
+      "-**/.git",
+      "-**/.vscode",
+      "-**/.idea",
+      "-**/.vscode-test",
+      "-**/node_modules",
+      "-vendor",
+      "-tmp"
+    ]
+  },
+  "formatting": {
+    "gofumpt": true,
+    "local": "github.com/retran/nexus/backend"
+  },
+  "ui": {
+    "completion": {
+      "usePlaceholders": true,
+      "completeUnimported": true
+    },
+    "diagnostic": {
+      "vulncheck": "Imports",
+      "staticcheck": true,
+      "analyses": {
+        "shadow": true,
+        "unusedparams": true,
+        "fieldalignment": false,
+        "nilness": true,
+        "unreachable": true,
+        "unusedresult": true,
+        "loopclosure": true
+      }
+    },
+    "documentation": {
+      "linksInHover": true,
+      "linkTarget": "pkg.go.dev"
+    },
+    "inlayHint": {
+      "hints": {
+        "assignVariableTypes": true,
+        "compositeLiteralFields": true,
+        "compositeLiteralTypes": true,
+        "constantValues": true,
+        "functionTypeParameters": true,
+        "parameterNames": true,
+        "rangeVariableTypes": true,
+        "ignoredError": true
+      }
+    },
+    "codelenses": {
+      "run_govulncheck": true,
+      "test": true,
+      "tidy": true,
+      "vendor": true,
+      "generate": true
+    },
+    "semanticTokens": true
+  }
+}

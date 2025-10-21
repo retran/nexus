@@ -1,0 +1,167 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":separateMajorReleases",
+    ":combinePatchMinorReleases",
+    ":ignoreModulesAndTests",
+    ":autodetectPinVersions",
+    ":prHourlyLimit2",
+    ":prConcurrentLimit10",
+    "group:monorepos",
+    "group:recommended",
+    "workarounds:all"
+  ],
+  "labels": ["dependencies"],
+  "assignees": ["retran"],
+  "baseBranches": ["dev"],
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "assignees": ["retran"],
+    "baseBranch": "dev"
+  },
+  "packageRules": [
+    {
+      "description": "Backend (Go) dependencies",
+      "matchManagers": ["gomod"],
+      "groupName": "backend dependencies",
+      "schedule": ["before 6am on Monday"],
+      "semanticCommitType": "build",
+      "semanticCommitScope": "backend"
+    },
+    {
+      "description": "Frontend dependencies (non-major)",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "frontend dependencies",
+      "schedule": ["before 6am on Monday"],
+      "semanticCommitType": "build",
+      "semanticCommitScope": "frontend"
+    },
+    {
+      "description": "Frontend major updates (separate PRs)",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["major"],
+      "schedule": ["before 6am on the first day of the month"],
+      "semanticCommitType": "build",
+      "semanticCommitScope": "frontend"
+    },
+    {
+      "description": "React ecosystem",
+      "matchPackagePatterns": ["^react", "^@types/react"],
+      "groupName": "react monorepo",
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "Refine ecosystem",
+      "matchPackagePatterns": ["^@refinedev/"],
+      "groupName": "refine monorepo",
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "Radix UI ecosystem",
+      "matchPackagePatterns": ["^@radix-ui/"],
+      "groupName": "radix-ui monorepo",
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "Tailwind CSS ecosystem",
+      "matchPackagePatterns": ["^@tailwindcss/", "^tailwind"],
+      "groupName": "tailwindcss monorepo",
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "TypeScript and ESLint tooling",
+      "matchPackagePatterns": [
+        "^typescript",
+        "^@typescript-eslint/",
+        "^eslint",
+        "^@eslint/"
+      ],
+      "groupName": "typescript and linting",
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "DevTools and build tools",
+      "matchDepTypes": ["devDependencies"],
+      "matchPackagePatterns": ["^vite", "^prettier", "^@vitejs/"],
+      "groupName": "dev tools",
+      "schedule": ["before 6am on Monday"]
+    },
+    {
+      "description": "Database migrations tooling",
+      "matchPaths": ["postgres/**"],
+      "groupName": "postgres tooling",
+      "schedule": ["before 6am on Monday"],
+      "semanticCommitType": "build",
+      "semanticCommitScope": "postgres"
+    },
+    {
+      "description": "Docker images",
+      "matchDatasources": ["docker"],
+      "groupName": "docker images",
+      "schedule": ["before 6am on Monday"],
+      "semanticCommitType": "build",
+      "semanticCommitScope": "docker"
+    },
+    {
+      "description": "Go version in go.mod",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["golang"],
+      "enabled": false,
+      "commitMessagePrefix": "build(backend):"
+    },
+    {
+      "description": "Pin GitHub Actions to digest",
+      "matchManagers": ["github-actions"],
+      "pinDigests": true,
+      "groupName": "github actions",
+      "schedule": ["before 6am on Monday"],
+      "semanticCommitType": "ci"
+    },
+    {
+      "description": "Security updates - immediate",
+      "matchUpdateTypes": ["patch"],
+      "matchCurrentVersion": "!/^0/",
+      "vulnerabilitySeverity": "high",
+      "groupName": "security updates",
+      "schedule": ["at any time"],
+      "automerge": false,
+      "labels": ["security", "dependencies"]
+    }
+  ],
+  "regexManagers": [
+    {
+      "description": "Update Golang version in Dockerfile.dev",
+      "fileMatch": ["(^|/)Dockerfile.dev$"],
+      "matchStrings": ["FROM golang:(?<currentValue>.*?)-alpine"],
+      "depNameTemplate": "golang",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    },
+    {
+      "description": "Update Node version in Dockerfile.dev",
+      "fileMatch": ["(^|/)Dockerfile.dev$"],
+      "matchStrings": ["FROM node:(?<currentValue>.*?)-alpine"],
+      "depNameTemplate": "node",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    },
+    {
+      "description": "Update PostgreSQL version in docker-compose",
+      "fileMatch": ["(^|/)docker-compose.*\\.ya?ml$"],
+      "matchStrings": ["image: postgres:(?<currentValue>.*?)-alpine"],
+      "depNameTemplate": "postgres",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
+  "ignoreDeps": [],
+  "prCreation": "immediate",
+  "rebaseWhen": "conflicted",
+  "stopUpdatingLabel": "renovate-pause",
+  "timezone": "UTC",
+  "schedule": ["before 6am on Monday"]
+}

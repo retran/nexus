@@ -1,0 +1,34 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+.git/
+.github/
+.gitignore
+.gitattributes
+*.md
+docs/
+.vscode/
+.idea/
+*.swp
+*~
+tmp/
+bin/
+*.exe
+*.out
+*.log
+air_build.log
+air_worker_build.log
+*_test.go
+testdata/
+vendor/
+.air.toml
+.air.worker.toml
+.golangci.yml
+.gopls.json
+.env
+.env.*
+!.env.example
+.task/
+.github/
+coverage.out
+*.coverprofile

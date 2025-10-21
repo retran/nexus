@@ -1,0 +1,5 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+node_modules
+*.log

@@ -1,0 +1,13 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+FROM node:current-alpine3.22
+
+WORKDIR /app
+
+COPY package.json yarn.lock ./
+RUN yarn install
+
+EXPOSE 3000
+
+CMD ["yarn", "dev", "--host"]

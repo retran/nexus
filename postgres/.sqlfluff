@@ -1,0 +1,74 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+[sqlfluff]
+dialect = postgres
+templater = raw
+encoding = utf-8
+exclude_rules = None
+max_line_length = 120
+
+[sqlfluff:indentation]
+indented_joins = false
+indented_using_on = true
+indented_on_contents = true
+indented_then = true
+indented_then_contents = true
+template_blocks_indent = true
+tab_space_size = 2
+indent_unit = space
+
+[sqlfluff:rules]
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = upper
+extended_capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.identifiers]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+capitalisation_policy = upper
+extended_capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.types]
+extended_capitalisation_policy = upper
+
+[sqlfluff:rules:aliasing.table]
+aliasing = explicit
+
+[sqlfluff:rules:aliasing.column]
+aliasing = explicit
+
+[sqlfluff:rules:aliasing.expression]
+aliasing = explicit
+
+[sqlfluff:rules:ambiguous.column_references]
+group_by_and_order_by_style = consistent
+
+[sqlfluff:rules:convention.select_trailing_comma]
+select_clause_trailing_comma = forbid
+
+[sqlfluff:rules:convention.count_rows]
+prefer_count_0 = false
+prefer_count_1 = false
+
+[sqlfluff:rules:convention.terminator]
+multiline_newline = false
+require_final_semicolon = true
+
+[sqlfluff:rules:convention.casting_style]
+preferred_type_casting_style = cast
+
+[sqlfluff:rules:layout.long_lines]
+ignore_comment_lines = true
+ignore_comment_clauses = true
+
+[sqlfluff:rules:references.from]
+force_enable = true
+
+[sqlfluff:rules:structure.subquery]
+forbid_subquery_in = both
