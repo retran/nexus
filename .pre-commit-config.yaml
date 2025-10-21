@@ -1,0 +1,164 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.min\.(js|css)$
+      - id: end-of-file-fixer
+        exclude: \.min\.(js|css)$
+      - id: check-yaml
+        args: ["--unsafe"]
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=5000"]
+        exclude: |
+          (?x)^(
+            frontend/public/.*\.(png|jpg|jpeg|gif|svg|webp|ico|woff|woff2|ttf|eot|mp4|webm|pdf)|
+            docs/.*\.(png|jpg|jpeg|gif|svg|pdf)|
+            .*\.lock$
+          )$
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: no-commit-to-branch
+        args: ["--branch", "main"]
+
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.62.2
+    hooks:
+      - id: golangci-lint
+        name: golangci-lint (backend)
+        entry: bash -c 'cd backend && golangci-lint run --fix'
+        pass_filenames: false
+        files: ^backend/.*\.go$
+        language: system
+
+  - repo: local
+    hooks:
+      - id: go-fmt
+        name: go fmt
+        entry: bash -c 'cd backend && go fmt ./...'
+        language: system
+        files: ^backend/.*\.go$
+        pass_filenames: false
+
+      - id: go-mod-tidy
+        name: go mod tidy
+        entry: bash -c 'cd backend && go mod tidy'
+        language: system
+        files: ^backend/(go\.mod|go\.sum)$
+        pass_filenames: false
+
+      - id: go-build
+        name: go build
+        entry: bash -c 'cd backend && go build -v ./...'
+        language: system
+        files: ^backend/.*\.go$
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: frontend-lint
+        name: ESLint (frontend)
+        entry: bash -c 'cd frontend && yarn lint:fix'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false
+
+      - id: frontend-prettier
+        name: Prettier (frontend)
+        entry: bash -c 'cd frontend && yarn format'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js|jsx|json|css|md)$
+        pass_filenames: false
+
+      - id: frontend-type-check
+        name: TypeScript check (frontend)
+        entry: bash -c 'cd frontend && yarn type-check'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+
+      - id: sqlfluff-lint
+        name: SQLFluff lint
+        entry: bash -c 'cd postgres && sqlfluff lint migrations/'
+        language: system
+        files: ^postgres/migrations/.*\.sql$
+        pass_filenames: false
+
+      - id: sqlfluff-fix
+        name: SQLFluff fix
+        entry: bash -c 'cd postgres && sqlfluff fix --force migrations/'
+        language: system
+        files: ^postgres/migrations/.*\.sql$
+        pass_filenames: false
+
+      - id: sql-prettier
+        name: Prettier (SQL)
+        entry: bash -c 'cd postgres && npm run format'
+        language: system
+        files: ^postgres/migrations/.*\.sql$
+        pass_filenames: false
+
+      - id: repo-prettier
+        name: Prettier (repo-wide)
+        entry: npx prettier --write
+        language: system
+        files: ^(.*\.(md|ya?ml|json))|(\.github/.*\.(md|ya?ml))|(docs/.*\.md)$
+        exclude: ^(frontend/|backend/|postgres/)
+
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+        name: Hadolint (Dockerfile linter)
+        args:
+          [
+            "--ignore",
+            "DL3018",
+            "--ignore",
+            "DL3008",
+            "--ignore",
+            "DL3062",
+            "--ignore",
+            "DL3060",
+          ]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+        name: Detect hardcoded secrets
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.43.0
+    hooks:
+      - id: markdownlint
+        name: Markdown lint
+        args: ["--fix"]
+        exclude: ^\.github/copilot-instructions\.md$
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.1.0
+    hooks:
+      - id: commitizen
+        name: Check commit message format
+        stages: [commit-msg]
+
+ci:
+  autofix_commit_msg: |
+    ci(pre-commit): auto fixes from hooks
+
+    [pre-commit.ci] auto fixes from pre-commit.com hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: "dev"
+  autoupdate_commit_msg: "ci(pre-commit): autoupdate hooks"
+  autoupdate_schedule: weekly

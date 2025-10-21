@@ -1,0 +1,51 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+plugins:
+  - prettier-plugin-tailwindcss
+
+tailwindStylesheet: ./src/App.css
+
+tailwindAttributes:
+  - className
+  - class
+  - classList
+  - /data-.*/
+
+tailwindFunctions:
+  - clsx
+  - cn
+  - cva
+  - tw
+
+tailwindPreserveWhitespace: false
+tailwindPreserveDuplicates: false
+
+semi: true
+singleQuote: true
+trailingComma: es5
+tabWidth: 2
+useTabs: false
+printWidth: 80
+arrowParens: always
+endOfLine: lf
+bracketSpacing: true
+bracketSameLine: false
+
+jsxSingleQuote: false
+quoteProps: as-needed
+
+proseWrap: preserve
+
+htmlWhitespaceSensitivity: css
+
+embeddedLanguageFormatting: auto
+
+overrides:
+  - files: "*.test.{js,ts,jsx,tsx}"
+    options:
+      printWidth: 100
+
+  - files: "*.{css,scss,less}"
+    options:
+      singleQuote: false

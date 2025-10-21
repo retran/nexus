@@ -1,0 +1,29 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+node_modules
+dist
+build
+out
+coverage
+.vite
+.next
+.nuxt
+.cache
+.eslintcache
+.prettiercache
+.parcel-cache
+.idea
+.vscode
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.min.js
+*.min.css
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

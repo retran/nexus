@@ -1,0 +1,150 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+version: "2"
+
+run:
+  timeout: 10m
+  tests: true
+  modules-download-mode: readonly
+  go: '1.25.2'
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - bodyclose
+    - copyloopvar
+    - errorlint
+    - gosec
+    - nilerr
+    - noctx
+    - rowserrcheck
+    - sqlclosecheck
+    - unconvert
+    - wrapcheck
+    - godot
+    - misspell
+    - revive
+    - whitespace
+    - dupl
+    - funlen
+    - gocognit
+    - gocyclo
+    - nestif
+    - prealloc
+    - exhaustive
+    - goconst
+    - gocritic
+    - nolintlint
+    - predeclared
+    - thelper
+    - unparam
+
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    govet:
+      enable-all: true
+      disable:
+        - shadow
+
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+
+    gosec:
+      excludes:
+        - G104 # Audit errors not checked - covered by errcheck
+
+    revive:
+      severity: warning
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+        - name: if-return
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unreachable-code
+        - name: unexported-return
+        - name: unused-parameter
+        - name: var-declaration
+        - name: var-naming
+
+    funlen:
+      lines: 100
+      statements: 50
+
+    gocognit:
+      min-complexity: 15
+
+    gocyclo:
+      min-complexity: 15
+
+    nestif:
+      min-complexity: 4
+
+    dupl:
+      threshold: 100
+
+    unparam:
+      check-exported: false
+
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - errcheck
+          - dupl
+          - gosec
+          - funlen
+          - gocognit
+          - unparam
+      - path: "zz_generated.*\\.go"
+        linters:
+          - dupl
+          - gocyclo
+      - path: testing/
+        linters:
+          - errcheck
+          - gosec
+
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/retran/nexus/backend
+
+issues:
+  max-issues-per-linter: 0 # 0 = unlimited
+  max-same-issues: 5
+
+output:
+  sort-order:
+    - linter
+    - file
+  show-stats: true

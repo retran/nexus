@@ -1,0 +1,568 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+version: "3"
+
+vars:
+  COMPOSE_FILE: docker-compose.dev.yaml
+  BACKEND_DIR: backend
+  FRONTEND_DIR: frontend
+  POSTGRES_DIR: postgres
+  MIGRATIONS_DIR: postgres/migrations
+  GREEN: \033[0;32m
+  RED: \033[0;31m
+  YELLOW: \033[0;33m
+  BLUE: \033[0;34m
+  NC: \033[0m
+
+silent: true
+
+tasks:
+  default:
+    desc: "Show available tasks"
+    cmds:
+      - task --list-all
+
+  setup:
+    desc: "Initial project setup (install deps and configure)"
+    cmds:
+      - task: tools:check
+      - task: env:init
+      - task: deps
+      - printf "{{.GREEN}}[OK]{{.NC}} Setup complete! Run 'task dev' to start\n"
+
+  deps:
+    desc: "Install all dependencies"
+    cmds:
+      - task: backend:deps
+      - task: frontend:deps
+      - task: db:deps
+
+  dev:
+    desc: "Start development environment"
+    cmds:
+      - |
+        [ -f .env ] || task setup
+      - task: up
+
+  up:
+    desc: "Start all services"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} up -d
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Services started:\n"
+        echo "   Frontend:    http://localhost:3000"
+        echo "   BFF API:     http://localhost:8000"
+        echo "   Temporal UI: http://localhost:8088"
+        echo "   PostgreSQL:  localhost:5432"
+
+  down:
+    desc: "Stop all services"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} down
+
+  restart:
+    desc: "Restart all services"
+    cmds:
+      - task: down
+      - task: up
+
+  logs:
+    desc: "Show service logs (use -- <service> for specific service)"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} logs -f {{.CLI_ARGS}}
+
+  ps:
+    desc: "Show service status"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} ps
+
+  status:
+    desc: "Show environment status and recent logs"
+    cmds:
+      - echo "=== Services ==="
+      - docker-compose -f {{.COMPOSE_FILE}} ps
+      - echo ""
+      - echo "=== Recent Logs ==="
+      - docker-compose -f {{.COMPOSE_FILE}} logs --tail=20
+
+  clean:
+    desc: "Stop services and remove volumes (WARNING: destroys data)"
+    prompt: "This will delete all data including database. Continue?"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} down -v
+      - printf "{{.GREEN}}[OK]{{.NC}} Services stopped and data removed\n"
+
+  clean:all:
+    desc: "Clean all build artifacts and data"
+    cmds:
+      - task: backend:clean
+      - task: frontend:clean
+      - task: clean
+
+  env:init:
+    desc: "Create .env file from example"
+    cmds:
+      - |
+        if [ ! -f .env ]; then
+          cp .env.example .env
+          printf "{{.GREEN}}[OK]{{.NC}} Created .env file\n"
+          printf "{{.YELLOW}}[WARN]{{.NC}} Review and update .env with your values\n"
+        else
+          printf "{{.GREEN}}[OK]{{.NC}} .env file exists\n"
+        fi
+
+  tools:check:
+    desc: "Check required tools are installed"
+    cmds:
+      - |
+        echo "Checking required tools..."
+        command -v docker >/dev/null || (printf "{{.RED}}[ERROR]{{.NC}} Docker not found\n" && exit 1)
+        command -v docker-compose >/dev/null || (printf "{{.RED}}[ERROR]{{.NC}} docker-compose not found\n" && exit 1)
+        command -v go >/dev/null || (printf "{{.YELLOW}}[WARN]{{.NC}} Go not found\n")
+        command -v node >/dev/null || (printf "{{.YELLOW}}[WARN]{{.NC}} Node.js not found\n")
+        command -v pipx >/dev/null || (printf "{{.YELLOW}}[WARN]{{.NC}} pipx not found (optional)\n")
+        printf "{{.GREEN}}[OK]{{.NC}} Required tools installed\n"
+
+  tools:install:
+    desc: "Install all development tools"
+    cmds:
+      - task: tools:install:golangci
+      - task: tools:install:sqlfluff
+      - task: tools:install:pre-commit
+
+  tools:install:golangci:
+    desc: "Install golangci-lint"
+    cmds:
+      - |
+        if command -v golangci-lint >/dev/null; then
+          printf "{{.GREEN}}[OK]{{.NC}} golangci-lint already installed ($(golangci-lint version))\n"
+        else
+          echo "Installing golangci-lint..."
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+          printf "{{.GREEN}}[OK]{{.NC}} golangci-lint installed\n"
+        fi
+
+  tools:install:sqlfluff:
+    desc: "Install sqlfluff for SQL linting"
+    cmds:
+      - |
+        if ! command -v pipx >/dev/null; then
+          printf "{{.RED}}[ERROR]{{.NC}} pipx not found. Install with: brew install pipx && pipx ensurepath\n"
+          exit 1
+        fi
+        if command -v sqlfluff >/dev/null 2>&1; then
+          printf "{{.GREEN}}[OK]{{.NC}} sqlfluff already installed ($(sqlfluff --version))\n"
+        else
+          echo "Installing sqlfluff with pipx..."
+          pipx install sqlfluff
+          printf "{{.GREEN}}[OK]{{.NC}} sqlfluff installed\n"
+          echo "Note: You may need to restart your shell or run: pipx ensurepath"
+        fi
+
+  tools:install:pre-commit:
+    desc: "Install pre-commit hooks"
+    cmds:
+      - |
+        if ! command -v pre-commit >/dev/null; then
+          echo "Installing pre-commit..."
+          pipx install pre-commit
+        fi
+        echo "Installing pre-commit hooks..."
+        pre-commit install --install-hooks
+        pre-commit install --hook-type commit-msg
+        printf "{{.GREEN}}[OK]{{.NC}} pre-commit hooks installed\n"
+  backend:deps:
+    desc: "Install backend dependencies"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - |
+        if [ ! -f go.sum ]; then
+          echo "Installing Go dependencies..."
+          go mod download
+          printf "{{.GREEN}}[OK]{{.NC}} Backend dependencies installed\n"
+        else
+          printf "{{.GREEN}}[OK]{{.NC}} Backend dependencies already installed\n"
+        fi
+
+  backend:build:
+    desc: "Build backend binary"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - go build -o bin/nexus ./cmd/nexus
+      - printf "{{.GREEN}}[OK]{{.NC}} Built backend/bin/nexus\n"
+
+  backend:tidy:
+    desc: "Tidy backend dependencies"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - go mod tidy
+
+  backend:format:
+    desc: "Format backend code"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - go fmt ./...
+
+  backend:lint:
+    desc: "Lint backend code"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - |
+        if ! command -v golangci-lint >/dev/null; then
+          printf "{{.RED}}[ERROR]{{.NC}} golangci-lint not installed. Run: task tools:install:golangci\n"
+          exit 1
+        fi
+        golangci-lint run ./...
+
+  backend:lint:fix:
+    desc: "Lint and auto-fix backend code"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - |
+        if ! command -v golangci-lint >/dev/null; then
+          printf "{{.RED}}[ERROR]{{.NC}} golangci-lint not installed. Run: task tools:install:golangci\n"
+          exit 1
+        fi
+        golangci-lint run --fix ./...
+
+  backend:test:
+    desc: "Run backend tests"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - go test -v -race ./...
+
+  backend:test:coverage:
+    desc: "Run backend tests with coverage"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+      - go tool cover -html=coverage.out -o coverage.html
+      - printf "{{.GREEN}}[OK]{{.NC}} Coverage report at backend/coverage.html\n"
+
+  backend:shell:
+    desc: "Open shell in backend container"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} exec api sh
+
+  backend:clean:
+    desc: "Clean backend build artifacts"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - rm -rf tmp/ bin/ *.log coverage.out coverage.html
+  frontend:deps:
+    desc: "Install frontend dependencies"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - |
+        if [ ! -d node_modules ]; then
+          echo "Installing frontend dependencies..."
+          yarn install
+          printf "{{.GREEN}}[OK]{{.NC}} Frontend dependencies installed\n"
+        else
+          printf "{{.GREEN}}[OK]{{.NC}} Frontend dependencies already installed\n"
+        fi
+
+  frontend:build:
+    desc: "Build frontend for production"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - yarn build
+      - printf "{{.GREEN}}[OK]{{.NC}} Frontend built successfully\n"
+
+  frontend:format:
+    desc: "Format frontend code"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - yarn format
+
+  frontend:format:check:
+    desc: "Check frontend code formatting"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - yarn format:check
+
+  frontend:lint:
+    desc: "Lint frontend code"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - yarn lint
+
+  frontend:lint:fix:
+    desc: "Lint and auto-fix frontend code"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - yarn lint:fix
+
+  frontend:type-check:
+    desc: "Type check frontend code"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - yarn type-check
+
+  frontend:test:
+    desc: "Run frontend tests"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - yarn test
+
+  frontend:test:coverage:
+    desc: "Run frontend tests with coverage"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - yarn test --coverage
+      - printf "{{.GREEN}}[OK]{{.NC}} Coverage report at frontend/coverage/index.html\n"
+
+  frontend:shell:
+    desc: "Open shell in frontend container"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} exec ui sh
+
+  frontend:clean:
+    desc: "Clean frontend build artifacts"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - rm -rf dist/ build/ .vite/ coverage/
+  db:deps:
+    desc: "Install database tooling dependencies"
+    dir: "{{.POSTGRES_DIR}}"
+    cmds:
+      - |
+        [ -d node_modules ] || npm install
+        printf "{{.GREEN}}[OK]{{.NC}} Database tooling dependencies installed\n"
+
+  db:migrate:
+    desc: "Run database migrations"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} --profile tools run --rm migrations up
+      - printf "{{.GREEN}}[OK]{{.NC}} Migrations applied\n"
+
+  db:migrate:down:
+    desc: "Rollback last migration"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} --profile tools run --rm migrations down 1
+      - printf "{{.GREEN}}[OK]{{.NC}} Migration rolled back\n"
+
+  db:migrate:create:
+    desc: "Create new migration (use -- <name>)"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          printf "{{.RED}}[ERROR]{{.NC}} Provide migration name: task db:migrate:create -- <name>\n"
+          exit 1
+        fi
+        TIMESTAMP=$(date +%s)
+        UP_FILE="{{.MIGRATIONS_DIR}}/${TIMESTAMP}_{{.CLI_ARGS}}.up.sql"
+        DOWN_FILE="{{.MIGRATIONS_DIR}}/${TIMESTAMP}_{{.CLI_ARGS}}.down.sql"
+        cat > "$UP_FILE" << 'EOF'
+        -- Copyright 2025 Andrew Vasilyev
+        -- SPDX-License-Identifier: APACHE-2.0
+
+        EOF
+        cat > "$DOWN_FILE" << 'EOF'
+        -- Copyright 2025 Andrew Vasilyev
+        -- SPDX-License-Identifier: APACHE-2.0
+
+        EOF
+        printf "{{.GREEN}}[OK]{{.NC}} Created:\n"
+        echo "   $UP_FILE"
+        echo "   $DOWN_FILE"
+
+  db:format:
+    desc: "Format SQL files"
+    dir: "{{.POSTGRES_DIR}}"
+    cmds:
+      - |
+        [ -d node_modules ] || npm install
+        npm run format
+
+  db:format:check:
+    desc: "Check SQL formatting"
+    dir: "{{.POSTGRES_DIR}}"
+    cmds:
+      - |
+        if [ ! -d node_modules ]; then
+          printf "{{.RED}}[ERROR]{{.NC}} Dependencies not installed. Run: task db:deps\n"
+          exit 1
+        fi
+        npm run format:check
+
+  db:lint:
+    desc: "Lint SQL files"
+    dir: "{{.POSTGRES_DIR}}"
+    cmds:
+      - |
+        if ! command -v sqlfluff >/dev/null 2>&1; then
+          printf "{{.RED}}[ERROR]{{.NC}} sqlfluff not installed. Run: task tools:install:sqlfluff\n"
+          exit 1
+        fi
+        npm run lint
+
+  db:lint:fix:
+    desc: "Lint and auto-fix SQL files"
+    dir: "{{.POSTGRES_DIR}}"
+    cmds:
+      - |
+        if ! command -v sqlfluff >/dev/null 2>&1; then
+          printf "{{.RED}}[ERROR]{{.NC}} sqlfluff not installed. Run: task tools:install:sqlfluff\n"
+          exit 1
+        fi
+        npm run lint:fix
+
+  db:shell:
+    desc: "Open PostgreSQL shell"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} exec postgres psql -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-nexus_db}
+
+  db:reset:
+    desc: "Reset database (WARNING: destroys all data)"
+    prompt: "This will delete all database data. Continue?"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} exec postgres psql -U ${POSTGRES_USER:-admin} -d postgres -c "DROP DATABASE IF EXISTS ${POSTGRES_DB:-nexus_db};"
+      - docker-compose -f {{.COMPOSE_FILE}} exec postgres psql -U ${POSTGRES_USER:-admin} -d postgres -c "CREATE DATABASE ${POSTGRES_DB:-nexus_db};"
+      - task: db:migrate
+  build:
+    desc: "Build all Docker images"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} build
+
+  build:backend:
+    desc: "Build backend Docker images (api + worker)"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} build api worker
+
+  build:frontend:
+    desc: "Build frontend Docker image"
+    cmds:
+      - docker-compose -f {{.COMPOSE_FILE}} build ui
+
+  format:
+    desc: "Format all code (backend, frontend, SQL, repo)"
+    cmds:
+      - task: backend:format
+      - task: frontend:format
+      - task: db:format
+      - task: repo:format
+
+  format:check:
+    desc: "Check all code formatting"
+    cmds:
+      - task: frontend:format:check
+      - task: db:format:check
+      - task: repo:format:check
+
+  temporal:ui:
+    desc: "Open Temporal UI in browser"
+    cmds:
+      - echo "Opening http://localhost:8088"
+      - open http://localhost:8088 || xdg-open http://localhost:8088 || echo "Visit http://localhost:8088"
+
+  repo:format:
+    desc: "Format repository-wide markdown, YAML, and JSON files"
+    cmds:
+      - |
+        if ! command -v npx &> /dev/null; then
+          printf "{{.RED}}[ERROR]{{.NC}} npx not found. Install Node.js first.\n"
+          exit 1
+        fi
+        npx prettier --write "*.md" "*.{yml,yaml}" "*.json" ".github/**/*.{yml,yaml}"
+
+  repo:format:check:
+    desc: "Check repository-wide file formatting"
+    cmds:
+      - |
+        if ! command -v npx &> /dev/null; then
+          printf "{{.RED}}[ERROR]{{.NC}} npx not found. Install Node.js first.\n"
+          exit 1
+        fi
+        npx prettier --check "*.md" "*.{yml,yaml}" "*.json" ".github/**/*.{yml,yaml}"
+
+  lint:
+    desc: "Lint all code (backend, frontend, SQL)"
+    cmds:
+      - task: backend:lint
+      - task: frontend:lint
+      - task: db:lint
+
+  lint:fix:
+    desc: "Lint and auto-fix all code"
+    cmds:
+      - task: backend:lint:fix
+      - task: frontend:lint:fix
+      - task: db:lint:fix
+
+  check:
+    desc: "Run all checks (format, lint, type-check)"
+    cmds:
+      - task: format
+      - task: lint
+      - task: frontend:type-check
+
+  pre-commit:
+    desc: "Run pre-commit hooks on all files"
+    cmds:
+      - |
+        if ! command -v pre-commit >/dev/null; then
+          printf "{{.RED}}[ERROR]{{.NC}} pre-commit not installed. Run: task tools:install-pre-commit\n"
+          exit 1
+        fi
+        pre-commit run --all-files
+
+  pre-commit:update:
+    desc: "Update pre-commit hooks to latest versions"
+    cmds:
+      - pre-commit autoupdate
+
+  test:
+    desc: "Run all tests"
+    cmds:
+      - task: backend:test
+      - task: frontend:test
+
+  test:coverage:
+    desc: "Generate coverage reports for all components"
+    cmds:
+      - task: backend:test:coverage
+      - task: frontend:test:coverage
+
+  security:
+    desc: "Run all security scans"
+    cmds:
+      - task: security:backend
+      - task: security:frontend
+      - task: security:secrets
+
+  security:backend:
+    desc: "Run security scan on backend (gosec + govulncheck)"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - |
+        echo "Running gosec..."
+        if ! command -v gosec >/dev/null; then
+          echo "Installing gosec..."
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+        fi
+        gosec ./...
+      - |
+        echo "Running govulncheck..."
+        if ! command -v govulncheck >/dev/null; then
+          echo "Installing govulncheck..."
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+        fi
+        govulncheck ./...
+
+  security:frontend:
+    desc: "Run security scan on frontend (yarn audit)"
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - yarn audit --level moderate
+
+  security:secrets:
+    desc: "Scan for secrets in code (gitleaks)"
+    cmds:
+      - |
+        if ! command -v gitleaks >/dev/null; then
+          printf "{{.RED}}[ERROR]{{.NC}} gitleaks not installed. Install with: brew install gitleaks\n"
+          exit 1
+        fi
+        gitleaks detect --source . --verbose
