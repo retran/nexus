@@ -246,15 +246,14 @@ jobs:
           cache-dependency-path: backend/go.sum
 
       - name: Run gosec
-        uses: securego/gosec@v2
+        uses: securego/gosec@v2.22.4
         with:
-          args: "-no-fail -fmt sarif -out gosec.sarif ./..."
-          working-directory: backend
+          args: "-no-fail -fmt sarif -out gosec.sarif ./backend/..."
 
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: backend/gosec.sarif
+          sarif_file: gosec.sarif
           category: gosec
 
       - name: Run govulncheck
