@@ -6,7 +6,7 @@
     "group:monorepos",
     "workarounds:all"
   ],
-  "baseBranches": ["dev"],
+  "baseBranchPatterns": ["dev"],
   "timezone": "Europe/Amsterdam",
   "schedule": ["before 6am on Monday"],
   "prCreation": "not-pending",
@@ -26,14 +26,14 @@
     },
     {
       "description": "Presets for all packages",
-      "matchPackagePatterns": ["*"],
       "extends": [
         ":dependencyDashboard",
         ":semanticCommits",
         ":prHourlyLimit2",
         ":prConcurrentLimit10",
         ":ignoreModulesAndTests"
-      ]
+      ],
+      "matchPackageNames": ["*"]
     },
     {
       "description": "Backend (Go) dependencies",
@@ -63,45 +63,45 @@
     },
     {
       "description": "React ecosystem",
-      "matchPackagePatterns": ["^react", "^@types/react"],
       "groupName": "react monorepo",
-      "schedule": ["before 6am on Monday"]
+      "schedule": ["before 6am on Monday"],
+      "matchPackageNames": ["/^react/", "/^@types/react/"]
     },
     {
       "description": "Refine ecosystem",
-      "matchPackagePatterns": ["^@refinedev/"],
       "groupName": "refine monorepo",
-      "schedule": ["before 6am on Monday"]
+      "schedule": ["before 6am on Monday"],
+      "matchPackageNames": ["/^@refinedev//"]
     },
     {
       "description": "Radix UI ecosystem",
-      "matchPackagePatterns": ["^@radix-ui/"],
       "groupName": "radix-ui monorepo",
-      "schedule": ["before 6am on Monday"]
+      "schedule": ["before 6am on Monday"],
+      "matchPackageNames": ["/^@radix-ui//"]
     },
     {
       "description": "Tailwind CSS ecosystem",
-      "matchPackagePatterns": ["^@tailwindcss/", "^tailwind"],
       "groupName": "tailwindcss monorepo",
-      "schedule": ["before 6am on Monday"]
+      "schedule": ["before 6am on Monday"],
+      "matchPackageNames": ["/^@tailwindcss//", "/^tailwind/"]
     },
     {
       "description": "TypeScript and ESLint tooling",
-      "matchPackagePatterns": [
-        "^typescript",
-        "^@typescript-eslint/",
-        "^eslint",
-        "^@eslint/"
-      ],
       "groupName": "typescript and linting",
-      "schedule": ["before 6am on Monday"]
+      "schedule": ["before 6am on Monday"],
+      "matchPackageNames": [
+        "/^typescript/",
+        "/^@typescript-eslint//",
+        "/^eslint/",
+        "/^@eslint//"
+      ]
     },
     {
       "description": "DevTools and build tools (e.g. Vite/Prettier)",
       "matchDepTypes": ["devDependencies"],
-      "matchPackagePatterns": ["^vite", "^prettier", "^@vitejs/"],
       "groupName": "dev tools",
-      "schedule": ["before 6am on Monday"]
+      "schedule": ["before 6am on Monday"],
+      "matchPackageNames": ["/^vite/", "/^prettier/", "/^@vitejs//"]
     },
     {
       "description": "Database migrations tooling",
@@ -151,14 +151,14 @@
   "vulnerabilityAlerts": {
     "labels": ["security", "dependencies"],
     "assignees": ["retran"],
-    "baseBranches": ["dev"],
+    "baseBranchPatterns": ["dev"],
     "enabled": true
   },
   "customManagers": [
     {
       "customType": "regex",
       "description": "Update Golang version in Dockerfile.dev",
-      "fileMatch": ["(^|/)Dockerfile.dev$"],
+      "managerFilePatterns": ["/(^|/)Dockerfile.dev$/"],
       "matchStrings": ["FROM golang:(?<currentValue>.*?)-alpine"],
       "depNameTemplate": "golang",
       "datasourceTemplate": "docker",
@@ -167,7 +167,7 @@
     {
       "customType": "regex",
       "description": "Update Node version in Dockerfile.dev",
-      "fileMatch": ["(^|/)Dockerfile.dev$"],
+      "managerFilePatterns": ["/(^|/)Dockerfile.dev$/"],
       "matchStrings": ["FROM node:(?<currentValue>.*?)-alpine"],
       "depNameTemplate": "node",
       "datasourceTemplate": "docker",
@@ -176,7 +176,7 @@
     {
       "customType": "regex",
       "description": "Update PostgreSQL version in docker-compose",
-      "fileMatch": ["(^|/)docker-compose.*\\.ya?ml$"],
+      "managerFilePatterns": ["/(^|/)docker-compose.*\\.ya?ml$/"],
       "matchStrings": ["image: postgres:(?<currentValue>.*?)-alpine"],
       "depNameTemplate": "postgres",
       "datasourceTemplate": "docker",
