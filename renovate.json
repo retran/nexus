@@ -11,8 +11,7 @@
     ":prHourlyLimit2",
     ":prConcurrentLimit10",
     "group:monorepos",
-    "group:recommended",
-    "workarounds:all"
+    "group:recommended"
   ],
   "labels": ["dependencies"],
   "assignees": ["retran"],
