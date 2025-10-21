@@ -2,27 +2,41 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended",
-    ":dependencyDashboard",
-    ":semanticCommits",
-    ":separateMajorReleases",
-    ":combinePatchMinorReleases",
-    ":ignoreModulesAndTests",
-    ":autodetectPinVersions",
-    ":prHourlyLimit2",
-    ":prConcurrentLimit10",
-    "group:monorepos",
     "group:recommended",
+    "group:monorepos",
     "workarounds:all"
   ],
+  "baseBranches": ["dev"],
+  "timezone": "Europe/Amsterdam",
+  "schedule": ["before 6am on Monday"],
+  "prCreation": "not-pending",
+  "rebaseWhen": "conflicted",
+  "stopUpdatingLabel": "renovate-pause",
   "labels": ["dependencies"],
   "assignees": ["retran"],
-  "baseBranches": ["dev"],
-  "vulnerabilityAlerts": {
-    "labels": ["security"],
-    "assignees": ["retran"],
-    "baseBranch": "dev"
-  },
   "packageRules": [
+    {
+      "description": "Separate major and combine minor/patch",
+      "matchUpdateTypes": ["major"],
+      "separateMajor": true
+    },
+    {
+      "description": "Combine minor/patch",
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "all minor and patch updates"
+    },
+    {
+      "description": "Presets for all packages",
+      "matchPackagePatterns": ["*"],
+      "extends": [
+        ":dependencyDashboard",
+        ":semanticCommits",
+        ":autodetectPinVersions",
+        ":prHourlyLimit2",
+        ":prConcurrentLimit10",
+        ":ignoreModulesAndTests"
+      ]
+    },
     {
       "description": "Backend (Go) dependencies",
       "matchManagers": ["gomod"],
@@ -44,6 +58,7 @@
       "description": "Frontend major updates (separate PRs)",
       "matchManagers": ["npm"],
       "matchUpdateTypes": ["major"],
+      "groupName": "frontend major updates",
       "schedule": ["before 6am on the first day of the month"],
       "semanticCommitType": "build",
       "semanticCommitScope": "frontend"
@@ -84,7 +99,7 @@
       "schedule": ["before 6am on Monday"]
     },
     {
-      "description": "DevTools and build tools",
+      "description": "DevTools and build tools (e.g. Vite/Prettier)",
       "matchDepTypes": ["devDependencies"],
       "matchPackagePatterns": ["^vite", "^prettier", "^@vitejs/"],
       "groupName": "dev tools",
@@ -107,13 +122,6 @@
       "semanticCommitScope": "docker"
     },
     {
-      "description": "Go version in go.mod",
-      "matchManagers": ["gomod"],
-      "matchDepTypes": ["golang"],
-      "enabled": false,
-      "commitMessagePrefix": "build(backend):"
-    },
-    {
       "description": "Pin GitHub Actions to digest",
       "matchManagers": ["github-actions"],
       "pinDigests": true,
@@ -122,16 +130,29 @@
       "semanticCommitType": "ci"
     },
     {
-      "description": "Security updates - immediate",
-      "matchUpdateTypes": ["patch"],
-      "matchCurrentVersion": "!/^0/",
+      "description": "Go version in go.mod (Disabled by default)",
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["golang"],
+      "enabled": false,
+      "commitMessagePrefix": "build(backend):"
+    },
+    {
+      "description": "High Severity Security updates - immediate",
       "vulnerabilitySeverity": "high",
-      "groupName": "security updates",
+      "groupName": "high security updates",
       "schedule": ["at any time"],
       "automerge": false,
-      "labels": ["security", "dependencies"]
+      "labels": ["security", "dependencies"],
+      "matchUpdateTypes": ["patch", "minor", "major"],
+      "matchCurrentVersion": "!/^0/"
     }
   ],
+  "vulnerabilityAlerts": {
+    "labels": ["security", "dependencies"],
+    "assignees": ["retran"],
+    "baseBranch": "dev",
+    "enabled": true
+  },
   "regexManagers": [
     {
       "description": "Update Golang version in Dockerfile.dev",
@@ -139,7 +160,8 @@
       "matchStrings": ["FROM golang:(?<currentValue>.*?)-alpine"],
       "depNameTemplate": "golang",
       "datasourceTemplate": "docker",
-      "versioningTemplate": "docker"
+      "versioningTemplate": "docker",
+      "groupName": "docker images"
     },
     {
       "description": "Update Node version in Dockerfile.dev",
@@ -147,7 +169,8 @@
       "matchStrings": ["FROM node:(?<currentValue>.*?)-alpine"],
       "depNameTemplate": "node",
       "datasourceTemplate": "docker",
-      "versioningTemplate": "docker"
+      "versioningTemplate": "docker",
+      "groupName": "docker images"
     },
     {
       "description": "Update PostgreSQL version in docker-compose",
@@ -155,13 +178,8 @@
       "matchStrings": ["image: postgres:(?<currentValue>.*?)-alpine"],
       "depNameTemplate": "postgres",
       "datasourceTemplate": "docker",
-      "versioningTemplate": "docker"
+      "versioningTemplate": "docker",
+      "groupName": "docker images"
     }
-  ],
-  "ignoreDeps": [],
-  "prCreation": "immediate",
-  "rebaseWhen": "conflicted",
-  "stopUpdatingLabel": "renovate-pause",
-  "timezone": "UTC",
-  "schedule": ["before 6am on Monday"]
+  ]
 }
