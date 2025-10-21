@@ -17,8 +17,7 @@
   "packageRules": [
     {
       "description": "Separate major and combine minor/patch",
-      "matchUpdateTypes": ["major"],
-      "separateMajor": true
+      "matchUpdateTypes": ["major"]
     },
     {
       "description": "Combine minor/patch",
