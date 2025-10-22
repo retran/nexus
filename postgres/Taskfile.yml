@@ -1,0 +1,114 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+version: "3"
+
+vars:
+  GREEN: \033[0;32m
+  RED: \033[0;31m
+  YELLOW: \033[0;33m
+  BLUE: \033[0;34m
+  NC: \033[0m
+  MIGRATIONS_DIR: migrations
+
+silent: true
+
+tasks:
+  default:
+    desc: "Show available database tasks"
+    cmds:
+      - task --list-all
+
+  deps:
+    desc: "Install database tooling dependencies"
+    cmds:
+      - |
+        [ -d node_modules ] || yarn install
+        printf "{{.GREEN}}[OK]{{.NC}} Database tooling dependencies installed\n"
+
+  migrate:
+    desc: "Run database migrations"
+    cmds:
+      - docker-compose -f ../docker-compose.dev.yaml --profile tools run --rm migrations up
+      - printf "{{.GREEN}}[OK]{{.NC}} Migrations applied\n"
+
+  migrate:down:
+    desc: "Rollback last migration"
+    cmds:
+      - docker-compose -f ../docker-compose.dev.yaml --profile tools run --rm migrations down 1
+      - printf "{{.GREEN}}[OK]{{.NC}} Migration rolled back\n"
+
+  migrate:create:
+    desc: "Create new migration (use -- <name>)"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          printf "{{.RED}}[ERROR]{{.NC}} Provide migration name: task migrate:create -- <name>\n"
+          exit 1
+        fi
+        TIMESTAMP=$(date +%s)
+        UP_FILE="{{.MIGRATIONS_DIR}}/${TIMESTAMP}_{{.CLI_ARGS}}.up.sql"
+        DOWN_FILE="{{.MIGRATIONS_DIR}}/${TIMESTAMP}_{{.CLI_ARGS}}.down.sql"
+        cat > "$UP_FILE" << 'EOF'
+        -- Copyright 2025 Andrew Vasilyev
+        -- SPDX-License-Identifier: APACHE-2.0
+
+        EOF
+        cat > "$DOWN_FILE" << 'EOF'
+        -- Copyright 2025 Andrew Vasilyev
+        -- SPDX-License-Identifier: APACHE-2.0
+
+        EOF
+        printf "{{.GREEN}}[OK]{{.NC}} Created:\n"
+        echo "   $UP_FILE"
+        echo "   $DOWN_FILE"
+
+  format:
+    desc: "Format SQL files"
+    cmds:
+      - |
+        [ -d node_modules ] || yarn install
+        yarn format
+
+  format:check:
+    desc: "Check SQL formatting"
+    cmds:
+      - |
+        if [ ! -d node_modules ]; then
+          printf "{{.RED}}[ERROR]{{.NC}} Dependencies not installed. Run: task deps\n"
+          exit 1
+        fi
+        yarn format:check
+
+  lint:
+    desc: "Lint SQL files"
+    cmds:
+      - |
+        if ! command -v sqlfluff >/dev/null 2>&1; then
+          printf "{{.RED}}[ERROR]{{.NC}} sqlfluff not installed. Run from root: task tools:install:sqlfluff\n"
+          exit 1
+        fi
+        yarn lint
+
+  lint:fix:
+    desc: "Lint and auto-fix SQL files"
+    cmds:
+      - |
+        if ! command -v sqlfluff >/dev/null 2>&1; then
+          printf "{{.RED}}[ERROR]{{.NC}} sqlfluff not installed. Run from root: task tools:install:sqlfluff\n"
+          exit 1
+        fi
+        yarn lint:fix
+
+  shell:
+    desc: "Open PostgreSQL shell"
+    cmds:
+      - docker-compose -f ../docker-compose.dev.yaml exec postgres psql -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-nexus_db}
+
+  reset:
+    desc: "Reset database (WARNING: destroys all data)"
+    prompt: "This will delete all database data. Continue?"
+    cmds:
+      - docker-compose -f ../docker-compose.dev.yaml exec postgres psql -U ${POSTGRES_USER:-admin} -d postgres -c "DROP DATABASE IF EXISTS ${POSTGRES_DB:-nexus_db};"
+      - docker-compose -f ../docker-compose.dev.yaml exec postgres psql -U ${POSTGRES_USER:-admin} -d postgres -c "CREATE DATABASE ${POSTGRES_DB:-nexus_db};"
+      - task: migrate

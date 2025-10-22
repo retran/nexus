@@ -1,0 +1,103 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+version: "3"
+
+vars:
+  GREEN: \033[0;32m
+  RED: \033[0;31m
+  YELLOW: \033[0;33m
+  BLUE: \033[0;34m
+  NC: \033[0m
+
+silent: true
+
+tasks:
+  default:
+    desc: "Show available frontend tasks"
+    cmds:
+      - task --list-all
+
+  deps:
+    desc: "Install frontend dependencies"
+    cmds:
+      - |
+        if [ ! -d node_modules ]; then
+          echo "Installing frontend dependencies..."
+          yarn install
+          printf "{{.GREEN}}[OK]{{.NC}} Frontend dependencies installed\n"
+        else
+          printf "{{.GREEN}}[OK]{{.NC}} Frontend dependencies already installed\n"
+        fi
+
+  dev:
+    desc: "Start frontend development server"
+    cmds:
+      - yarn dev
+
+  build:
+    desc: "Build frontend for production"
+    cmds:
+      - yarn build
+      - printf "{{.GREEN}}[OK]{{.NC}} Frontend built successfully\n"
+
+  preview:
+    desc: "Preview production build"
+    cmds:
+      - yarn preview
+
+  format:
+    desc: "Format frontend code"
+    cmds:
+      - yarn format
+
+  format:check:
+    desc: "Check frontend code formatting"
+    cmds:
+      - yarn format:check
+
+  lint:
+    desc: "Lint frontend code"
+    cmds:
+      - yarn lint
+
+  lint:fix:
+    desc: "Lint and auto-fix frontend code"
+    cmds:
+      - yarn lint:fix
+
+  type-check:
+    desc: "Type check frontend code"
+    cmds:
+      - yarn type-check
+
+  test:
+    desc: "Run frontend tests"
+    cmds:
+      - yarn test
+
+  test:coverage:
+    desc: "Run frontend tests with coverage"
+    cmds:
+      - yarn test --coverage
+      - printf "{{.GREEN}}[OK]{{.NC}} Coverage report at coverage/index.html\n"
+
+  test:watch:
+    desc: "Run frontend tests in watch mode"
+    cmds:
+      - yarn test --watch
+
+  shell:
+    desc: "Open shell in frontend container"
+    cmds:
+      - docker-compose -f ../docker-compose.dev.yaml exec ui sh
+
+  clean:
+    desc: "Clean frontend build artifacts"
+    cmds:
+      - rm -rf dist/ build/ .vite/ coverage/
+
+  security:
+    desc: "Run security scan on frontend (yarn audit)"
+    cmds:
+      - yarn audit --level moderate
