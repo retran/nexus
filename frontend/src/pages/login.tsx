@@ -34,7 +34,7 @@ export const Login: React.FC = () => {
           type: 'standard',
         });
       } catch (error) {
-        console.log(error);
+        console.error('Login error:', error);
       }
     }, []);
 

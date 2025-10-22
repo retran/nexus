@@ -8,7 +8,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useGo, useResourceParams, useTranslate } from '@refinedev/core';
 import { ChevronLeft, InfoIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 
 /**
  * When the app is navigated to a non-existent route, refine shows a default error page.
@@ -17,26 +17,24 @@ import { useEffect, useState } from 'react';
  * @see {@link https://refine.dev/docs/packages/documentation/routers/} for more details.
  */
 export function ErrorComponent() {
-  const [errorMessage, setErrorMessage] = useState<string>();
-
   const translate = useTranslate();
   const go = useGo();
 
   const { resource, action } = useResourceParams();
 
-  useEffect(() => {
+  // Use useMemo instead of useState + useEffect for computed values
+  const errorMessage = useMemo(() => {
     if (resource && action) {
-      setErrorMessage(
-        translate(
-          'pages.error.info',
-          {
-            action: action,
-            resource: resource?.name,
-          },
-          `You may have forgotten to add the "${action}" component to "${resource?.name}" resource.`
-        )
+      return translate(
+        'pages.error.info',
+        {
+          action: action,
+          resource: resource?.name,
+        },
+        `You may have forgotten to add the "${action}" component to "${resource?.name}" resource.`
       );
     }
+    return undefined;
   }, [resource, action, translate]);
 
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useTheme } from '@/components/refine-ui/theme/theme-provider';
+import { useTheme } from '@/components/refine-ui/theme/use-theme';
 import { Toaster as Sonner, type ToasterProps } from 'sonner';
 
 export function Toaster({ ...props }: ToasterProps) {

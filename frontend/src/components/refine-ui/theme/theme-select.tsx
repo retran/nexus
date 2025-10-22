@@ -10,7 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Check, ChevronDown, Monitor, Moon, Sun } from 'lucide-react';
 import React from 'react';
-import { useTheme } from './theme-provider';
+import { useTheme } from './use-theme';
 
 type ThemeOption = {
   value: 'light' | 'dark' | 'system';

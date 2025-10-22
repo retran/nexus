@@ -328,7 +328,7 @@ tasks:
     dir: "{{.POSTGRES_DIR}}"
     cmds:
       - |
-        [ -d node_modules ] || npm install
+        [ -d node_modules ] || yarn install
         printf "{{.GREEN}}[OK]{{.NC}} Database tooling dependencies installed\n"
 
   db:migrate:
@@ -373,8 +373,8 @@ tasks:
     dir: "{{.POSTGRES_DIR}}"
     cmds:
       - |
-        [ -d node_modules ] || npm install
-        npm run format
+        [ -d node_modules ] || yarn install
+        yarn format
 
   db:format:check:
     desc: "Check SQL formatting"
@@ -385,7 +385,7 @@ tasks:
           printf "{{.RED}}[ERROR]{{.NC}} Dependencies not installed. Run: task db:deps\n"
           exit 1
         fi
-        npm run format:check
+        yarn format:check
 
   db:lint:
     desc: "Lint SQL files"
@@ -396,7 +396,7 @@ tasks:
           printf "{{.RED}}[ERROR]{{.NC}} sqlfluff not installed. Run: task tools:install:sqlfluff\n"
           exit 1
         fi
-        npm run lint
+        yarn lint
 
   db:lint:fix:
     desc: "Lint and auto-fix SQL files"
@@ -407,7 +407,7 @@ tasks:
           printf "{{.RED}}[ERROR]{{.NC}} sqlfluff not installed. Run: task tools:install:sqlfluff\n"
           exit 1
         fi
-        npm run lint:fix
+        yarn lint:fix
 
   db:shell:
     desc: "Open PostgreSQL shell"
