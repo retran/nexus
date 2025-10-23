@@ -467,6 +467,7 @@ generate:
 filter:
   ignore:
     - "**/*.lock"
+    - "**/package-lock.json"
     - "yarn.lock"
     - "go.sum"
     - "dist/**"
