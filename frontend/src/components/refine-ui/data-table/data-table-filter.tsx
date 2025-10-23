@@ -542,7 +542,6 @@ export function DataTableFilterDropdownDateSinglePicker<TData>({
               isApplyDisabled={!hasDate}
               onClear={() => {
                 column.setFilterValue(undefined);
-                column.setFilterValue(undefined);
                 setIsOpen(false);
               }}
               onApply={() => {
