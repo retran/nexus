@@ -18,11 +18,11 @@ import {
   SidebarHeader as ShadcnSidebarHeader,
   SidebarRail as ShadcnSidebarRail,
   SidebarTrigger as ShadcnSidebarTrigger,
-  useSidebar as useShadcnSidebar,
 } from '@/components/ui/sidebar';
+import { useSidebar as useShadcnSidebar } from '@/components/ui/use-sidebar';
 import { cn } from '@/lib/utils';
 import {
-  useLink,
+  useGo,
   useMenu,
   useRefineOptions,
   type TreeMenuItem,
@@ -169,7 +169,7 @@ function SidebarItemCollapsible({ item, selectedKey }: MenuItemProps) {
 
 function SidebarItemDropdown({ item, selectedKey }: MenuItemProps) {
   const { children } = item;
-  const Link = useLink();
+  const go = useGo();
 
   return (
     <DropdownMenu>
@@ -183,18 +183,21 @@ function SidebarItemDropdown({ item, selectedKey }: MenuItemProps) {
 
           return (
             <DropdownMenuItem key={childKey || child.name} asChild>
-              <Link
-                to={child.route || ''}
-                className={cn('flex w-full items-center gap-2', {
-                  'bg-accent text-accent-foreground': isSelected,
-                })}
+              <button
+                onClick={() => go({ to: child.route || '' })}
+                className={cn(
+                  'flex w-full cursor-pointer items-center gap-2 border-none bg-transparent p-2 text-left',
+                  {
+                    'bg-accent text-accent-foreground': isSelected,
+                  }
+                )}
               >
                 <ItemIcon
                   icon={child.meta?.icon ?? child.icon}
                   isSelected={isSelected}
                 />
                 <span>{getDisplayName(child)}</span>
-              </Link>
+              </button>
             </DropdownMenuItem>
           );
         })}
@@ -311,7 +314,7 @@ function SidebarButton({
   onClick,
   ...props
 }: SidebarButtonProps) {
-  const Link = useLink();
+  const go = useGo();
 
   const buttonContent = (
     <>
@@ -353,9 +356,12 @@ function SidebarButton({
       {...props}
     >
       {asLink && item.route ? (
-        <Link to={item.route} className={cn('flex w-full items-center gap-2')}>
+        <span
+          onClick={() => go({ to: item.route! })}
+          className={cn('flex w-full cursor-pointer items-center gap-2')}
+        >
           {buttonContent}
-        </Link>
+        </span>
       ) : (
         buttonContent
       )}

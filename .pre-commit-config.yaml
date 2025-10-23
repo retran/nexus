@@ -101,7 +101,7 @@ repos:
 
       - id: sql-prettier
         name: Prettier (SQL)
-        entry: bash -c 'cd postgres && npm run format'
+        entry: bash -c 'cd postgres && yarn format'
         language: system
         files: ^postgres/migrations/.*\.sql$
         pass_filenames: false

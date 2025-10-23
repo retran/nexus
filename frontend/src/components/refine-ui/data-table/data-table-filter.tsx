@@ -477,20 +477,27 @@ export function DataTableFilterDropdownDateSinglePicker<TData>({
     return date;
   };
 
-  const [filterValue, setFilterValue] = useState<Date | undefined>(() =>
-    parseDate(columnFilterValue)
+  // Use computed value instead of state synchronization
+  const filterValue = useMemo(
+    () => parseDate(columnFilterValue),
+    [columnFilterValue]
   );
 
   useEffect(() => {
-    column.columnDef.meta = {
-      ...column.columnDef.meta,
-      filterOperator: defaultOperator,
-    };
+    // Use callback instead of direct mutation
+    if (column.columnDef.meta) {
+      const currentMeta = column.columnDef.meta;
+      const newMeta = {
+        ...currentMeta,
+        filterOperator: defaultOperator,
+      };
+      // Only update if different to avoid unnecessary re-renders
+      const metaWithOperator = currentMeta as { filterOperator?: string };
+      if (metaWithOperator.filterOperator !== defaultOperator) {
+        Object.assign(column.columnDef.meta, newMeta);
+      }
+    }
   }, [defaultOperator, column]);
-
-  useEffect(() => {
-    setFilterValue(parseDate(columnFilterValue));
-  }, [columnFilterValue]);
 
   const hasDate = !!filterValue;
 
@@ -522,7 +529,7 @@ export function DataTableFilterDropdownDateSinglePicker<TData>({
               mode="single"
               selected={filterValue}
               onSelect={(date) => {
-                setFilterValue(date);
+                column.setFilterValue(date);
               }}
             />
 
@@ -535,7 +542,6 @@ export function DataTableFilterDropdownDateSinglePicker<TData>({
               isApplyDisabled={!hasDate}
               onClear={() => {
                 column.setFilterValue(undefined);
-                setFilterValue(undefined);
                 setIsOpen(false);
               }}
               onApply={() => {
@@ -647,7 +653,6 @@ export function DataTableFilterDropdownDateRangePicker<TData>({
               isApplyDisabled={!hasDateRange}
               onClear={() => {
                 column.setFilterValue(undefined);
-                setFilterValue(undefined);
                 setIsOpen(false);
               }}
               onApply={() => {
@@ -713,10 +718,15 @@ export function DataTableFilterInput<TData>({
 
   const handleOperatorChange = (value: CrudOperators) => {
     setOperator(value);
-    columnFromProps.columnDef.meta = {
-      ...columnFromProps.columnDef.meta,
-      filterOperator: value,
-    };
+    // Use callback instead of direct mutation
+    if (columnFromProps.columnDef.meta) {
+      const currentMeta = columnFromProps.columnDef.meta;
+      const newMeta = {
+        ...currentMeta,
+        filterOperator: value,
+      };
+      Object.assign(columnFromProps.columnDef.meta, newMeta);
+    }
   };
 
   return (

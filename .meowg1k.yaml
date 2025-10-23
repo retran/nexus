@@ -467,6 +467,7 @@ generate:
 filter:
   ignore:
     - "**/*.lock"
+    - "**/package-lock.json"
     - "yarn.lock"
     - "go.sum"
     - "dist/**"
@@ -702,7 +703,7 @@ summarize:
 
     - match: "**/package.json"
       systemPrompt: |
-        Summarize the npm package changes in 1-2 sentences.
+        Summarize the yarn package changes in 1-2 sentences.
         Focus on dependencies, scripts, or configuration modified.
 
     - match: "**/*.md"

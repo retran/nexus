@@ -19,14 +19,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { useLink, useLogin, useRefineOptions } from '@refinedev/core';
+import { useGo, useLogin, useRefineOptions } from '@refinedev/core';
 
 export const SignInForm = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const Link = useLink();
+  const go = useGo();
 
   const { title } = useRefineOptions();
 
@@ -138,8 +138,9 @@ export const SignInForm = () => {
                 />
                 <Label htmlFor="remember">Remember me</Label>
               </div>
-              <Link
-                to="/forgot-password"
+              <button
+                type="button"
+                onClick={() => go({ to: '/forgot-password' })}
                 className={cn(
                   'text-sm',
                   'flex',
@@ -147,12 +148,15 @@ export const SignInForm = () => {
                   'gap-2',
                   'text-primary hover:underline',
                   'text-blue-600',
-                  'dark:text-blue-400'
+                  'dark:text-blue-400',
+                  'bg-transparent',
+                  'border-none',
+                  'cursor-pointer'
                 )}
               >
                 <span>Forgot password</span>
                 <CircleHelp className={cn('w-4', 'h-4')} />
-              </Link>
+              </button>
             </div>
 
             <Button type="submit" size="lg" className={cn('w-full', 'mt-6')}>
@@ -223,17 +227,21 @@ export const SignInForm = () => {
             <span className={cn('text-sm', 'text-muted-foreground')}>
               No account?{' '}
             </span>
-            <Link
-              to="/register"
+            <button
+              type="button"
+              onClick={() => go({ to: '/register' })}
               className={cn(
                 'text-green-600',
                 'dark:text-green-400',
                 'font-semibold',
-                'underline'
+                'underline',
+                'bg-transparent',
+                'border-none',
+                'cursor-pointer'
               )}
             >
               Sign up
-            </Link>
+            </button>
           </div>
         </CardFooter>
       </Card>

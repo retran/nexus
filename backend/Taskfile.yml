@@ -1,0 +1,107 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+version: "3"
+
+vars:
+  GREEN: \033[0;32m
+  RED: \033[0;31m
+  YELLOW: \033[0;33m
+  BLUE: \033[0;34m
+  NC: \033[0m
+
+silent: true
+
+tasks:
+  default:
+    desc: "Show available backend tasks"
+    cmds:
+      - task --list-all
+
+  deps:
+    desc: "Install backend dependencies"
+    cmds:
+      - |
+        if [ ! -f go.sum ]; then
+          echo "Installing Go dependencies..."
+          go mod download
+          printf "{{.GREEN}}[OK]{{.NC}} Backend dependencies installed\n"
+        else
+          printf "{{.GREEN}}[OK]{{.NC}} Backend dependencies already installed\n"
+        fi
+
+  build:
+    desc: "Build backend binary"
+    cmds:
+      - go build -o bin/nexus ./cmd/nexus
+      - printf "{{.GREEN}}[OK]{{.NC}} Built bin/nexus\n"
+
+  tidy:
+    desc: "Tidy backend dependencies"
+    cmds:
+      - go mod tidy
+
+  format:
+    desc: "Format backend code"
+    cmds:
+      - go fmt ./...
+
+  lint:
+    desc: "Lint backend code"
+    cmds:
+      - |
+        if ! command -v golangci-lint >/dev/null; then
+          printf "{{.RED}}[ERROR]{{.NC}} golangci-lint not installed. Run from root: task tools:install:golangci\n"
+          exit 1
+        fi
+        golangci-lint run ./...
+
+  lint:fix:
+    desc: "Lint and auto-fix backend code"
+    cmds:
+      - |
+        if ! command -v golangci-lint >/dev/null; then
+          printf "{{.RED}}[ERROR]{{.NC}} golangci-lint not installed. Run from root: task tools:install:golangci\n"
+          exit 1
+        fi
+        golangci-lint run --fix ./...
+
+  test:
+    desc: "Run backend tests"
+    cmds:
+      - go test -v -race ./...
+
+  test:coverage:
+    desc: "Run backend tests with coverage"
+    cmds:
+      - go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+      - go tool cover -html=coverage.out -o coverage.html
+      - printf "{{.GREEN}}[OK]{{.NC}} Coverage report at coverage.html\n"
+
+  shell:
+    desc: "Open shell in backend container"
+    cmds:
+      - docker-compose -f ../docker-compose.dev.yaml exec api sh
+
+  clean:
+    desc: "Clean backend build artifacts"
+    cmds:
+      - rm -rf tmp/ bin/ *.log coverage.out coverage.html
+
+  security:
+    desc: "Run security scan on backend (gosec + govulncheck)"
+    cmds:
+      - |
+        echo "Running gosec..."
+        if ! command -v gosec >/dev/null; then
+          echo "Installing gosec..."
+          go install github.com/secureco/gosec/v2/cmd/gosec@latest
+        fi
+        gosec ./...
+      - |
+        echo "Running govulncheck..."
+        if ! command -v govulncheck >/dev/null; then
+          echo "Installing govulncheck..."
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+        fi
+        govulncheck ./...

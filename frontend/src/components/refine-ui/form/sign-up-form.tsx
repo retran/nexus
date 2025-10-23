@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import {
-  useLink,
+  useGo,
   useNotification,
   useRefineOptions,
   useRegister,
@@ -30,7 +30,7 @@ export const SignUpForm = () => {
 
   const { open } = useNotification();
 
-  const Link = useLink();
+  const go = useGo();
 
   const { title } = useRefineOptions();
 
@@ -225,17 +225,21 @@ export const SignUpForm = () => {
             <span className={cn('text-sm', 'text-muted-foreground')}>
               Have an account?{' '}
             </span>
-            <Link
-              to="/login"
+            <button
+              type="button"
+              onClick={() => go({ to: '/login' })}
               className={cn(
                 'text-blue-600',
                 'dark:text-blue-400',
                 'font-semibold',
-                'underline'
+                'underline',
+                'bg-transparent',
+                'border-none',
+                'cursor-pointer'
               )}
             >
               Sign in
-            </Link>
+            </button>
           </div>
         </CardFooter>
       </Card>

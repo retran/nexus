@@ -14,12 +14,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { useForgotPassword, useLink, useRefineOptions } from '@refinedev/core';
+import { useForgotPassword, useGo, useRefineOptions } from '@refinedev/core';
 
 export const ForgotPasswordForm = () => {
   const [email, setEmail] = useState('');
 
-  const Link = useLink();
+  const go = useGo();
 
   const { title } = useRefineOptions();
 
@@ -104,8 +104,9 @@ export const ForgotPasswordForm = () => {
           </form>
 
           <div className={cn('mt-8')}>
-            <Link
-              to="/login"
+            <button
+              type="button"
+              onClick={() => go({ to: '/login' })}
               className={cn(
                 'inline-flex',
                 'items-center',
@@ -113,12 +114,15 @@ export const ForgotPasswordForm = () => {
                 'text-sm',
                 'text-muted-foreground',
                 'hover:text-foreground',
-                'transition-colors'
+                'transition-colors',
+                'bg-transparent',
+                'border-none',
+                'cursor-pointer'
               )}
             >
               <ArrowLeft className={cn('w-4', 'h-4')} />
               <span>Back</span>
-            </Link>
+            </button>
           </div>
         </CardContent>
       </Card>
