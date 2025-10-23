@@ -653,7 +653,6 @@ export function DataTableFilterDropdownDateRangePicker<TData>({
               isApplyDisabled={!hasDateRange}
               onClear={() => {
                 column.setFilterValue(undefined);
-                column.setFilterValue(undefined);
                 setIsOpen(false);
               }}
               onApply={() => {
