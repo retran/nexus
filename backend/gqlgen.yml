@@ -1,0 +1,46 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+# Where are all the schema files located? globs are supported eg  src/**/*.graphqls
+schema:
+  - internal/api/graphql/schema.graphql
+
+# Where should the generated server code go?
+exec:
+  filename: internal/api/graphql/generated.go
+  package: graphql
+
+# Where should any generated models go?
+model:
+  filename: internal/api/graphql/model/models.go
+  package: model
+
+# Where should the resolver implementations go?
+resolver:
+  layout: follow-schema
+  dir: internal/api/graphql/resolvers
+  package: resolvers
+
+# Optional: turn on to not generate builtin scalars
+# omit_builtin_scalars: false
+
+# Optional: turn on to use struct pointers in models
+# struct_tag: json
+
+# Optional: turn on to panic if type doesn't exist
+# strict_mode: false
+
+# gqlgen will search for any type names in the schema in these go packages
+# if they match it will use them, otherwise it will generate them.
+autobind:
+  - "github.com/retran/nexus/backend/internal/repository/postgres"
+
+# This section declares type mapping between GraphQL and Go types
+models:
+  # Map our enums to the generated sqlc types
+  UserRole:
+    model:
+      - github.com/retran/nexus/backend/internal/repository/postgres.UserRole
+  OAuthProvider:
+    model:
+      - github.com/retran/nexus/backend/internal/repository/postgres.OauthProvider

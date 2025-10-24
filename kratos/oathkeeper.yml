@@ -1,0 +1,85 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+# Ory Oathkeeper Configuration for Kratos Forward Auth
+
+version: v0.40.7
+
+serve:
+  proxy:
+    port: 4455
+    cors:
+      enabled: true
+      allowed_origins:
+        - "*"
+      allowed_methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+      allowed_headers:
+        - Authorization
+        - Content-Type
+        - Cookie
+      exposed_headers:
+        - Content-Type
+        - Set-Cookie
+
+  api:
+    port: 4456
+
+access_rules:
+  repositories:
+    - file:///etc/config/access-rules.yml
+
+errors:
+  fallback:
+    - json
+  handlers:
+    json:
+      enabled: true
+      config:
+        verbose: true
+    redirect:
+      enabled: true
+      config:
+        to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
+
+authenticators:
+  cookie_session:
+    enabled: true
+    config:
+      check_session_url: http://kratos:4433/sessions/whoami
+      preserve_path: true
+      extra_from: "@this"
+      subject_from: "identity.id"
+      only:
+        - ory_session_*
+
+  noop:
+    enabled: true
+
+authorizers:
+  allow:
+    enabled: true
+
+mutators:
+  noop:
+    enabled: true
+
+  header:
+    enabled: true
+    config:
+      headers:
+        X-User: "{{ print .Extra.identity.traits.email }}"
+        X-User-Id: "{{ print .Subject }}"
+        X-User-Name: "{{ print .Extra.identity.traits.name.first }} {{ print .Extra.identity.traits.name.last }}"

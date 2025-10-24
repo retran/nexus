@@ -10,4 +10,13 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    host: true,
+    port: 5173,
+    strictPort: true,
+    hmr: {
+      clientPort: 80,
+      host: "nexus.local",
+    },
+  },
 });

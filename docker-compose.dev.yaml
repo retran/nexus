@@ -19,6 +19,147 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=5432"
+
+  # PostgreSQL Exporter - metrics for Postgres
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    restart: always
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+    ports:
+      - "9187:9187"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=9187"
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis-dev-password}
+    volumes:
+      - redis_dev_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=6379"
+
+  # Redis Exporter - metrics for Redis
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    restart: always
+    environment:
+      - REDIS_ADDR=redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis-dev-password}
+    ports:
+      - "9121:9121"
+    depends_on:
+      redis:
+        condition: service_healthy
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=9121"
+
+  traefik:
+    image: traefik:v3.0
+    restart: always
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--log.level=INFO"
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.addEntryPointsLabels=true"
+      - "--metrics.prometheus.addRoutersLabels=true"
+      - "--metrics.prometheus.addServicesLabels=true"
+    ports:
+      - "80:80"
+      - "8090:8080" # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.nexus.local`)"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.middlewares=kratos-auth@docker"
+      - "prometheus.scrape=true"
+      - "prometheus.port=8080"
+      - "prometheus.path=/metrics"
+
+  # Ory Kratos - Identity & User Management for SSO
+  kratos:
+    image: oryd/kratos:v1.2.0
+    restart: always
+    env_file: .env
+    environment:
+      - DSN=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable&max_conns=20&max_idle_conns=4
+    volumes:
+      - ./kratos:/etc/config/kratos
+    command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
+    expose:
+      - "4433"  # Public API
+      - "4434"  # Admin API
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      # Public API for self-service flows
+      - "traefik.http.routers.kratos-public.rule=Host(`auth.nexus.local`) && PathPrefix(`/`)"
+      - "traefik.http.routers.kratos-public.entrypoints=web"
+      - "traefik.http.services.kratos-public.loadbalancer.server.port=4433"
+
+  # Kratos Self-Service UI - Login/Registration pages
+  kratos-selfservice-ui:
+    image: oryd/kratos-selfservice-ui-node:latest
+    restart: always
+    environment:
+      - KRATOS_PUBLIC_URL=http://kratos:4433
+      - KRATOS_BROWSER_URL=http://auth.nexus.local
+      - PORT=3000
+      - SECURITY_MODE=
+    expose:
+      - "3000"
+    depends_on:
+      - kratos
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kratos-ui.rule=Host(`auth.nexus.local`)"
+      - "traefik.http.routers.kratos-ui.entrypoints=web"
+      - "traefik.http.services.kratos-ui.loadbalancer.server.port=3000"
+
+  # Kratos Forward Auth - Middleware for Traefik SSO protection
+  kratos-forward-auth:
+    image: oryd/oathkeeper:v0.40.7
+    restart: always
+    command: serve proxy -c /etc/config/oathkeeper.yml
+    environment:
+      - LOG_LEVEL=info
+    volumes:
+      - ./kratos:/etc/config
+    expose:
+      - "4455"  # Proxy port for forward auth
+    depends_on:
+      - kratos
+    labels:
+      - "traefik.enable=true"
+      # Forward Auth middleware definition
+      - "traefik.http.middlewares.kratos-auth.forwardauth.address=http://kratos-forward-auth:4455/decisions"
+      - "traefik.http.middlewares.kratos-auth.forwardauth.trustForwardHeader=true"
+      - "traefik.http.middlewares.kratos-auth.forwardauth.authResponseHeaders=X-User,X-User-Id"
 
   temporal:
     image: temporalio/auto-setup:latest
@@ -28,79 +169,258 @@ services:
       - "8088:8088"
     env_file: .env
     environment:
-      - DB=postgres
+      - DB=postgres12_pgx
       - DB_PORT=5432
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PWD=${POSTGRES_PASSWORD}
       - POSTGRES_SEEDS=postgres
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamic_config.yaml
+      - PROMETHEUS_ENDPOINT=0.0.0.0:8000
     depends_on:
       postgres:
         condition: service_healthy
-
-  api:
+    labels:
+      - "prometheus.scrape=true"
+      - "prometheus.port=8000"
+      - "prometheus.path=/metrics"
+  # GraphQL API (internal service)
+  api-server:
     build:
       context: ./backend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile.api-server.dev
     restart: always
-    ports:
-      - "8000:8000"
-      - "2345:2345"
+    expose:
+      - "8081"
     env_file: .env
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - SERVER_PORT=8081
     volumes:
       - ./backend:/app
-    command: ["air", "-c", ".air.toml"]
     depends_on:
-      - postgres
-      - temporal
+      postgres:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-server.rule=Host(`graphql.nexus.local`)"
+      - "traefik.http.routers.api-server.entrypoints=web"
+      - "traefik.http.services.api-server.loadbalancer.server.port=8081"
 
+  # REST API Gateway (Backend for Frontend)
+  gateway:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.gateway.dev
+    restart: always
+    expose:
+      - "8080"
+    env_file: .env
+    environment:
+      - GRAPHQL_ENDPOINT=http://api-server:8081/graphql
+      - SERVER_PORT=8080
+      - ALLOWED_ORIGINS=http://nexus.local,http://localhost
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis-dev-password}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - FRONTEND_URL=${FRONTEND_URL:-http://nexus.local}
+      - RATE_LIMIT_OAUTH=${RATE_LIMIT_OAUTH:-5}
+      - RATE_LIMIT_HEALTH=${RATE_LIMIT_HEALTH:-60}
+      - RATE_LIMIT_API=${RATE_LIMIT_API:-300}
+      - RATE_LIMIT_ADMIN=${RATE_LIMIT_ADMIN:-100}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      api-server:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      traefik:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gateway.rule=Host(`api.nexus.local`)"
+      - "traefik.http.routers.gateway.entrypoints=web"
+      - "traefik.http.services.gateway.loadbalancer.server.port=8080"
+      # Rate limiting at Traefik level (DDoS protection)
+      - "traefik.http.middlewares.gateway-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.gateway-ratelimit.ratelimit.period=1s"
+      - "traefik.http.middlewares.gateway-ratelimit.ratelimit.burst=50"
+      - "traefik.http.routers.gateway.middlewares=kratos-auth@docker,gateway-ratelimit"
+
+  # Temporal Worker
   worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile.worker.dev
     restart: always
     env_file: .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - TEMPORAL_NAMESPACE=default
+      - TEMPORAL_TASK_QUEUE=nexus-task-queue
     volumes:
       - ./backend:/app
-    # Note: You will need a separate .air.worker.toml for the worker
-    # command: ["air", "-c", ".air.worker.toml"]
-    # For now, we keep it simple and comment it out.
     depends_on:
-      - postgres
-      - temporal
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
 
   ui:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
     restart: always
-    ports:
-      - "3000:3000"
+    expose:
+      - "5173"
     env_file: .env
+    environment:
+      - VITE_API_URL=http://api.nexus.local
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      - api
+      gateway:
+        condition: service_started
+      traefik:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ui.rule=Host(`nexus.local`)"
+      - "traefik.http.routers.ui.entrypoints=web"
+      - "traefik.http.services.ui.loadbalancer.server.port=5173"
+      # Rate limiting for frontend (protect against scraping/abuse)
+      - "traefik.http.middlewares.ui-ratelimit.ratelimit.average=50"
+      - "traefik.http.middlewares.ui-ratelimit.ratelimit.period=1s"
+      - "traefik.http.middlewares.ui-ratelimit.ratelimit.burst=100"
+      - "traefik.http.routers.ui.middlewares=kratos-auth@docker,ui-ratelimit"
 
-  migrations:
-    image: migrate/migrate
+  # VictoriaMetrics - Prometheus-compatible time-series database
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:latest
+    restart: always
+    ports:
+      - "8428:8428"
+    volumes:
+      - victoriametrics_data:/victoria-metrics-data
+      - ./observability/prometheus-config.yaml:/etc/prometheus/prometheus.yml
+    command:
+      - "--storageDataPath=/victoria-metrics-data"
+      - "--httpListenAddr=:8428"
+      - "--retentionPeriod=90d"
+      - "--promscrape.config=/etc/prometheus/prometheus.yml"
+    depends_on:
+      - postgres-exporter
+      - redis-exporter
+      - traefik
+      - temporal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.victoriametrics.rule=Host(`metrics.nexus.local`)"
+      - "traefik.http.routers.victoriametrics.entrypoints=web"
+      - "traefik.http.services.victoriametrics.loadbalancer.server.port=8428"
+      - "traefik.http.routers.victoriametrics.middlewares=kratos-auth@docker"
+
+  # VictoriaLogs - Log aggregation system
+  victorialogs:
+    image: victoriametrics/victoria-logs:latest
+    restart: always
+    ports:
+      - "9428:9428"
+    volumes:
+      - victorialogs_data:/victoria-logs-data
+    command:
+      - "--storageDataPath=/victoria-logs-data"
+      - "--httpListenAddr=:9428"
+      - "--retentionPeriod=30d"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.victorialogs.rule=Host(`logs.nexus.local`)"
+      - "traefik.http.routers.victorialogs.entrypoints=web"
+      - "traefik.http.services.victorialogs.loadbalancer.server.port=9428"
+      - "traefik.http.routers.victorialogs.middlewares=kratos-auth@docker"
+
+  # VictoriaTraces - Distributed tracing backend
+  victoriatraces:
+    image: victoriametrics/victoria-traces:latest
+    restart: always
+    ports:
+      - "4318:4318" # OpenTelemetry HTTP
+      - "14268:14268" # Jaeger HTTP
+      - "9411:9411" # Zipkin
+    environment:
+      - STORAGE_TYPE=victoria-metrics
+      - STORAGE_VICTORIA_METRICS_URL=http://victoriametrics:8428
+    depends_on:
+      - victoriametrics
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.victoriatraces.rule=Host(`traces.nexus.local`)"
+      - "traefik.http.routers.victoriatraces.entrypoints=web"
+      - "traefik.http.services.victoriatraces.loadbalancer.server.port=4318"
+      - "traefik.http.routers.victoriatraces.middlewares=kratos-auth@docker"
+
+  # Promtail - Log shipping agent for Docker containers
+  promtail:
+    image: grafana/promtail:latest
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./observability/promtail-config.yaml:/etc/promtail/config.yaml
+    command: -config.file=/etc/promtail/config.yaml
+    depends_on:
+      - victorialogs
+
+  # Grafana - Unified observability dashboard
+  grafana:
+    image: grafana/grafana:latest
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=http://grafana.nexus.local
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - victoriametrics
+      - victorialogs
+      - victoriatraces
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.nexus.local`)"
+      - "traefik.http.routers.grafana.entrypoints=web"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+      - "traefik.http.routers.grafana.middlewares=kratos-auth@docker"
+
+  atlas:
+    image: arigaio/atlas:latest
     profiles:
       - tools
     volumes:
-      - ./postgres/migrations:/migrations
-    command:
-      [
-        "-path",
-        "/migrations",
-        "-database",
-        "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable",
-        "up",
-      ]
+      - ./postgres:/app
+    working_dir: /app
     env_file: .env
+    command: ["version"]
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
   postgres_dev_data:
+  redis_dev_data:
+  victoriametrics_data:
+  victorialogs_data:
+  grafana_data:

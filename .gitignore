@@ -17,7 +17,7 @@ frontend/yarn-error.log*
 frontend/pnpm-debug.log*
 frontend/.vite/
 backend/tmp/
-backend/server
+backend/bin
 *.exe
 *.out
 backend/*.log

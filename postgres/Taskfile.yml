@@ -6,10 +6,17 @@ version: "3"
 vars:
   GREEN: \033[0;32m
   RED: \033[0;31m
-  YELLOW: \033[0;33m
-  BLUE: \033[0;34m
   NC: \033[0m
-  MIGRATIONS_DIR: migrations
+  SCHEMA_PATH: "file:///app/schema.hcl"
+  MIGRATIONS_PATH: "file:///app/migrations"
+  POSTGRES_USER:
+    sh: echo "${POSTGRES_USER:-admin}"
+  POSTGRES_PASSWORD:
+    sh: echo "${POSTGRES_PASSWORD:-SUPER_SECRET_PASSWORD}"
+  POSTGRES_DB:
+    sh: echo "${POSTGRES_DB:-nexus_db}"
+  DB_URL: "postgres://{{.POSTGRES_USER}}:{{.POSTGRES_PASSWORD}}@postgres:5432/{{.POSTGRES_DB}}?sslmode=disable"
+  DEV_DB_URL: "postgres://{{.POSTGRES_USER}}:{{.POSTGRES_PASSWORD}}@postgres:5432/{{.POSTGRES_DB}}_dev?sslmode=disable"
 
 silent: true
 
@@ -20,85 +27,119 @@ tasks:
       - task --list-all
 
   deps:
-    desc: "Install database tooling dependencies"
+    desc: "Install database tooling dependencies (e.g., for sqlfluff via yarn)"
     cmds:
       - |
-        [ -d node_modules ] || yarn install
-        printf "{{.GREEN}}[OK]{{.NC}} Database tooling dependencies installed\n"
+        if [ -f "package.json" ]; then
+          [ -d node_modules ] || yarn install
+          printf "{{.GREEN}}[OK]{{.NC}} Database tooling dependencies installed\n"
+        else
+          printf "{{.GREEN}}[OK]{{.NC}} No package.json found, skipping dependency installation.\n"
+        fi
 
-  migrate:
-    desc: "Run database migrations"
+  dev:ensure:
+    desc: "Ensure dev database exists"
     cmds:
-      - docker-compose -f ../docker-compose.dev.yaml --profile tools run --rm migrations up
-      - printf "{{.GREEN}}[OK]{{.NC}} Migrations applied\n"
+      - |
+        docker-compose -f ../docker-compose.dev.yaml exec postgres psql -U ${POSTGRES_USER:-admin} -d postgres -c "CREATE DATABASE ${POSTGRES_DB:-nexus_db}_dev;" 2>/dev/null || true
+        printf "{{.GREEN}}[OK]{{.NC}} Dev database ready\n"
+    silent: true
 
-  migrate:down:
-    desc: "Rollback last migration"
+  schema:fmt:
+    desc: "Format schema.hcl file"
     cmds:
-      - docker-compose -f ../docker-compose.dev.yaml --profile tools run --rm migrations down 1
-      - printf "{{.GREEN}}[OK]{{.NC}} Migration rolled back\n"
+      - docker-compose -f ../docker-compose.dev.yaml --profile tools run --rm atlas schema fmt .
+      - printf "{{.GREEN}}[OK]{{.NC}} Schema formatted\n"
 
-  migrate:create:
-    desc: "Create new migration (use -- <name>)"
+  schema:lint:
+    desc: "Lint schema file against potential issues"
+    cmds:
+      - task: dev:ensure
+      - docker-compose -f ../docker-compose.dev.yaml --profile tools run --rm atlas schema lint --dev-url {{.DEV_DB_URL}} --latest 1
+      - printf "{{.GREEN}}[OK]{{.NC}} Schema linted\n"
+
+  schema:diff:
+    desc: "Generate new migration from schema changes (use -- <name>)"
     cmds:
       - |
         if [ -z "{{.CLI_ARGS}}" ]; then
-          printf "{{.RED}}[ERROR]{{.NC}} Provide migration name: task migrate:create -- <name>\n"
+          printf "{{.RED}}[ERROR]{{.NC}} Provide migration name: task schema:diff -- <name>\n"
           exit 1
         fi
-        TIMESTAMP=$(date +%s)
-        UP_FILE="{{.MIGRATIONS_DIR}}/${TIMESTAMP}_{{.CLI_ARGS}}.up.sql"
-        DOWN_FILE="{{.MIGRATIONS_DIR}}/${TIMESTAMP}_{{.CLI_ARGS}}.down.sql"
-        cat > "$UP_FILE" << 'EOF'
+      - task: dev:ensure
+      - |
+        docker-compose -f ../docker-compose.dev.yaml --profile tools run --rm atlas migrate diff {{.CLI_ARGS}} \
+          --dir {{.MIGRATIONS_PATH}} \
+          --to {{.SCHEMA_PATH}} \
+          --dev-url {{.DEV_DB_URL}}
+        printf "{{.GREEN}}[OK]{{.NC}} Migration '{{.CLI_ARGS}}' generated\n"
+        printf "Running formatter on new migration file...\n"
+      - task: lint:fix
+      - task: migrate:hash
+
+  migrate:new:
+    desc: "Create new empty migration file (use -- <name>)"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          printf "{{.RED}}[ERROR]{{.NC}} Provide migration name: task migrate:new -- <name>\n"
+          exit 1
+        fi
+        TIMESTAMP=$(date +%Y%m%d%H%M%S)
+        FILENAME="migrations/${TIMESTAMP}_{{.CLI_ARGS}}.sql"
+        cat > "$FILENAME" << 'EOF'
         -- Copyright 2025 Andrew Vasilyev
         -- SPDX-License-Identifier: APACHE-2.0
 
-        EOF
-        cat > "$DOWN_FILE" << 'EOF'
-        -- Copyright 2025 Andrew Vasilyev
-        -- SPDX-License-Identifier: APACHE-2.0
+        -- TODO: Add your migration SQL here
 
         EOF
-        printf "{{.GREEN}}[OK]{{.NC}} Created:\n"
-        echo "   $UP_FILE"
-        echo "   $DOWN_FILE"
+        printf "{{.GREEN}}[OK]{{.NC}} Created migration file:\n"
+        echo "   $FILENAME"
+        printf "{{.YELLOW}}[NOTE]{{.NC}} Don't forget to run 'task migrate:hash' after editing\n"
 
-  format:
-    desc: "Format SQL files"
+  migrate:hash:
+    desc: "Update migration hash file (atlas.sum)"
     cmds:
       - |
-        [ -d node_modules ] || yarn install
-        yarn format
+        docker-compose -f ../docker-compose.dev.yaml --profile tools run --rm atlas migrate hash --dir {{.MIGRATIONS_PATH}}
+        printf "{{.GREEN}}[OK]{{.NC}} Migration hashes updated\n"
 
-  format:check:
-    desc: "Check SQL formatting"
+  migrate:status:
+    desc: "Show migration status"
     cmds:
-      - |
-        if [ ! -d node_modules ]; then
-          printf "{{.RED}}[ERROR]{{.NC}} Dependencies not installed. Run: task deps\n"
-          exit 1
-        fi
-        yarn format:check
+      - docker-compose -f ../docker-compose.dev.yaml --profile tools run --rm atlas migrate status --url {{.DB_URL}}
+
+  migrate:apply:
+    desc: "Apply all pending migrations to the database"
+    cmds:
+      - docker-compose -f ../docker-compose.dev.yaml --profile tools run --rm atlas migrate apply --url {{.DB_URL}}
+      - printf "{{.GREEN}}[OK]{{.NC}} Migrations applied\n"
+
+  schema:apply:
+    desc: "Alias for migrate:apply"
+    cmds:
+      - task: migrate:apply
 
   lint:
-    desc: "Lint SQL files"
+    desc: "Lint SQL files (migrations and queries)"
     cmds:
-      - |
-        if ! command -v sqlfluff >/dev/null 2>&1; then
-          printf "{{.RED}}[ERROR]{{.NC}} sqlfluff not installed. Run from root: task tools:install:sqlfluff\n"
-          exit 1
-        fi
-        yarn lint
+      - yarn lint
 
   lint:fix:
     desc: "Lint and auto-fix SQL files"
     cmds:
-      - |
-        if ! command -v sqlfluff >/dev/null 2>&1; then
-          printf "{{.RED}}[ERROR]{{.NC}} sqlfluff not installed. Run from root: task tools:install:sqlfluff\n"
-          exit 1
-        fi
-        yarn lint:fix
+      - yarn lint:fix
+
+  format:
+    desc: "Alias for lint:fix"
+    cmds:
+      - task: lint:fix
+
+  format:check:
+    desc: "Alias for lint"
+    cmds:
+      - task: lint
 
   shell:
     desc: "Open PostgreSQL shell"
@@ -111,4 +152,4 @@ tasks:
     cmds:
       - docker-compose -f ../docker-compose.dev.yaml exec postgres psql -U ${POSTGRES_USER:-admin} -d postgres -c "DROP DATABASE IF EXISTS ${POSTGRES_DB:-nexus_db};"
       - docker-compose -f ../docker-compose.dev.yaml exec postgres psql -U ${POSTGRES_USER:-admin} -d postgres -c "CREATE DATABASE ${POSTGRES_DB:-nexus_db};"
-      - task: migrate
+      - task: migrate:apply

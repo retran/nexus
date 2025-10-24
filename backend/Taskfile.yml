@@ -31,15 +31,71 @@ tasks:
         fi
 
   build:
-    desc: "Build backend binary"
+    desc: "Build all backend binaries"
     cmds:
-      - go build -o bin/nexus ./cmd/nexus
-      - printf "{{.GREEN}}[OK]{{.NC}} Built bin/nexus\n"
+      - go build -o bin/api-server ./cmd/api-server
+      - go build -o bin/gateway ./cmd/gateway
+      - go build -o bin/worker ./cmd/worker
+      - printf "{{.GREEN}}[OK]{{.NC}} Built bin/api-server, bin/gateway, and bin/worker\n"
+
+  build:api-server:
+    desc: "Build GraphQL API server"
+    cmds:
+      - go build -o bin/api-server ./cmd/api-server
+      - printf "{{.GREEN}}[OK]{{.NC}} Built bin/api-server\n"
+
+  build:gateway:
+    desc: "Build REST API gateway"
+    cmds:
+      - go build -o bin/gateway ./cmd/gateway
+      - printf "{{.GREEN}}[OK]{{.NC}} Built bin/gateway\n"
+
+  build:worker:
+    desc: "Build Temporal worker"
+    cmds:
+      - go build -o bin/worker ./cmd/worker
+      - printf "{{.GREEN}}[OK]{{.NC}} Built bin/worker\n"
 
   tidy:
     desc: "Tidy backend dependencies"
     cmds:
       - go mod tidy
+
+  db:generate:
+    desc: "Generate Go code from SQL queries using sqlc"
+    cmds:
+      - |
+        if ! command -v sqlc >/dev/null; then
+          printf "{{.RED}}[ERROR]{{.NC}} sqlc not installed. Install: brew install sqlc or go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest\n"
+          exit 1
+        fi
+        sqlc generate
+        printf "{{.GREEN}}[OK]{{.NC}} Generated database code in internal/db/\n"
+
+  graphql:generate:
+    desc: "Generate GraphQL server code using gqlgen"
+    cmds:
+      - |
+        if ! command -v gqlgen >/dev/null; then
+          printf "{{.RED}}[ERROR]{{.NC}} gqlgen not installed. Install: go install github.com/99designs/gqlgen@latest\n"
+          exit 1
+        fi
+        gqlgen generate
+        printf "{{.GREEN}}[OK]{{.NC}} Generated GraphQL server code in internal/graph/\n"
+
+  graphql:client:generate:
+    desc: "Generate GraphQL client code using genqlient"
+    cmds:
+      - |
+        go run github.com/Khan/genqlient
+        printf "{{.GREEN}}[OK]{{.NC}} Generated GraphQL client code in internal/graphql/\n"
+
+  generate:
+    desc: "Generate all code (database + GraphQL server + GraphQL client)"
+    cmds:
+      - task: db:generate
+      - task: graphql:generate
+      - task: graphql:client:generate
 
   format:
     desc: "Format backend code"

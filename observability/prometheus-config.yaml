@@ -1,0 +1,70 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Prometheus scrape configuration for VictoriaMetrics
+global:
+  scrape_interval: 15s
+  external_labels:
+    cluster: "nexus-dev"
+    environment: "development"
+
+scrape_configs:
+  # PostgreSQL metrics
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          service: "postgres"
+
+  # Redis metrics
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+        labels:
+          service: "redis"
+
+  # Traefik metrics
+  - job_name: "traefik"
+    static_configs:
+      - targets: ["traefik:8080"]
+        labels:
+          service: "traefik"
+    metrics_path: "/metrics"
+
+  # Temporal metrics
+  - job_name: "temporal"
+    static_configs:
+      - targets: ["temporal:8000"]
+        labels:
+          service: "temporal"
+    metrics_path: "/metrics"
+
+  # VictoriaMetrics self-monitoring
+  - job_name: "victoriametrics"
+    static_configs:
+      - targets: ["victoriametrics:8428"]
+        labels:
+          service: "victoriametrics"
+
+  # Application services (Gateway, API Server, Worker)
+  # These will be added when we instrument the Go services
+  - job_name: "nexus-gateway"
+    static_configs:
+      - targets: ["gateway:8080"]
+        labels:
+          service: "gateway"
+    metrics_path: "/metrics"
+
+  - job_name: "nexus-api-server"
+    static_configs:
+      - targets: ["api-server:8081"]
+        labels:
+          service: "api-server"
+    metrics_path: "/metrics"
+
+  - job_name: "nexus-worker"
+    static_configs:
+      - targets: ["worker:8082"]
+        labels:
+          service: "worker"
+    metrics_path: "/metrics"

@@ -1,6 +1,23 @@
 # Copyright 2025 Andrew Vasilyev
 # SPDX-License-Identifier: APACHE-2.0
 
+# Architecture Enforcement with depguard
+#
+# This configuration enforces clean architecture boundaries:
+#
+# FORBIDDEN DATABASE ACCESS:
+#   - cmd/gateway/**          → Must use GraphQL client
+#   - internal/api/rest/**    → Must use GraphQL client
+#   - internal/activities/**  → Must use GraphQL client
+#   - internal/workflows/**   → Must NEVER access DB (use activities)
+#
+# ALLOWED DATABASE ACCESS:
+#   - internal/api/graphql/resolvers/** → GraphQL resolvers (single source of truth)
+#   - cmd/api-server/**                 → GraphQL server initialization
+#   - cmd/worker/**                     → Worker initialization (only for setup)
+#
+# To verify: golangci-lint run ./internal/api/rest/... ./cmd/gateway/... ./internal/activities/... ./internal/workflows/...
+
 version: "2"
 
 run:
@@ -43,6 +60,7 @@ linters:
     - predeclared
     - thelper
     - unparam
+    - depguard  # Enforce architectural boundaries for internal package imports
 
   settings:
     errcheck:
@@ -110,6 +128,43 @@ linters:
 
     unparam:
       check-exported: false
+
+    depguard:
+      rules:
+        # Prevent database imports in Gateway layer
+        prevent-db-in-gateway:
+          list-mode: lax
+          files:
+            - "**/cmd/gateway/**/*.go"
+            - "**/internal/api/rest/**/*.go"
+            - "!$test"
+          deny:
+            - pkg: github.com/retran/nexus/backend/internal/repository/postgres
+              desc: "Gateway and REST API must use GraphQL client, not direct database access"
+            - pkg: github.com/jackc/pgx
+              desc: "Gateway must not access database directly"
+
+        # Prevent database imports in Activities (should use GraphQL)
+        prevent-db-in-activities:
+          list-mode: lax
+          files:
+            - "**/internal/activities/**/*.go"
+            - "!$test"
+          deny:
+            - pkg: github.com/retran/nexus/backend/internal/repository/postgres
+              desc: "Activities must use GraphQL client instead of direct database access"
+
+        # Prevent ANY database access in Workflows (determinism)
+        prevent-db-in-workflows:
+          list-mode: lax
+          files:
+            - "**/internal/workflows/**/*.go"
+            - "!$test"
+          deny:
+            - pkg: github.com/retran/nexus/backend/internal/repository/postgres
+              desc: "Workflows must be deterministic - no database access allowed"
+            - pkg: github.com/jackc/pgx
+              desc: "Workflows must be deterministic - no I/O operations including database"
 
   exclusions:
     rules:

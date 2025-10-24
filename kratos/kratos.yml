@@ -1,0 +1,167 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+# Ory Kratos Configuration for Nexus
+# Unified SSO with Google and Apple OAuth
+
+version: v1.1.0
+
+dsn: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable&max_conns=20&max_idle_conns=4
+
+serve:
+  public:
+    base_url: http://auth.nexus.local
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://nexus.local
+        - http://grafana.nexus.local
+        - http://metrics.nexus.local
+        - http://logs.nexus.local
+        - http://traefik.nexus.local
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+      allowed_headers:
+        - Authorization
+        - Cookie
+        - Content-Type
+      exposed_headers:
+        - Content-Type
+        - Set-Cookie
+  admin:
+    base_url: http://kratos:4434
+
+selfservice:
+  default_browser_return_url: http://nexus.local/
+  allowed_return_urls:
+    - http://nexus.local
+    - http://grafana.nexus.local
+    - http://metrics.nexus.local
+    - http://logs.nexus.local
+    - http://traefik.nexus.local
+
+  methods:
+    password:
+      enabled: false  # Disable password auth, OAuth only
+
+    totp:
+      enabled: true
+      config:
+        issuer: Nexus
+
+    oidc:
+      enabled: true
+      config:
+        providers:
+          - id: google
+            provider: google
+            client_id: ${GOOGLE_CLIENT_ID}
+            client_secret: ${GOOGLE_CLIENT_SECRET}
+            mapper_url: file:///etc/config/kratos/oidc.google.jsonnet
+            scope:
+              - email
+              - profile
+
+          - id: apple
+            provider: apple
+            client_id: ${APPLE_CLIENT_ID}
+            client_secret: ${APPLE_CLIENT_SECRET}
+            apple_private_key_id: ${APPLE_KEY_ID}
+            apple_team_id: ${APPLE_TEAM_ID}
+            apple_private_key: ${APPLE_PRIVATE_KEY}
+            mapper_url: file:///etc/config/kratos/oidc.apple.jsonnet
+            scope:
+              - email
+              - name
+
+  flows:
+    error:
+      ui_url: http://auth.nexus.local/error
+
+    settings:
+      ui_url: http://auth.nexus.local/settings
+      privileged_session_max_age: 15m
+      required_aal: highest_available
+
+    recovery:
+      enabled: false  # No password recovery needed (OAuth only)
+
+    verification:
+      enabled: true
+      ui_url: http://auth.nexus.local/verification
+      use: code
+      after:
+        default_browser_return_url: http://nexus.local/
+
+    logout:
+      after:
+        default_browser_return_url: http://auth.nexus.local/login
+
+    login:
+      ui_url: http://auth.nexus.local/login
+      lifespan: 10m
+      after:
+        default_browser_return_url: http://nexus.local/
+
+    registration:
+      lifespan: 10m
+      ui_url: http://auth.nexus.local/registration
+      after:
+        default_browser_return_url: http://nexus.local/
+        oidc:
+          hooks:
+            - hook: session
+            - hook: web_hook
+              config:
+                url: http://gateway:8080/api/webhooks/kratos/registration
+                method: POST
+                body: file:///etc/config/kratos/webhook.jsonnet
+                auth:
+                  type: api_key
+                  config:
+                    name: X-Webhook-Secret
+                    value: ${KRATOS_WEBHOOK_SECRET}
+                    in: header
+
+log:
+  level: info
+  format: json
+  leak_sensitive_values: false
+
+secrets:
+  cookie:
+    - ${SESSION_SECRET}
+  cipher:
+    - ${STORAGE_ENCRYPTION_KEY}
+
+ciphers:
+  algorithm: xchacha20-poly1305
+
+hashers:
+  algorithm: bcrypt
+  bcrypt:
+    cost: 12
+
+identity:
+  default_schema_id: default
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/identity.schema.json
+
+session:
+  lifespan: 24h
+  earliest_possible_extend: 1h
+  cookie:
+    domain: nexus.local
+    path: /
+    same_site: Lax
+    persistent: true
+
+cookies:
+  domain: nexus.local
+  path: /
+  same_site: Lax

@@ -1,0 +1,42 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+# Mutations
+
+mutation CreateAuditLog($input: CreateAuditLogInput!) {
+  createAuditLog(input: $input) {
+    id
+    userId
+    eventType
+    ipAddress
+    userAgent
+    metadata
+    createdAt
+  }
+}
+
+# Queries
+
+query GetAuditLog($id: UUID!) {
+  auditLog(id: $id) {
+    id
+    userId
+    eventType
+    ipAddress
+    userAgent
+    metadata
+    createdAt
+  }
+}
+
+query ListAuditLogs($userId: UUID, $eventType: AuditEventType, $limit: Int, $offset: Int) {
+  auditLogs(userId: $userId, eventType: $eventType, limit: $limit, offset: $offset) {
+    id
+    userId
+    eventType
+    ipAddress
+    userAgent
+    metadata
+    createdAt
+  }
+}

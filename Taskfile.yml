@@ -139,6 +139,7 @@ tasks:
     cmds:
       - task: backend:format
       - task: frontend:format
+      - task: db:schema:fmt
       - task: db:format
       - task: repo:format
 
@@ -146,6 +147,7 @@ tasks:
     desc: "Check all code formatting"
     cmds:
       - task: frontend:format:check
+      - task: db:schema:lint
       - task: db:format:check
       - task: repo:format:check
 
@@ -154,6 +156,7 @@ tasks:
     cmds:
       - task: backend:lint
       - task: frontend:lint
+      - task: db:schema:lint
       - task: db:lint
 
   lint:fix:
@@ -161,6 +164,7 @@ tasks:
     cmds:
       - task: backend:lint:fix
       - task: frontend:lint:fix
+      - task: db:schema:fmt
       - task: db:lint:fix
 
   test:
@@ -178,7 +182,7 @@ tasks:
   check:
     desc: "Run all checks (format, lint, type-check)"
     cmds:
-      - task: format
+      - task: format:check
       - task: lint
       - task: frontend:type-check
 

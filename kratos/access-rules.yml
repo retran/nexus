@@ -1,0 +1,91 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+# Ory Oathkeeper Access Rules for SSO Protection
+
+- id: "webhooks:public"
+  upstream:
+    preserve_host: true
+    url: "http://gateway:8080"
+  match:
+    url: "http://<(api.nexus.local)>/api/webhooks/<.*>"
+    methods:
+      - POST
+  authenticators:
+    - handler: noop
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+
+- id: "kratos:public"
+  upstream:
+    preserve_host: true
+    url: "http://kratos:4433"
+  match:
+    url: "http://<(auth.nexus.local|kratos)><.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: noop
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+
+- id: "nexus:protected"
+  upstream:
+    preserve_host: true
+    url: "http://gateway:8080"
+  match:
+    url: "http://<(nexus.local|api.nexus.local)><.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: header
+
+- id: "grafana:protected"
+  upstream:
+    preserve_host: true
+    url: "http://grafana:3000"
+  match:
+    url: "http://grafana.nexus.local<.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: header
+
+- id: "victoria:protected"
+  upstream:
+    preserve_host: true
+    url: "http://victoriametrics:8428"
+  match:
+    url: "http://metrics.nexus.local<.*>"
+    methods:
+      - GET
+      - POST
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: header
