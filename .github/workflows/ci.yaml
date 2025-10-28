@@ -43,7 +43,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:18-alpine3.22@sha256:e08e178a23d51e4a1e9e79fb2500b35b91cef3902744519420d257b8c0fb0a3c
+        image: postgres:18-alpine3.22@sha256:48c8ad3a7284b82be4482a52076d47d879fd6fb084a1cbfccbd551f9331b0e40
         env:
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_password
@@ -255,7 +255,7 @@ jobs:
           args: "-no-fail -fmt sarif -out gosec.sarif ./backend/..."
 
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@16140ae1a102900babc80a33c44059580f687047 # v4
+        uses: github/codeql-action/upload-sarif@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4
         with:
           sarif_file: gosec.sarif
           category: gosec
@@ -308,7 +308,7 @@ jobs:
           output: "trivy-backend.sarif"
 
       - name: Upload Trivy results (backend)
-        uses: github/codeql-action/upload-sarif@16140ae1a102900babc80a33c44059580f687047 # v4
+        uses: github/codeql-action/upload-sarif@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4
         with:
           sarif_file: "trivy-backend.sarif"
           category: trivy-backend
@@ -322,7 +322,7 @@ jobs:
           output: "trivy-frontend.sarif"
 
       - name: Upload Trivy results (frontend)
-        uses: github/codeql-action/upload-sarif@16140ae1a102900babc80a33c44059580f687047 # v4
+        uses: github/codeql-action/upload-sarif@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4
         with:
           sarif_file: "trivy-frontend.sarif"
           category: trivy-frontend
