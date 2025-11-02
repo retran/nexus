@@ -609,9 +609,9 @@ func (v *UpdateUserUpdateUser) GetUpdatedAt() time.Time { return v.UpdatedAt }
 type UserRole string
 
 const (
-	UserRoleNone   UserRole = "NONE"
-	UserRoleMember UserRole = "MEMBER"
-	UserRoleAdmin  UserRole = "ADMIN"
+	UserRoleNone   UserRole = "none"
+	UserRoleMember UserRole = "member"
+	UserRoleAdmin  UserRole = "admin"
 )
 
 var AllUserRole = []UserRole{

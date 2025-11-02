@@ -255,7 +255,7 @@ tasks:
 
   # BUILD
   build:
-    desc: "Build all services (api-server, gateway, worker, ui)"
+    desc: "Build all services (data-api, gateway, worker, ui)"
     cmds:
       - task: backend:build
       - task: frontend:build

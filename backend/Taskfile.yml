@@ -28,19 +28,19 @@ tasks:
 
   # BUILD
   build:
-    desc: "Build all backend binaries (api-server, gateway, worker)"
+    desc: "Build all backend binaries (data-api, gateway, worker)"
     cmds:
-      - task: build:api-server
+      - task: build:data-api
       - task: build:gateway
       - task: build:worker
       - printf "{{.GREEN}}[OK]{{.NC}} All backend binaries built\n"
 
-  build:api-server:
+  build:data-api:
     desc: "Build API server binary"
     cmds:
       - mkdir -p bin
-      - go build -o bin/api-server ./cmd/api-server
-      - printf "{{.GREEN}}[OK]{{.NC}} Built bin/api-server\n"
+      - go build -o bin/data-api ./cmd/data-api
+      - printf "{{.GREEN}}[OK]{{.NC}} Built bin/data-api\n"
 
   build:gateway:
     desc: "Build Gateway binary"

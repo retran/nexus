@@ -42,7 +42,11 @@ selfservice:
 
   methods:
     password:
-      enabled: false
+      enabled: true
+      config:
+        haveibeenpwned_enabled: false
+        identifier_similarity_check_enabled: true
+        min_password_length: 8
     totp:
       config:
         issuer: Nexus
@@ -110,7 +114,7 @@ selfservice:
           hooks:
             - hook: web_hook
               config:
-                url: http://gateway:8080/webhooks/kratos/post-registration
+                url: http://webhooks:8082/webhooks/kratos/registration
                 method: POST
                 body: file:///etc/config/kratos/webhook.jsonnet
                 auth:
@@ -128,7 +132,7 @@ selfservice:
           hooks:
             - hook: web_hook
               config:
-                url: http://gateway:8080/webhooks/kratos/post-registration
+                url: http://webhooks:8082/webhooks/kratos/registration
                 method: POST
                 body: file:///etc/config/kratos/webhook.jsonnet
                 auth:

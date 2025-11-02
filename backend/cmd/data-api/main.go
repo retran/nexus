@@ -1,7 +1,8 @@
 // Copyright 2025 Andrew Vasilyev
 // SPDX-License-Identifier: Apache-2.0
 
-// Package main starts the GraphQL API server.
+// Package main starts the Data API (GraphQL) server executable.
+// This service provides GraphQL API for database operations.
 package main
 
 import (

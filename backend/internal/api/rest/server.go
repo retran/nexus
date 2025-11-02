@@ -45,10 +45,7 @@ type Config struct {
 	WriteTimeout       time.Duration
 	Port               int
 	ReadTimeout        time.Duration
-	RateLimitOAuth     int
-	RateLimitHealth    int
-	RateLimitAPI       int
-	RateLimitAdmin     int
+	// Rate limiting removed - now handled by Traefik
 }
 
 // Server represents the REST API Gateway HTTP server.
@@ -123,30 +120,8 @@ func New(cfg *Config) (*Server, error) {
 func (s *Server) Start() error {
 	authMiddleware := middleware.NewAuthMiddleware(s.gqlClient, s.config.JWTSecret)
 
-	// TODO: Remove after OAuth migration to Kratos is complete
-	_ = middleware.NewRateLimiter(s.redisClient, middleware.RateLimitConfig{
-		Requests: s.config.RateLimitOAuth,
-		Window:   time.Minute,
-		KeyFunc:  middleware.DefaultKeyFunc,
-	})
-
-	healthRateLimiter := middleware.NewRateLimiter(s.redisClient, middleware.RateLimitConfig{
-		Requests: s.config.RateLimitHealth,
-		Window:   time.Minute,
-		KeyFunc:  middleware.DefaultKeyFunc,
-	})
-
-	apiRateLimiter := middleware.NewRateLimiter(s.redisClient, middleware.RateLimitConfig{
-		Requests: s.config.RateLimitAPI,
-		Window:   time.Minute,
-		KeyFunc:  middleware.UserKeyFunc,
-	})
-
-	adminRateLimiter := middleware.NewRateLimiter(s.redisClient, middleware.RateLimitConfig{
-		Requests: s.config.RateLimitAdmin,
-		Window:   time.Minute,
-		KeyFunc:  middleware.UserKeyFunc,
-	})
+	// Rate limiting removed - now handled by Traefik at edge level
+	// All requests are rate limited by Traefik before reaching this service
 
 	var auditService *services.TemporalAuditService
 	if s.temporalClient != nil {
@@ -169,35 +144,34 @@ func (s *Server) Start() error {
 	// 	s.config.FrontendURL,
 	// )
 	meHandlers := handlers.NewMeHandlers(auditService)
-	kratosWebhookHandlers := handlers.NewKratosWebhookHandlers(s.gqlClient)
 
 	mux := http.NewServeMux()
 
-	// Kratos webhook (no auth required - validated by webhook secret)
-	mux.Handle("POST /api/webhooks/kratos/registration", apiRateLimiter.Middleware(http.HandlerFunc(kratosWebhookHandlers.HandleRegistration)))
-
 	// TODO: Remove old OAuth routes - now using Kratos
-	// mux.Handle("GET /api/auth/google/login", oauthRateLimiter.Middleware(http.HandlerFunc(authHandlers.GoogleLogin)))
-	// mux.Handle("GET /api/auth/google/callback", oauthRateLimiter.Middleware(http.HandlerFunc(authHandlers.GoogleCallback)))
+	// mux.Handle("GET /api/auth/google/login", http.HandlerFunc(authHandlers.GoogleLogin))
+	// mux.Handle("GET /api/auth/google/callback", http.HandlerFunc(authHandlers.GoogleCallback))
 
-	mux.Handle("GET /health", healthRateLimiter.Middleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	// Health check endpoint - no auth required, rate limited by Traefik
+	mux.Handle("GET /health", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("OK")); err != nil {
 			log.Printf("health check write error: %v", err)
 		}
-	})))
+	}))
 
-	mux.Handle("GET /api/me", apiRateLimiter.Middleware(authMiddleware.RequireAuth(http.HandlerFunc(meHandlers.GetMe))))
-	mux.Handle("POST /api/auth/logout", apiRateLimiter.Middleware(authMiddleware.RequireAuth(http.HandlerFunc(meHandlers.Logout))))
-	mux.Handle("GET /api/auth/token", apiRateLimiter.Middleware(http.HandlerFunc(meHandlers.GetToken)))
+	// User endpoints - auth required, rate limited by Traefik
+	mux.Handle("GET /api/me", authMiddleware.RequireAuth(http.HandlerFunc(meHandlers.GetMe)))
+	mux.Handle("POST /api/auth/logout", authMiddleware.RequireAuth(http.HandlerFunc(meHandlers.Logout)))
+	mux.Handle("GET /api/auth/token", http.HandlerFunc(meHandlers.GetToken))
 
-	mux.Handle("GET /api/users", apiRateLimiter.Middleware(authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.ListUsers))))
-	mux.Handle("GET /api/users/{id}", apiRateLimiter.Middleware(authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.GetUser))))
-	mux.Handle("GET /api/users/email/{email}", apiRateLimiter.Middleware(authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.GetUserByEmail))))
+	mux.Handle("GET /api/users", authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.ListUsers)))
+	mux.Handle("GET /api/users/{id}", authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.GetUser)))
+	mux.Handle("GET /api/users/email/{email}", authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.GetUserByEmail)))
 
-	mux.Handle("POST /api/users", adminRateLimiter.Middleware(authMiddleware.RequireAdmin(http.HandlerFunc(userHandlers.CreateUser))))
-	mux.Handle("PUT /api/users/{id}", adminRateLimiter.Middleware(authMiddleware.RequireAdmin(http.HandlerFunc(userHandlers.UpdateUser))))
-	mux.Handle("DELETE /api/users/{id}", adminRateLimiter.Middleware(authMiddleware.RequireAdmin(http.HandlerFunc(userHandlers.DeleteUser))))
+	// Admin endpoints - admin auth required, rate limited by Traefik
+	mux.Handle("POST /api/users", authMiddleware.RequireAdmin(http.HandlerFunc(userHandlers.CreateUser)))
+	mux.Handle("PUT /api/users/{id}", authMiddleware.RequireAdmin(http.HandlerFunc(userHandlers.UpdateUser)))
+	mux.Handle("DELETE /api/users/{id}", authMiddleware.RequireAdmin(http.HandlerFunc(userHandlers.DeleteUser)))
 
 	var handler http.Handler = mux
 	handler = middleware.Recovery(handler)

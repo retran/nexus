@@ -38,11 +38,7 @@ func main() {
 		TemporalHost:       getEnv("TEMPORAL_HOST", "localhost:7233"),
 		TemporalNamespace:  getEnv("TEMPORAL_NAMESPACE", "default"),
 		TemporalTaskQueue:  getEnv("TEMPORAL_TASK_QUEUE", "nexus-task-queue"),
-		// Rate limiting configuration (requests per minute)
-		RateLimitOAuth:  getEnvInt("RATE_LIMIT_OAUTH", 5),   // OAuth endpoints (per IP)
-		RateLimitHealth: getEnvInt("RATE_LIMIT_HEALTH", 60), // Health check (per IP)
-		RateLimitAPI:    getEnvInt("RATE_LIMIT_API", 300),   // Authenticated API (per user)
-		RateLimitAdmin:  getEnvInt("RATE_LIMIT_ADMIN", 100), // Admin endpoints (per user)
+		// Rate limiting removed - now handled by Traefik at edge level
 	}
 
 	server, err := rest.New(&cfg)

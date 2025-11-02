@@ -22,10 +22,11 @@
 
 - id: "protected:api"
   upstream:
-    preserve_host: true
+    preserve_host: false
     url: "http://gateway:8080"
+    strip_path: /.ory/kratos/public
   match:
-    url: "http://api.nexus.local/<**>"
+    url: "http://<{api,127.0.0.1,localhost}{,:4455}>/api/<**>"
     methods:
       - GET
       - POST
@@ -38,13 +39,17 @@
     handler: allow
   mutators:
     - handler: header
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
 
 - id: "protected:graphql"
   upstream:
-    preserve_host: true
-    url: "http://api-server:8081"
+    preserve_host: false
+    url: "http://data-api:8081"
   match:
-    url: "http://graphql.nexus.local/<**>"
+    url: "http://<{graphql,127.0.0.1,localhost}{,:4455}>/graphql<**>"
     methods:
       - GET
       - POST
@@ -54,33 +59,27 @@
     handler: allow
   mutators:
     - handler: header
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
 
 - id: "protected:ui"
   upstream:
-    preserve_host: true
+    preserve_host: false
     url: "http://ui:3000"
   match:
-    url: "http://nexus.local/<**>"
+    url: "http://<{nexus,127.0.0.1,localhost}{,:4455}>/<**>"
     methods:
       - GET
+      - POST
   authenticators:
     - handler: cookie_session
   authorizer:
     handler: allow
   mutators:
     - handler: noop
-
-- id: "protected:ui-static"
-  upstream:
-    preserve_host: true
-    url: "http://ui:3000"
-  match:
-    url: "http://nexus.local/<{src,assets,node_modules}/**>"
-    methods:
-      - GET
-  authenticators:
-    - handler: anonymous
-  authorizer:
-    handler: allow
-  mutators:
-    - handler: noop
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login

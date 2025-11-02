@@ -3629,7 +3629,7 @@ func (ec *executionContext) unmarshalInputCreateUserInput(ctx context.Context, o
 	}
 
 	if _, present := asMap["role"]; !present {
-		asMap["role"] = "NONE"
+		asMap["role"] = "none"
 	}
 
 	fieldsInOrder := [...]string{"kratosIdentityId", "email", "name", "picture", "role"}

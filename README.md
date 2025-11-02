@@ -75,9 +75,9 @@ Once the stack is running, access the services at:
 
 These ports are exposed for debugging but not typically accessed directly:
 
-- **API Server (gRPC)**: `localhost:8081`
+- **Data API (GraphQL)**: `localhost:8081` - Direct database access API
 - **Temporal (gRPC)**: `localhost:7233`
-- **Delve Debugger**: `localhost:2345` (attached to api-server)
+- **Delve Debugger**: `localhost:2345` (attached to data-api)
 
 ## License
 

@@ -1,6 +1,7 @@
 // Copyright 2025 Andrew Vasilyev
 // SPDX-License-Identifier: Apache-2.0
 
+// Package handlers contains HTTP handlers for REST API endpoints.
 package handlers
 
 import (

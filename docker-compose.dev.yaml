@@ -80,10 +80,10 @@ services:
       postgres:
         condition: service_healthy
 
-  api-server:
+  data-api:
     build:
       context: ./backend
-      dockerfile: Dockerfile.api-server.dev
+      dockerfile: Dockerfile.data-api.dev
     restart: always
     expose:
       - "8081"
@@ -95,12 +95,8 @@ services:
       - POSTGRES_HOST=postgres
     volumes:
       - ./backend:/app
-    command: ["air", "-c", ".air.api-server.toml"]
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.api-server.rule=Host(`graphql.nexus.local`)"
-      - "traefik.http.routers.api-server.entrypoints=web"
-      - "traefik.http.services.api-server.loadbalancer.server.port=8081"
+    command: ["air", "-c", ".air.data-api.toml"]
+    # NO Traefik labels - accessed via Oathkeeper only
     depends_on:
       - postgres
       - temporal
@@ -113,7 +109,7 @@ services:
     env_file: .env
     environment:
       - TEMPORAL_HOST=temporal:7233
-      - API_URL=http://api-server:8081/graphql # Worker reaches the API server
+      - API_URL=http://data-api:8081/graphql # Worker reaches the API server
     volumes:
       - ./backend:/app
     command: ["air", "-c", ".air.worker.toml"]
@@ -122,8 +118,28 @@ services:
         condition: service_healthy
       temporal:
         condition: service_started
-      api-server:
+      data-api:
         condition: service_started
+
+  webhooks:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.webhooks.dev
+    restart: always
+    expose:
+      - "8082"
+    env_file: .env
+    environment:
+      - PORT=8082
+      - GRAPHQL_ENDPOINT=http://data-api:8081/graphql
+      - KRATOS_WEBHOOK_SECRET=${WEBHOOK_SECRET}
+    volumes:
+      - ./backend:/app
+    command: ["air", "-c", ".air.webhooks.toml"]
+    depends_on:
+      data-api:
+        condition: service_started
+    # NO Traefik labels - internal only, not exposed to public
 
   gateway:
     build:
@@ -134,7 +150,7 @@ services:
       - "8080"
     env_file: .env
     environment:
-      - GRAPHQL_ENDPOINT=http://api-server:8081/graphql
+      - GRAPHQL_ENDPOINT=http://data-api:8081/graphql
       - TEMPORAL_HOST=temporal:7233
       - POSTGRES_HOST=postgres
       - REDIS_HOST=redis
@@ -142,13 +158,9 @@ services:
     volumes:
       - ./backend:/app
     command: ["air", "-c", ".air.gateway.toml"]
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.gateway.rule=Host(`api.nexus.local`)"
-      - "traefik.http.routers.gateway.entrypoints=web"
-      - "traefik.http.services.gateway.loadbalancer.server.port=8080"
+    # NO Traefik labels - accessed via Oathkeeper only
     depends_on:
-      api-server:
+      data-api:
         condition: service_started
       temporal:
         condition: service_started
@@ -168,11 +180,7 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.ui.rule=Host(`nexus.local`)"
-      - "traefik.http.routers.ui.entrypoints=web"
-      - "traefik.http.services.ui.loadbalancer.server.port=3000"
+    # NO Traefik labels - accessed via Oathkeeper only
     depends_on:
       - gateway
 
@@ -207,6 +215,17 @@ services:
     command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier # --dev flag for development only!
     volumes:
       - ./kratos/dev:/etc/config/kratos:ro
+    labels:
+      - "traefik.enable=true"
+      # Route for Kratos API endpoints (self-service flows)
+      - "traefik.http.routers.kratos-public.rule=Host(`auth.nexus.local`) && (PathPrefix(`/self-service`) || PathPrefix(`/schemas`) || PathPrefix(`/.well-known`))"
+      - "traefik.http.routers.kratos-public.priority=100"
+      - "traefik.http.services.kratos-public.loadbalancer.server.port=4433"
+      # Stricter rate limiting for auth endpoints: 60 requests per minute per IP
+      - "traefik.http.middlewares.kratos-ratelimit.ratelimit.average=60"
+      - "traefik.http.middlewares.kratos-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.kratos-ratelimit.ratelimit.burst=20"
+      - "traefik.http.routers.kratos-public.middlewares=kratos-ratelimit"
     depends_on:
       kratos-migrate:
         condition: service_completed_successfully
@@ -227,9 +246,17 @@ services:
       - CSRF_COOKIE_SECRET=${CSRF_COOKIE_SECRET}
     labels:
       - "traefik.enable=true"
+      # Route for UI pages (lower priority than API)
+      # Provides: login, registration, settings, recovery, verification, account dashboard
       - "traefik.http.routers.kratos-ui.rule=Host(`auth.nexus.local`)"
+      - "traefik.http.routers.kratos-ui.priority=1"
       - "traefik.http.routers.kratos-ui.entrypoints=web"
       - "traefik.http.services.kratos-ui.loadbalancer.server.port=3000"
+      # Rate limiting for UI: 300 requests per minute per IP
+      - "traefik.http.middlewares.kratos-ui-ratelimit.ratelimit.average=300"
+      - "traefik.http.middlewares.kratos-ui-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.kratos-ui-ratelimit.ratelimit.burst=50"
+      - "traefik.http.routers.kratos-ui.middlewares=kratos-ui-ratelimit"
     depends_on:
       - kratos
 
@@ -242,8 +269,23 @@ services:
     command: serve -c /etc/config/oathkeeper/oathkeeper.yml
     volumes:
       - ./kratos/dev:/etc/config/oathkeeper:ro
+    labels:
+      - "traefik.enable=true"
+      # Route all protected domains through Oathkeeper
+      - "traefik.http.routers.oathkeeper.rule=Host(`nexus.local`) || Host(`api.nexus.local`) || Host(`graphql.nexus.local`)"
+      - "traefik.http.routers.oathkeeper.entrypoints=web"
+      - "traefik.http.routers.oathkeeper.priority=50"
+      - "traefik.http.services.oathkeeper.loadbalancer.server.port=4455"
+      # Rate limiting: 1000 requests per minute per IP
+      - "traefik.http.middlewares.oathkeeper-ratelimit.ratelimit.average=1000"
+      - "traefik.http.middlewares.oathkeeper-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.oathkeeper-ratelimit.ratelimit.burst=100"
+      - "traefik.http.routers.oathkeeper.middlewares=oathkeeper-ratelimit"
     depends_on:
       - kratos
+      - gateway
+      - ui
+      - data-api
 
   atlas:
     image: arigaio/atlas:latest

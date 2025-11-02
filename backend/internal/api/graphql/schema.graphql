@@ -5,9 +5,9 @@ scalar Time
 scalar UUID
 
 enum UserRole {
-  NONE
-  MEMBER
-  ADMIN
+  none
+  member
+  admin
 }
 
 enum AuditEventType {
@@ -57,7 +57,7 @@ input CreateUserInput {
   email: String!
   name: String
   picture: String
-  role: UserRole = NONE
+  role: UserRole = none
 }
 
 input UpdateUserInput {

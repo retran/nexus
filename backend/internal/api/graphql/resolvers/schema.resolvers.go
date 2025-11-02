@@ -384,9 +384,7 @@ func (r *Resolver) Query() graphql1.QueryResolver { return &queryResolver{r} }
 // User returns graphql1.UserResolver implementation.
 func (r *Resolver) User() graphql1.UserResolver { return &userResolver{r} }
 
-type (
-	auditLogResolver struct{ *Resolver }
-	mutationResolver struct{ *Resolver }
-	queryResolver    struct{ *Resolver }
-	userResolver     struct{ *Resolver }
-)
+type auditLogResolver struct{ *Resolver }
+type mutationResolver struct{ *Resolver }
+type queryResolver struct{ *Resolver }
+type userResolver struct{ *Resolver }
