@@ -1,0 +1,122 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+# Queries
+
+query GetUser($id: UUID!) {
+  user(id: $id) {
+    id
+    kratosIdentityId
+    email
+    name
+    picture
+    role
+    createdAt
+    updatedAt
+  }
+}
+
+query GetUserByEmail($email: String!) {
+  userByEmail(email: $email) {
+    id
+    kratosIdentityId
+    email
+    name
+    picture
+    role
+    createdAt
+    updatedAt
+  }
+}
+
+query GetUserByKratosId($kratosIdentityId: UUID!) {
+  userByKratosId(kratosIdentityId: $kratosIdentityId) {
+    id
+    kratosIdentityId
+    email
+    name
+    picture
+    role
+    createdAt
+    updatedAt
+  }
+}
+
+query ListUsers($limit: Int, $offset: Int) {
+  users(limit: $limit, offset: $offset) {
+    id
+    kratosIdentityId
+    email
+    name
+    picture
+    role
+    createdAt
+    updatedAt
+  }
+}
+
+query ListUsersByRole($role: UserRole!, $limit: Int, $offset: Int) {
+  usersByRole(role: $role, limit: $limit, offset: $offset) {
+    id
+    kratosIdentityId
+    email
+    name
+    picture
+    role
+    createdAt
+    updatedAt
+  }
+}
+
+query CountUsers {
+  countUsers
+}
+
+query CountUsersByRole($role: UserRole!) {
+  countUsersByRole(role: $role)
+}
+
+# Mutations
+
+mutation CreateUser($input: CreateUserInput!) {
+  createUser(input: $input) {
+    id
+    kratosIdentityId
+    email
+    name
+    picture
+    role
+    createdAt
+    updatedAt
+  }
+}
+
+mutation UpdateUser($id: UUID!, $input: UpdateUserInput!) {
+  updateUser(id: $id, input: $input) {
+    id
+    kratosIdentityId
+    email
+    name
+    picture
+    role
+    createdAt
+    updatedAt
+  }
+}
+
+mutation UpdateUserRole($id: UUID!, $input: UpdateUserRoleInput!) {
+  updateUserRole(id: $id, input: $input) {
+    id
+    kratosIdentityId
+    email
+    name
+    picture
+    role
+    createdAt
+    updatedAt
+  }
+}
+
+mutation DeleteUser($id: UUID!) {
+  deleteUser(id: $id)
+}
