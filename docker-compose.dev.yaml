@@ -1,5 +1,5 @@
 # Copyright 2025 Andrew Vasilyev
-# SPDX-License-Identifier: APACHE-2.0
+# SPDX-License-Identifier: Apache-2.0
 
 services:
   postgres:
@@ -12,6 +12,19 @@ services:
     env_file: .env
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -39,10 +52,14 @@ services:
       context: ./backend
       dockerfile: Dockerfile.api-server.dev
     restart: always
+    expose:
+      - "8081" # Internal port exposed by the Go API server
     ports:
-      - "8000:8000"
-      - "2345:2345"
+      - "2345:2345" # Debugger
     env_file: .env
+    environment:
+      - SERVER_PORT=8081 # Configure Go server to listen on 8081
+      - POSTGRES_HOST=postgres
     volumes:
       - ./backend:/app
     command: ["air", "-c", ".air.api-server.toml"]
@@ -56,6 +73,9 @@ services:
       dockerfile: Dockerfile.worker.dev
     restart: always
     env_file: .env
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - API_URL=http://api-server:8081/graphql # Worker reaches the API server
     volumes:
       - ./backend:/app
     command: ["air", "-c", ".air.worker.toml"]
@@ -67,19 +87,45 @@ services:
       api-server:
         condition: service_started
 
+  gateway:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.gateway.dev
+    restart: always
+    ports:
+      - "8080:8080" # Public gateway port
+    env_file: .env
+    environment:
+      - GRAPHQL_ENDPOINT=http://api-server:8081/graphql
+      - TEMPORAL_HOST=temporal:7233
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
+    volumes:
+      - ./backend:/app
+    command: ["air", "-c", ".air.gateway.toml"]
+    depends_on:
+      api-server:
+        condition: service_started
+      temporal:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   ui:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
     restart: always
     ports:
-      - "3000:3000" # TODO: Будет заменен на expose
+      - "3000:3000" # TODO: Replace with expose
     env_file: .env
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      - api-server # Обновлена зависимость
+      - gateway # UI depends on the gateway
 
   atlas:
     image: arigaio/atlas:latest
@@ -95,3 +141,4 @@ services:
 
 volumes:
   postgres_dev_data:
+  redis_dev_data:

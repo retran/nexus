@@ -5,8 +5,10 @@ go 1.25.3
 require (
 	github.com/99designs/gqlgen v0.17.81
 	github.com/Khan/genqlient v0.8.1
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
+	github.com/redis/go-redis/v9 v9.16.0
 	github.com/sqlc-dev/sqlc v1.30.0
 	github.com/vektah/gqlparser/v2 v2.5.30
 	go.temporal.io/sdk v1.37.0
@@ -20,9 +22,11 @@ require (
 	github.com/alexflint/go-scalar v1.2.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.6.1 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/cubicdaiya/gonp v1.0.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/facebookgo/clock v0.0.0-20150410010913-600d898af40a // indirect
 	github.com/fatih/structtag v1.2.0 // indirect

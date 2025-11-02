@@ -21,6 +21,11 @@ tasks:
       - go build -o bin/worker ./cmd/worker
       - printf "{{.GREEN}}[OK]{{.NC}} Built bin/api-server, bin/gateway, and bin/worker\n"
 
+  tidy:
+    desc: "Tidy backend dependencies"
+    cmds:
+      - go mod tidy
+
   generate:
     desc: "Generate all code (database + GraphQL server + GraphQL client)"
     cmds:
