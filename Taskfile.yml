@@ -3,70 +3,44 @@
 
 version: "3"
 
-includes:
-  backend:
-    taskfile: ./backend/Taskfile.yml
-    dir: ./backend
-  frontend:
-    taskfile: ./frontend/Taskfile.yml
-    dir: ./frontend
-  db:
-    taskfile: ./postgres/Taskfile.yml
-    dir: ./postgres
-
 vars:
-  COMPOSE_FILE: docker-compose.dev.yaml
   GREEN: \033[0;32m
   RED: \033[0;31m
   YELLOW: \033[0;33m
   BLUE: \033[0;34m
   NC: \033[0m
 
+includes:
+  backend:
+    taskfile: backend/Taskfile.yml
+    dir: backend
+  frontend:
+    taskfile: frontend/Taskfile.yml
+    dir: frontend
+  postgres:
+    taskfile: postgres/Taskfile.yml
+    dir: postgres
+
 silent: true
 
 tasks:
   default:
-    desc: "Show available tasks"
+    desc: "Show all available tasks"
     cmds:
       - task --list-all
 
-  setup:
-    desc: "Initial project setup (install deps and configure)"
-    cmds:
-      - task: tools:check
-      - task: env:init
-      - task: deps
-      - printf "{{.GREEN}}[OK]{{.NC}} Setup complete! Run 'task dev' to start\n"
-
-  deps:
-    desc: "Install all dependencies"
-    cmds:
-      - task: backend:deps
-      - task: frontend:deps
-      - task: db:deps
-
-  dev:
-    desc: "Start development environment"
-    cmds:
-      - |
-        [ -f .env ] || task setup
-      - task: up
-
+  # DEVELOPMENT ENVIRONMENT
   up:
-    desc: "Start all services"
+    desc: "Start all services in development mode"
     cmds:
-      - docker-compose -f {{.COMPOSE_FILE}} up -d
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} Services started:\n"
-        echo "   Frontend:    http://localhost:3000"
-        echo "   BFF API:     http://localhost:8000"
-        echo "   Temporal UI: http://localhost:8088"
-        echo "   PostgreSQL:  localhost:5432"
+      - docker-compose -f docker-compose.dev.yaml up -d
+      - printf "{{.GREEN}}[OK]{{.NC}} All services are starting...\n"
 
   down:
     desc: "Stop all services"
     cmds:
-      - docker-compose -f {{.COMPOSE_FILE}} down
+      - docker-compose -f docker-compose.dev.yaml down
+      - printf "{{.GREEN}}[OK]{{.NC}} All services stopped.\n"
 
   restart:
     desc: "Restart all services"
@@ -74,94 +48,47 @@ tasks:
       - task: down
       - task: up
 
-  logs:
-    desc: "Show service logs (use -- <service> for specific service)"
-    cmds:
-      - docker-compose -f {{.COMPOSE_FILE}} logs -f {{.CLI_ARGS}}
-
   ps:
-    desc: "Show service status"
+    desc: "List running services"
     cmds:
-      - docker-compose -f {{.COMPOSE_FILE}} ps
+      - docker-compose -f docker-compose.dev.yaml ps
 
-  status:
-    desc: "Show environment status and recent logs"
+  logs:
+    desc: "View logs from all services (use -- <service> for specific one)"
     cmds:
-      - echo "=== Services ==="
-      - docker-compose -f {{.COMPOSE_FILE}} ps
-      - echo ""
-      - echo "=== Recent Logs ==="
-      - docker-compose -f {{.COMPOSE_FILE}} logs --tail=20
+      - docker-compose -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}}
 
-  clean:
-    desc: "Stop services and remove volumes (WARNING: destroys data)"
-    prompt: "This will delete all data including database. Continue?"
-    cmds:
-      - docker-compose -f {{.COMPOSE_FILE}} down -v
-      - printf "{{.GREEN}}[OK]{{.NC}} Services stopped and data removed\n"
-
-  clean:all:
-    desc: "Clean all build artifacts and data"
-    cmds:
-      - task: backend:clean
-      - task: frontend:clean
-      - task: clean
-
-  env:init:
-    desc: "Create .env file from example"
-    cmds:
-      - |
-        if [ ! -f .env ]; then
-          cp .env.example .env
-          printf "{{.GREEN}}[OK]{{.NC}} Created .env file\n"
-          printf "{{.YELLOW}}[WARN]{{.NC}} Review and update .env with your values\n"
-        else
-          printf "{{.GREEN}}[OK]{{.NC}} .env file exists\n"
-        fi
-
-  build:
-    desc: "Build all Docker images"
-    cmds:
-      - docker-compose -f {{.COMPOSE_FILE}} build
-
-  build:backend:
-    desc: "Build backend Docker images (api + worker)"
-    cmds:
-      - docker-compose -f {{.COMPOSE_FILE}} build api worker
-
-  build:frontend:
-    desc: "Build frontend Docker image"
-    cmds:
-      - docker-compose -f {{.COMPOSE_FILE}} build ui
-
+  # AGGREGATED CODE QUALITY & CHECKS
   format:
-    desc: "Format all code (backend, frontend, SQL, repo)"
+    desc: "Format all code (Go, JS/TS, SQL, HCL)"
     cmds:
-      - task: backend:format
       - task: frontend:format
-      - task: db:format
-      - task: repo:format
+      - task: backend:format
+      - task: postgres:schema:fmt
+      - task: postgres:lint:fix
 
   format:check:
     desc: "Check all code formatting"
     cmds:
       - task: frontend:format:check
-      - task: db:format:check
-      - task: repo:format:check
+      - task: backend:format:check
+      - task: postgres:lint:sql
 
   lint:
-    desc: "Lint all code (backend, frontend, SQL)"
+    desc: "Run all linters"
     cmds:
-      - task: backend:lint
       - task: frontend:lint
-      - task: db:lint
+      - task: backend:lint
+      - task: postgres:lint:schema
+      - task: postgres:lint:sql
 
   lint:fix:
-    desc: "Lint and auto-fix all code"
+    desc: "Run all linters and auto-fix issues"
     cmds:
-      - task: backend:lint:fix
       - task: frontend:lint:fix
-      - task: db:lint:fix
+      - task: backend:lint:fix
+      - task: postgres:schema:fmt
+      - task: postgres:lint:fix
 
   test:
     desc: "Run all tests"
@@ -170,7 +97,7 @@ tasks:
       - task: frontend:test
 
   test:coverage:
-    desc: "Generate coverage reports for all components"
+    desc: "Run all tests and generate coverage reports"
     cmds:
       - task: backend:test:coverage
       - task: frontend:test:coverage
@@ -178,125 +105,6 @@ tasks:
   check:
     desc: "Run all checks (format, lint, type-check)"
     cmds:
-      - task: format
+      - task: format:check
       - task: lint
       - task: frontend:type-check
-
-  security:
-    desc: "Run all security scans"
-    cmds:
-      - task: backend:security
-      - task: frontend:security
-      - task: security:secrets
-
-  security:secrets:
-    desc: "Scan for secrets in code (gitleaks)"
-    cmds:
-      - |
-        if ! command -v gitleaks >/dev/null; then
-          printf "{{.RED}}[ERROR]{{.NC}} gitleaks not installed. Install with: brew install gitleaks\n"
-          exit 1
-        fi
-        gitleaks detect --source . --verbose
-
-  tools:check:
-    desc: "Check required tools are installed"
-    cmds:
-      - |
-        echo "Checking required tools..."
-        command -v docker >/dev/null || (printf "{{.RED}}[ERROR]{{.NC}} Docker not found\n" && exit 1)
-        command -v docker-compose >/dev/null || (printf "{{.RED}}[ERROR]{{.NC}} docker-compose not found\n" && exit 1)
-        command -v go >/dev/null || (printf "{{.YELLOW}}[WARN]{{.NC}} Go not found\n")
-        command -v node >/dev/null || (printf "{{.YELLOW}}[WARN]{{.NC}} Node.js not found\n")
-        command -v pipx >/dev/null || (printf "{{.YELLOW}}[WARN]{{.NC}} pipx not found (optional)\n")
-        printf "{{.GREEN}}[OK]{{.NC}} Required tools installed\n"
-
-  tools:install:
-    desc: "Install all development tools"
-    cmds:
-      - task: tools:install:golangci
-      - task: tools:install:sqlfluff
-      - task: tools:install:pre-commit
-
-  tools:install:golangci:
-    desc: "Install golangci-lint"
-    cmds:
-      - |
-        if command -v golangci-lint >/dev/null; then
-          printf "{{.GREEN}}[OK]{{.NC}} golangci-lint already installed ($(golangci-lint version))\n"
-        else
-          echo "Installing golangci-lint..."
-          go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-          printf "{{.GREEN}}[OK]{{.NC}} golangci-lint installed\n"
-        fi
-
-  tools:install:sqlfluff:
-    desc: "Install sqlfluff for SQL linting"
-    cmds:
-      - |
-        if ! command -v pipx >/dev/null; then
-          printf "{{.RED}}[ERROR]{{.NC}} pipx not found. Install with: brew install pipx && pipx ensurepath\n"
-          exit 1
-        fi
-        if command -v sqlfluff >/dev/null 2>&1; then
-          printf "{{.GREEN}}[OK]{{.NC}} sqlfluff already installed ($(sqlfluff --version))\n"
-        else
-          echo "Installing sqlfluff with pipx..."
-          pipx install sqlfluff
-          printf "{{.GREEN}}[OK]{{.NC}} sqlfluff installed\n"
-          echo "Note: You may need to restart your shell or run: pipx ensurepath"
-        fi
-
-  tools:install:pre-commit:
-    desc: "Install pre-commit hooks"
-    cmds:
-      - |
-        if ! command -v pre-commit >/dev/null; then
-          echo "Installing pre-commit..."
-          pipx install pre-commit
-        fi
-        echo "Installing pre-commit hooks..."
-        pre-commit install --install-hooks
-        pre-commit install --hook-type commit-msg
-        printf "{{.GREEN}}[OK]{{.NC}} pre-commit hooks installed\n"
-
-  temporal:ui:
-    desc: "Open Temporal UI in browser"
-    cmds:
-      - echo "Opening http://localhost:8088"
-      - open http://localhost:8088 || xdg-open http://localhost:8088 || echo "Visit http://localhost:8088"
-
-  repo:format:
-    desc: "Format repository-wide markdown, YAML, and JSON files"
-    cmds:
-      - |
-        if ! command -v npx &> /dev/null; then
-          printf "{{.RED}}[ERROR]{{.NC}} npx not found. Install Node.js first.\n"
-          exit 1
-        fi
-        npx prettier --write "*.md" "*.{yml,yaml}" "*.json" ".github/**/*.{yml,yaml}"
-
-  repo:format:check:
-    desc: "Check repository-wide file formatting"
-    cmds:
-      - |
-        if ! command -v npx &> /dev/null; then
-          printf "{{.RED}}[ERROR]{{.NC}} npx not found. Install Node.js first.\n"
-          exit 1
-        fi
-        npx prettier --check "*.md" "*.{yml,yaml}" "*.json" ".github/**/*.{yml,yaml}"
-
-  pre-commit:
-    desc: "Run pre-commit hooks on all files"
-    cmds:
-      - |
-        if ! command -v pre-commit >/dev/null; then
-          printf "{{.RED}}[ERROR]{{.NC}} pre-commit not installed. Run: task tools:install:pre-commit\n"
-          exit 1
-        fi
-        pre-commit run --all-files
-
-  pre-commit:update:
-    desc: "Update pre-commit hooks to latest versions"
-    cmds:
-      - pre-commit autoupdate

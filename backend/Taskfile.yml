@@ -46,6 +46,22 @@ tasks:
     cmds:
       - go fmt ./...
 
+  format:check:
+    desc: "Verify backend code formatting"
+    cmds:
+      - |
+        FILES=$(git ls-files '*.go')
+        if [ -z "$FILES" ]; then
+          printf "{{.GREEN}}[OK]{{.NC}} No Go files to check\n"
+          exit 0
+        fi
+        UNFORMATTED=$(gofmt -l $FILES)
+        if [ -n "$UNFORMATTED" ]; then
+          printf "{{.RED}}[ERROR]{{.NC}} gofmt detected unformatted files:\n%s\n" "$UNFORMATTED"
+          exit 1
+        fi
+        printf "{{.GREEN}}[OK]{{.NC}} Backend formatting looks good\n"
+
   lint:
     desc: "Lint backend code"
     cmds:
