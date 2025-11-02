@@ -714,17 +714,19 @@ summarize:
 
     - match: "**/LICENSE*"
       skip: true
+
     - match: "**/NOTICE*"
       skip: true
+
     - match: "**/COPYRIGHT*"
       skip: true
+
     - match: "**/.github/copilot-instructions.md"
       systemPrompt: |
         Summarize changes to AI coding agent instructions.
         Focus on architectural guidance or development workflow updates.
 
     - match: "**/.meowg1k.yaml"
-      profile: "smart"
       systemPrompt: |
         Summarize changes to meowg1k AI tooling configuration in 2-3 sentences.
         Focus on:

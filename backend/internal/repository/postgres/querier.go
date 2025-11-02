@@ -15,13 +15,13 @@ type Querier interface {
 	CountUsers(ctx context.Context) (int64, error)
 	CountUsersByRole(ctx context.Context, userRole UserRole) (int64, error)
 	// Copyright 2025 Andrew Vasilyev
-	// SPDX-License-Identifier: APACHE-2.0
+	// SPDX-License-Identifier: Apache-2.0
 	CreateAuditLog(ctx context.Context, arg CreateAuditLogParams) (AuditLog, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	GetAuditLogByID(ctx context.Context, id uuid.UUID) (AuditLog, error)
 	// Copyright 2025 Andrew Vasilyev
-	// SPDX-License-Identifier: APACHE-2.0
+	// SPDX-License-Identifier: Apache-2.0
 	GetUser(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByKratosID(ctx context.Context, kratosIdentityID uuid.UUID) (User, error)
