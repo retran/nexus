@@ -18,8 +18,9 @@ SELECT * FROM users
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 
+-- name: ListUsersByRole :many
 SELECT * FROM users
-WHERE user_role = $1::user_role
+WHERE user_role = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3;
 
@@ -65,7 +66,7 @@ RETURNING *;
 -- name: UpdateUserRole :one
 UPDATE users
 SET
-  user_role = $2::user_role,
+  user_role = $2,
   updated_at = NOW()
 WHERE id = $1
 RETURNING *;
@@ -79,4 +80,4 @@ SELECT COUNT(*) FROM users;
 
 -- name: CountUsersByRole :one
 SELECT COUNT(*) FROM users
-WHERE user_role = $1::user_role;
+WHERE user_role = $1;

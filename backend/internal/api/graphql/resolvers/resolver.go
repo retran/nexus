@@ -1,9 +1,9 @@
-// Package resolvers contains the GraphQL resolver dependencies.
+// Package resolvers contains GraphQL resolver implementations.
 package resolvers
 
-// This file will not be regenerated automatically.
-//
-// It serves as dependency injection for your app, add any dependencies you require here.
+import "github.com/retran/nexus/backend/internal/repository/postgres"
 
-// Resolver wires dependencies into the generated GraphQL resolvers.
-type Resolver struct{}
+// Resolver provides gqlgen with the configured data access dependencies.
+type Resolver struct {
+	Queries *postgres.Queries
+}

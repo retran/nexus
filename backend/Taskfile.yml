@@ -6,9 +6,7 @@ version: "3"
 vars:
   GREEN: \033[0;32m
   RED: \033[0;31m
-  YELLOW: \033[0;33m
   NC: \033[0m
-  GOCACHE: "{{.TASKFILE_DIR}}/tmp/gocache"
 
 tasks:
   default:
@@ -18,21 +16,10 @@ tasks:
   build:
     desc: "Build all backend binaries"
     cmds:
-      - |
-        mkdir -p bin {{.GOCACHE}}
-        export GOCACHE="{{.GOCACHE}}"
-        go build -o bin/api-server ./cmd/api-server
-        go build -o bin/gateway ./cmd/gateway
-        go build -o bin/worker ./cmd/worker
-        printf "{{.GREEN}}[OK]{{.NC}} Built bin/api-server, bin/gateway, and bin/worker\n"
-
-  tidy:
-    desc: "Tidy backend dependencies"
-    cmds:
-      - |
-        mkdir -p {{.GOCACHE}}
-        export GOCACHE="{{.GOCACHE}}"
-        go mod tidy
+      - go build -o bin/api-server ./cmd/api-server
+      - go build -o bin/gateway ./cmd/gateway
+      - go build -o bin/worker ./cmd/worker
+      - printf "{{.GREEN}}[OK]{{.NC}} Built bin/api-server, bin/gateway, and bin/worker\n"
 
   generate:
     desc: "Generate all code (database + GraphQL server + GraphQL client)"
@@ -60,8 +47,6 @@ tasks:
           printf "{{.RED}}[ERROR]{{.NC}} gqlgen not installed. Install: go install github.com/99designs/gqlgen@latest\n"
           exit 1
         fi
-        mkdir -p {{.GOCACHE}}
-        export GOCACHE="{{.GOCACHE}}"
         gqlgen generate
         printf "{{.GREEN}}[OK]{{.NC}} Generated GraphQL server code in internal/api/graphql/\n"
 
@@ -69,10 +54,8 @@ tasks:
     desc: "Generate GraphQL client code using genqlient"
     cmds:
       - |
-        mkdir -p {{.GOCACHE}}
-        export GOCACHE="{{.GOCACHE}}"
         go run github.com/Khan/genqlient
-        printf "{{.GREEN}}[OK]{{.NC}} Generated GraphQL client code in internal/client/graphql/\n"
+        printf "{{.GREEN}}[OK]{{.NC}} Generated GraphQL client code in internal/graphql/\n"
 
   format:
     desc: "Format backend code"
@@ -100,46 +83,31 @@ tasks:
   lint:
     desc: "Lint backend code"
     cmds:
-      - |
-        mkdir -p {{.GOCACHE}}
-        export GOCACHE="{{.GOCACHE}}"
-        golangci-lint run
+      - golangci-lint run
 
   lint:fix:
     desc: "Lint and auto-fix backend code"
     cmds:
-      - |
-        mkdir -p {{.GOCACHE}}
-        export GOCACHE="{{.GOCACHE}}"
-        golangci-lint run --fix
+      - golangci-lint run --fix
 
   test:
     desc: "Run backend tests"
     cmds:
-      - |
-        mkdir -p {{.GOCACHE}}
-        export GOCACHE="{{.GOCACHE}}"
-        go test -v ./...
+      - go test -v ./...
 
   test:coverage:
     desc: "Run backend tests with coverage"
     cmds:
-      - |
-        mkdir -p {{.GOCACHE}}
-        export GOCACHE="{{.GOCACHE}}"
-        go test -v -coverprofile=coverage.out ./...
-        go tool cover -html=coverage.out -o coverage.html
-        printf "{{.GREEN}}[OK]{{.NC}} Coverage report saved to backend/coverage.html\n"
+      - go test -v -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+      - printf "{{.GREEN}}[OK]{{.NC}} Coverage report saved to backend/coverage.html\n"
 
   vuln:check:
     desc: "Check for vulnerabilities"
     cmds:
       - |
-        mkdir -p {{.GOCACHE}}
-        export GOCACHE="{{.GOCACHE}}"
         if ! command -v govulncheck >/dev/null; then
           printf "{{.YELLOW}}[INFO]{{.NC}} govulncheck not installed. Installing...\n"
           go install golang.org/x/vuln/cmd/govulncheck@latest
         fi
         govulncheck ./...
-        printf "{{.GREEN}}[OK]{{.NC}} govulncheck completed\n"

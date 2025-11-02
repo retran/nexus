@@ -1,7 +1,7 @@
 -- Copyright 2025 Andrew Vasilyev
 -- SPDX-License-Identifier: APACHE-2.0
 
---- name: CreateAuditLog :one
+-- name: CreateAuditLog :one
 INSERT INTO audit_logs (
     user_id,
     event_type,

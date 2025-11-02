@@ -30,6 +30,50 @@ func (q *Queries) CountAuditLogs(ctx context.Context, arg CountAuditLogsParams) 
 	return count, err
 }
 
+const CreateAuditLog = `-- name: CreateAuditLog :one
+
+INSERT INTO audit_logs (
+    user_id,
+    event_type,
+    ip_address,
+    user_agent,
+    metadata
+) VALUES (
+    $1, $2, $3, $4, $5
+) RETURNING id, user_id, event_type, ip_address, user_agent, metadata, created_at
+`
+
+type CreateAuditLogParams struct {
+	UserID    pgtype.UUID    `json:"user_id"`
+	EventType AuditEventType `json:"event_type"`
+	IpAddress *string        `json:"ip_address"`
+	UserAgent *string        `json:"user_agent"`
+	Metadata  []byte         `json:"metadata"`
+}
+
+// Copyright 2025 Andrew Vasilyev
+// SPDX-License-Identifier: APACHE-2.0
+func (q *Queries) CreateAuditLog(ctx context.Context, arg CreateAuditLogParams) (AuditLog, error) {
+	row := q.db.QueryRow(ctx, CreateAuditLog,
+		arg.UserID,
+		arg.EventType,
+		arg.IpAddress,
+		arg.UserAgent,
+		arg.Metadata,
+	)
+	var i AuditLog
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.EventType,
+		&i.IpAddress,
+		&i.UserAgent,
+		&i.Metadata,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const GetAuditLogByID = `-- name: GetAuditLogByID :one
 SELECT id, user_id, event_type, ip_address, user_agent, metadata, created_at FROM audit_logs
 WHERE id = $1

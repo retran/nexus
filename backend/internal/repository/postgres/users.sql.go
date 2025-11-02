@@ -24,11 +24,11 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 
 const CountUsersByRole = `-- name: CountUsersByRole :one
 SELECT COUNT(*) FROM users
-WHERE user_role = $1::user_role
+WHERE user_role = $1
 `
 
-func (q *Queries) CountUsersByRole(ctx context.Context, dollar_1 UserRole) (int64, error) {
-	row := q.db.QueryRow(ctx, CountUsersByRole, dollar_1)
+func (q *Queries) CountUsersByRole(ctx context.Context, userRole UserRole) (int64, error) {
+	row := q.db.QueryRow(ctx, CountUsersByRole, userRole)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -193,6 +193,48 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 	return items, nil
 }
 
+const ListUsersByRole = `-- name: ListUsersByRole :many
+SELECT id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at FROM users
+WHERE user_role = $1
+ORDER BY created_at DESC
+LIMIT $2 OFFSET $3
+`
+
+type ListUsersByRoleParams struct {
+	UserRole UserRole `json:"user_role"`
+	Limit    int32    `json:"limit"`
+	Offset   int32    `json:"offset"`
+}
+
+func (q *Queries) ListUsersByRole(ctx context.Context, arg ListUsersByRoleParams) ([]User, error) {
+	rows, err := q.db.Query(ctx, ListUsersByRole, arg.UserRole, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []User{}
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.KratosIdentityID,
+			&i.Email,
+			&i.DisplayName,
+			&i.Picture,
+			&i.UserRole,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const UpdateUser = `-- name: UpdateUser :one
 UPDATE users
 SET
@@ -228,19 +270,19 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 const UpdateUserRole = `-- name: UpdateUserRole :one
 UPDATE users
 SET
-  user_role = $2::user_role,
+  user_role = $2,
   updated_at = NOW()
 WHERE id = $1
 RETURNING id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at
 `
 
 type UpdateUserRoleParams struct {
-	ID      uuid.UUID `json:"id"`
-	Column2 UserRole  `json:"column_2"`
+	ID       uuid.UUID `json:"id"`
+	UserRole UserRole  `json:"user_role"`
 }
 
 func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error) {
-	row := q.db.QueryRow(ctx, UpdateUserRole, arg.ID, arg.Column2)
+	row := q.db.QueryRow(ctx, UpdateUserRole, arg.ID, arg.UserRole)
 	var i User
 	err := row.Scan(
 		&i.ID,

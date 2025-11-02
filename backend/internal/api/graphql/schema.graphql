@@ -1,0 +1,117 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+scalar Time
+scalar UUID
+
+enum UserRole {
+  NONE
+  MEMBER
+  ADMIN
+}
+
+enum AuditEventType {
+  USER_CREATED
+  USER_UPDATED
+  USER_DELETED
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  SETTINGS_UPDATED
+  ROLE_CHANGED
+}
+
+type AuditLog {
+  id: UUID!
+  userId: UUID
+  user: User
+  eventType: AuditEventType!
+  ipAddress: String
+  userAgent: String
+  metadata: String # JSON string
+  createdAt: Time!
+}
+
+input CreateAuditLogInput {
+  userId: UUID
+  eventType: AuditEventType!
+  ipAddress: String
+  userAgent: String
+  metadata: String # JSON string
+}
+
+type User {
+  id: UUID!
+  kratosIdentityId: UUID!
+  email: String!
+  name: String
+  picture: String
+  role: UserRole!
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+
+input CreateUserInput {
+  kratosIdentityId: UUID!
+  email: String!
+  name: String
+  picture: String
+  role: UserRole = NONE
+}
+
+input UpdateUserInput {
+  name: String
+  picture: String
+}
+
+input UpdateUserRoleInput {
+  role: UserRole!
+}
+
+
+type Query {
+  # Get user by ID
+  user(id: UUID!): User
+
+  # Get user by email
+  userByEmail(email: String!): User
+
+  # Get user by Kratos identity ID
+  userByKratosId(kratosIdentityId: UUID!): User
+
+  # List all users with pagination
+  users(limit: Int = 50, offset: Int = 0): [User!]!
+
+  # List users by role with pagination
+  usersByRole(role: UserRole!, limit: Int = 50, offset: Int = 0): [User!]!
+
+  # Count total number of users
+  countUsers: Int!
+
+  # Count users by role
+  countUsersByRole(role: UserRole!): Int!
+
+  # Get audit logs with optional filtering
+  auditLogs(userId: UUID, eventType: AuditEventType, limit: Int = 50, offset: Int = 0): [AuditLog!]!
+
+  # Get single audit log by ID
+  auditLog(id: UUID!): AuditLog
+}
+
+type Mutation {
+  # Create a new user (called by Kratos webhook)
+  createUser(input: CreateUserInput!): User!
+
+  # Update user profile (name, picture)
+  updateUser(id: UUID!, input: UpdateUserInput!): User!
+
+  # Update user role (admin only)
+  updateUserRole(id: UUID!, input: UpdateUserRoleInput!): User!
+
+  # Delete a user
+  deleteUser(id: UUID!): Boolean!
+
+  # Create audit log entry
+  createAuditLog(input: CreateAuditLogInput!): AuditLog!
+}
