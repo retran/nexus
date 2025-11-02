@@ -1,17 +1,17 @@
 // Copyright 2025 Andrew Vasilyev
 // SPDX-License-Identifier: Apache-2.0
 
+// Package main starts the GraphQL API server.
 package main
 
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"net/http"
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
@@ -24,7 +24,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	dbConfig := postgres.Config{
+	dbConfig := &postgres.Config{
 		Host:            getEnv("POSTGRES_HOST", "localhost"),
 		Port:            5432,
 		Database:        getEnv("POSTGRES_DB", "nexus"),
@@ -59,9 +59,11 @@ func main() {
 	mux.Handle("/graphql", srv)
 	mux.Handle("/", playground.Handler("GraphQL Playground", "/graphql"))
 
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		if _, err := w.Write([]byte("OK")); err != nil {
+			log.Printf("health check response write failed: %v", err)
+		}
 	})
 
 	port := getEnv("SERVER_PORT", "8081")
@@ -90,7 +92,8 @@ func main() {
 	defer cancel()
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		log.Printf("Server forced to shutdown: %v", err)
+		return
 	}
 
 	log.Println("Server stopped")
