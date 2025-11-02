@@ -1,0 +1,25 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: APACHE-2.0
+
+# GraphQL schema location
+schema: internal/api/graphql/schema.graphql
+
+# Where to write generated code
+generated: internal/client/graphql/generated.go
+
+# Package name for generated code
+package: graphql
+
+# Directory containing .graphql files with queries/mutations
+operations:
+  - internal/client/graphql/queries/*.graphql
+
+# Use pointers for optional fields
+optional: pointer
+
+# Generate bindings for these scalar types
+bindings:
+  UUID:
+    type: github.com/google/uuid.UUID
+  Time:
+    type: time.Time
