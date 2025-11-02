@@ -47,14 +47,20 @@ tasks:
       - printf "{{.GREEN}}[OK]{{.NC}} All dependencies installed\n"
 
   env:init:
-    desc: "Initialize .env file from template"
+    desc: "Initialize .env file from development template"
     cmds:
       - |
         if [ ! -f .env ]; then
-          cp .env.example .env 2>/dev/null || echo "POSTGRES_USER=admin
+          if [ -f .env.dev.example ]; then
+            cp .env.dev.example .env
+            printf "{{.GREEN}}[OK]{{.NC}} .env file created from .env.dev.example\n"
+            printf "{{.YELLOW}}[NOTE]{{.NC}} Don't forget to update secret values in .env\n"
+          else
+            echo "POSTGRES_USER=admin
         POSTGRES_PASSWORD=SUPER_SECRET_PASSWORD
         POSTGRES_DB=nexus_db" > .env
-          printf "{{.GREEN}}[OK]{{.NC}} .env file created\n"
+            printf "{{.GREEN}}[OK]{{.NC}} .env file created with defaults\n"
+          fi
         else
           printf "{{.YELLOW}}[INFO]{{.NC}} .env file already exists\n"
         fi
@@ -188,11 +194,17 @@ tasks:
       - task: frontend:test:coverage
 
   check:
-    desc: "Run all checks (format, lint, type-check)"
+    desc: "Run all checks (same as pre-commit hooks)"
     cmds:
-      - task: format:check
-      - task: lint
-      - task: frontend:type-check
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running pre-commit checks...\n"
+        if ! command -v pre-commit >/dev/null 2>&1; then
+          printf "{{.RED}}[ERROR]{{.NC}} pre-commit is not installed\n"
+          printf "{{.YELLOW}}[INFO]{{.NC}} Install with: brew install pre-commit\n"
+          exit 1
+        fi
+        pre-commit run --all-files
+        printf "{{.GREEN}}[OK]{{.NC}} All checks passed!\n"
 
   # BUILD
   build:

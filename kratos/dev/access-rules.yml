@@ -1,0 +1,86 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Oathkeeper Access Rules - DEVELOPMENT ENVIRONMENT
+# Production rules will use actual domains with HTTPS
+
+- id: "public:auth"
+  upstream:
+    preserve_host: true
+    url: "http://kratos-selfservice-ui:3000"
+  match:
+    url: "http://auth.nexus.local/<**>"
+    methods:
+      - GET
+      - POST
+  authenticators:
+    - handler: anonymous
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+
+- id: "protected:api"
+  upstream:
+    preserve_host: true
+    url: "http://gateway:8080"
+  match:
+    url: "http://api.nexus.local/<**>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: header
+
+- id: "protected:graphql"
+  upstream:
+    preserve_host: true
+    url: "http://api-server:8081"
+  match:
+    url: "http://graphql.nexus.local/<**>"
+    methods:
+      - GET
+      - POST
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: header
+
+- id: "protected:ui"
+  upstream:
+    preserve_host: true
+    url: "http://ui:3000"
+  match:
+    url: "http://nexus.local/<**>"
+    methods:
+      - GET
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+
+- id: "protected:ui-static"
+  upstream:
+    preserve_host: true
+    url: "http://ui:3000"
+  match:
+    url: "http://nexus.local/<{src,assets,node_modules}/**>"
+    methods:
+      - GET
+  authenticators:
+    - handler: anonymous
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop

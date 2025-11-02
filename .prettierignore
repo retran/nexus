@@ -10,3 +10,6 @@ build/
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
+
+# Jsonnet files (Ory Kratos templates)
+*.jsonnet

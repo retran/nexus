@@ -1,15 +1,47 @@
 # Copyright 2025 Andrew Vasilyev
 # SPDX-License-Identifier: Apache-2.0
 
+# Docker Compose - DEVELOPMENT ENVIRONMENT
+# This configuration is for local development only.
+# Production deployment uses separate compose files with:
+# - HTTPS/TLS certificates (Let's Encrypt)
+# - Actual domains (not .local)
+# - HashiCorp Vault for secrets
+# - Cloudflare Tunnel for external access
+# - Production-grade logging and monitoring
+
 services:
+  traefik:
+    image: traefik:v3.5
+    restart: always
+    command:
+      - "--api.insecure=true" # Dev only! Prod: secure dashboard
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--log.level=DEBUG" # Dev: DEBUG; Prod: INFO or WARN
+    ports:
+      - "80:80" # HTTP
+      - "8090:8080" # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.nexus.local`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.entrypoints=web"
+
   postgres:
-    image: postgres:alpine
+    image: postgres:18-alpine
     restart: always
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
+      - ./postgres/init-kratos-db.sh:/docker-entrypoint-initdb.d/init-kratos-db.sh
     ports:
-      - "5432:5432"
+      - "5432:5432" # Dev: exposed for local access; Prod: internal only
     env_file: .env
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD} # Dev: from .env; Prod: from Vault
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
       interval: 10s
@@ -17,32 +49,33 @@ services:
       retries: 5
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_password}
     ports:
-      - "6379:6379"
+      - "6379:6379" # Dev: exposed for local access; Prod: internal only
     volumes:
       - redis_dev_data:/data
+    env_file: .env # Dev: from .env; Prod: from Vault
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   temporal:
-    image: temporalio/auto-setup:latest
+    image: temporalio/auto-setup:1.29.1
     restart: always
     ports:
       - "7233:7233"
       - "8088:8088"
     env_file: .env
     environment:
-      - DB=postgres
+      - DB=postgres12 # Use postgres12 or postgres12_pgx for PostgreSQL support
       - DB_PORT=5432
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PWD=${POSTGRES_PASSWORD}
       - POSTGRES_SEEDS=postgres
-      - DYNAMIC_CONFIG_FILE_PATH=config/dynamic_config.yaml
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,16 +86,21 @@ services:
       dockerfile: Dockerfile.api-server.dev
     restart: always
     expose:
-      - "8081" # Internal port exposed by the Go API server
+      - "8081"
     ports:
       - "2345:2345" # Debugger
     env_file: .env
     environment:
-      - SERVER_PORT=8081 # Configure Go server to listen on 8081
+      - SERVER_PORT=8081
       - POSTGRES_HOST=postgres
     volumes:
       - ./backend:/app
     command: ["air", "-c", ".air.api-server.toml"]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-server.rule=Host(`graphql.nexus.local`)"
+      - "traefik.http.routers.api-server.entrypoints=web"
+      - "traefik.http.services.api-server.loadbalancer.server.port=8081"
     depends_on:
       - postgres
       - temporal
@@ -92,17 +130,23 @@ services:
       context: ./backend
       dockerfile: Dockerfile.gateway.dev
     restart: always
-    ports:
-      - "8080:8080" # Public gateway port
+    expose:
+      - "8080"
     env_file: .env
     environment:
       - GRAPHQL_ENDPOINT=http://api-server:8081/graphql
       - TEMPORAL_HOST=temporal:7233
       - POSTGRES_HOST=postgres
       - REDIS_HOST=redis
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis_password}
     volumes:
       - ./backend:/app
     command: ["air", "-c", ".air.gateway.toml"]
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gateway.rule=Host(`api.nexus.local`)"
+      - "traefik.http.routers.gateway.entrypoints=web"
+      - "traefik.http.services.gateway.loadbalancer.server.port=8080"
     depends_on:
       api-server:
         condition: service_started
@@ -118,14 +162,88 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.dev
     restart: always
-    ports:
-      - "3000:3000" # TODO: Replace with expose
+    expose:
+      - "3000"
     env_file: .env
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ui.rule=Host(`nexus.local`)"
+      - "traefik.http.routers.ui.entrypoints=web"
+      - "traefik.http.services.ui.loadbalancer.server.port=3000"
     depends_on:
-      - gateway # UI depends on the gateway
+      - gateway
+
+  kratos-migrate:
+    image: oryd/kratos:v1.3.1
+    restart: on-failure
+    env_file: .env
+    environment:
+      - DSN=${DSN}
+    command: -c /etc/config/kratos/kratos.yml migrate sql -e --yes
+    volumes:
+      - ./kratos/dev:/etc/config/kratos:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  kratos:
+    image: oryd/kratos:v1.3.1
+    restart: always
+    expose:
+      - "4433" # Public API
+      - "4434" # Admin API
+    env_file: .env
+    environment:
+      - DSN=${DSN}
+      - SECRETS_COOKIE=${KRATOS_COOKIE_SECRET}
+      - SECRETS_CIPHER=${KRATOS_CIPHER_SECRET}
+      - SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - SELFSERVICE_FLOWS_LOGIN_AFTER_OIDC_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE=${WEBHOOK_SECRET}
+      - SELFSERVICE_FLOWS_REGISTRATION_AFTER_PASSWORD_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE=${WEBHOOK_SECRET}
+    command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier # --dev flag for development only!
+    volumes:
+      - ./kratos/dev:/etc/config/kratos:ro
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+
+  kratos-selfservice-ui:
+    image: oryd/kratos-selfservice-ui-node:v1.3.1
+    restart: always
+    expose:
+      - "3000"
+    env_file: .env
+    environment:
+      - KRATOS_PUBLIC_URL=http://kratos:4433
+      - KRATOS_BROWSER_URL=http://auth.nexus.local
+      - SECURITY_MODE=cookie
+      - PORT=3000
+      - COOKIE_SECRET=${COOKIE_SECRET}
+      - CSRF_COOKIE_NAME=${CSRF_COOKIE_NAME}
+      - CSRF_COOKIE_SECRET=${CSRF_COOKIE_SECRET}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kratos-ui.rule=Host(`auth.nexus.local`)"
+      - "traefik.http.routers.kratos-ui.entrypoints=web"
+      - "traefik.http.services.kratos-ui.loadbalancer.server.port=3000"
+    depends_on:
+      - kratos
+
+  oathkeeper:
+    image: oryd/oathkeeper:v0.40.9
+    restart: always
+    expose:
+      - "4455" # Proxy port
+      - "4456" # API port
+    command: serve -c /etc/config/oathkeeper/oathkeeper.yml
+    volumes:
+      - ./kratos/dev:/etc/config/oathkeeper:ro
+    depends_on:
+      - kratos
 
   atlas:
     image: arigaio/atlas:latest
