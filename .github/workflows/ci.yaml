@@ -332,7 +332,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [api, worker, ui]
+        include:
+          - service: api
+            context: ./backend
+            file: ./backend/Dockerfile.api-server.dev
+          - service: ui
+            context: ./frontend
+            file: ./frontend/Dockerfile.dev
     steps:
       - name: Checkout code
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
@@ -343,8 +349,8 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
-          context: ${{ matrix.service == 'ui' && './frontend' || './backend' }}
-          file: ${{ matrix.service == 'ui' && './frontend/Dockerfile.dev' || './backend/Dockerfile.dev' }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           push: false
           tags: nexus-${{ matrix.service }}:test
           cache-from: type=gha

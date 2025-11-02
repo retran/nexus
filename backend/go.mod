@@ -1,6 +1,6 @@
 module github.com/retran/nexus/backend
 
-go 1.25.2
+go 1.25.3
 
 require (
 	github.com/99designs/gqlgen v0.17.81
