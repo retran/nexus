@@ -29,6 +29,91 @@ tasks:
     cmds:
       - task --list-all
 
+  # SETUP & INSTALLATION
+  setup:
+    desc: "First-time setup: install dependencies, initialize environment"
+    cmds:
+      - task: env:init
+      - task: deps
+      - task: tools:check
+      - printf "{{.GREEN}}[OK]{{.NC}} Setup complete! Run 'task up' to start services.\n"
+
+  deps:
+    desc: "Install all project dependencies"
+    cmds:
+      - task: backend:deps
+      - task: frontend:deps
+      - task: postgres:deps
+      - printf "{{.GREEN}}[OK]{{.NC}} All dependencies installed\n"
+
+  env:init:
+    desc: "Initialize .env file from template"
+    cmds:
+      - |
+        if [ ! -f .env ]; then
+          cp .env.example .env 2>/dev/null || echo "POSTGRES_USER=admin
+        POSTGRES_PASSWORD=SUPER_SECRET_PASSWORD
+        POSTGRES_DB=nexus_db" > .env
+          printf "{{.GREEN}}[OK]{{.NC}} .env file created\n"
+        else
+          printf "{{.YELLOW}}[INFO]{{.NC}} .env file already exists\n"
+        fi
+
+  # TOOLS MANAGEMENT
+  tools:install:
+    desc: "Install required host tools (golangci-lint, sqlfluff, pre-commit, etc.)"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Installing development tools...\n"
+
+        # golangci-lint
+        if ! command -v golangci-lint >/dev/null 2>&1; then
+          printf "Installing golangci-lint...\n"
+          brew install golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+        fi
+
+        # sqlfluff (Python)
+        if ! command -v sqlfluff >/dev/null 2>&1; then
+          printf "Installing sqlfluff...\n"
+          pip install sqlfluff || pip3 install sqlfluff
+        fi
+
+        # pre-commit
+        if ! command -v pre-commit >/dev/null 2>&1; then
+          printf "Installing pre-commit...\n"
+          brew install pre-commit || pip install pre-commit
+        fi
+
+        # gitleaks
+        if ! command -v gitleaks >/dev/null 2>&1; then
+          printf "Installing gitleaks...\n"
+          brew install gitleaks
+        fi
+
+        printf "{{.GREEN}}[OK]{{.NC}} All tools installed\n"
+
+  tools:check:
+    desc: "Check if all required tools are installed"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking required tools...\n"
+        MISSING=""
+
+        command -v go >/dev/null 2>&1 || MISSING="$MISSING go"
+        command -v node >/dev/null 2>&1 || MISSING="$MISSING node"
+        command -v yarn >/dev/null 2>&1 || MISSING="$MISSING yarn"
+        command -v docker >/dev/null 2>&1 || MISSING="$MISSING docker"
+        command -v docker-compose >/dev/null 2>&1 || MISSING="$MISSING docker-compose"
+
+        if [ -n "$MISSING" ]; then
+          printf "{{.RED}}[ERROR]{{.NC}} Missing required tools:$MISSING\n"
+          printf "{{.YELLOW}}[INFO]{{.NC}} Run 'task tools:install' to install optional tools\n"
+          exit 1
+        fi
+
+        printf "{{.GREEN}}[OK]{{.NC}} All required tools are installed\n"
+        printf "{{.YELLOW}}[INFO]{{.NC}} Run 'task tools:install' to install optional development tools\n"
+
   # DEVELOPMENT ENVIRONMENT
   up:
     desc: "Start all services in development mode"
@@ -108,3 +193,45 @@ tasks:
       - task: format:check
       - task: lint
       - task: frontend:type-check
+
+  # BUILD
+  build:
+    desc: "Build all services (api-server, gateway, worker, ui)"
+    cmds:
+      - task: backend:build
+      - task: frontend:build
+      - printf "{{.GREEN}}[OK]{{.NC}} All services built\n"
+
+  # SECURITY
+  security:
+    desc: "Run all security checks (gitleaks, gosec, govulncheck, yarn audit)"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running gitleaks...\n"
+        if command -v gitleaks >/dev/null 2>&1; then
+          gitleaks detect --source . --verbose || printf "{{.YELLOW}}[WARN]{{.NC}} Gitleaks found issues\n"
+        else
+          printf "{{.YELLOW}}[WARN]{{.NC}} gitleaks not installed, skipping\n"
+        fi
+      - task: backend:security
+      - task: frontend:security
+      - printf "{{.GREEN}}[OK]{{.NC}} Security checks complete\n"
+
+  # UTILITIES
+  repo:format:
+    desc: "Format repository root files (YAML, Markdown)"
+    cmds:
+      - |
+        if command -v prettier >/dev/null 2>&1; then
+          prettier --write "*.{yaml,yml,md}"
+          printf "{{.GREEN}}[OK]{{.NC}} Root files formatted\n"
+        else
+          printf "{{.YELLOW}}[WARN]{{.NC}} prettier not installed, skipping\n"
+        fi
+
+  clean:
+    desc: "Clean all build artifacts and caches"
+    cmds:
+      - task: backend:clean
+      - task: frontend:clean
+      - printf "{{.GREEN}}[OK]{{.NC}} All artifacts cleaned\n"

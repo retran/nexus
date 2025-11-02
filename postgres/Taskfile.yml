@@ -25,6 +25,19 @@ tasks:
     cmds:
       - task --list-all
 
+  # DEPENDENCIES
+  deps:
+    desc: "Install Node dependencies for SQL tooling (prettier-plugin-sql, sqlfluff)"
+    cmds:
+      - |
+        if [ ! -d node_modules ]; then
+          echo "Installing SQL tooling dependencies..."
+          yarn install
+          printf "{{.GREEN}}[OK]{{.NC}} SQL tooling dependencies installed\n"
+        else
+          printf "{{.GREEN}}[OK]{{.NC}} SQL tooling dependencies already installed\n"
+        fi
+
   # SCHEMA MANAGEMENT (Atlas HCL)
   schema:fmt:
     desc: "Format schema.hcl file"
@@ -90,6 +103,16 @@ tasks:
       - printf "{{.GREEN}}[OK]{{.NC}} Migrations applied\n"
 
   # SQL & SCHEMA LINTING
+  lint:
+    desc: "Lint SQL files using sqlfluff (alias for lint:sql)"
+    cmds:
+      - task: lint:sql
+
+  lint:fix:
+    desc: "Lint and auto-fix SQL files using sqlfluff (alias for lint:sql:fix)"
+    cmds:
+      - task: lint:sql:fix
+
   lint:schema:
     desc: "Lint schema.hcl against potential issues using Atlas"
     cmds:
@@ -107,7 +130,7 @@ tasks:
     cmds:
       - yarn lint
 
-  lint:fix:
+  lint:sql:fix:
     desc: "Lint and auto-fix SQL files using sqlfluff"
     cmds:
       - yarn lint:fix

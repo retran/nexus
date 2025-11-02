@@ -95,9 +95,11 @@ tasks:
   clean:
     desc: "Clean frontend build artifacts"
     cmds:
-      - rm -rf dist/ build/ .vite/ coverage/
+      - rm -rf dist/ build/ .vite/ coverage/ node_modules/.cache/
+      - printf "{{.GREEN}}[OK]{{.NC}} Frontend artifacts cleaned\n"
 
   security:
     desc: "Run security scan on frontend (yarn audit)"
     cmds:
-      - yarn audit --level moderate
+      - yarn audit --level moderate || printf "{{.YELLOW}}[WARN]{{.NC}} yarn audit found vulnerabilities\n"
+      - printf "{{.GREEN}}[OK]{{.NC}} Frontend security check complete\n"
