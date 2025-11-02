@@ -126,12 +126,59 @@ tasks:
     cmds:
       - docker-compose -f docker-compose.dev.yaml up -d
       - printf "{{.GREEN}}[OK]{{.NC}} All services are starting...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Waiting for PostgreSQL to be ready...\n"
+        sleep 3
+        until docker-compose -f docker-compose.dev.yaml exec -T postgres pg_isready -U ${POSTGRES_USER:-admin} >/dev/null 2>&1; do
+          printf "{{.YELLOW}}[WAIT]{{.NC}} PostgreSQL is not ready yet...\n"
+          sleep 2
+        done
+        printf "{{.GREEN}}[OK]{{.NC}} PostgreSQL is ready\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking if migrations are needed...\n"
+        if docker-compose -f docker-compose.dev.yaml exec -T postgres psql -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-nexus_db} -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'" | grep -q '^0$'; then
+          printf "{{.YELLOW}}[INFO]{{.NC}} Database is empty, applying migrations...\n"
+          task postgres:migrate:apply
+        else
+          printf "{{.GREEN}}[OK]{{.NC}} Database already initialized\n"
+        fi
 
   down:
     desc: "Stop all services"
     cmds:
       - docker-compose -f docker-compose.dev.yaml down
       - printf "{{.GREEN}}[OK]{{.NC}} All services stopped.\n"
+
+  down:clean:
+    desc: "Stop all services and remove volumes (clean slate)"
+    cmds:
+      - |
+        printf "{{.YELLOW}}[WARNING]{{.NC}} This will remove all containers, networks, and volumes for this project.\n"
+        printf "{{.YELLOW}}[WARNING]{{.NC}} All data will be lost!\n"
+        read -p "Are you sure? (yes/no): " CONFIRM
+        if [ "$CONFIRM" != "yes" ]; then
+          printf "{{.RED}}[CANCELLED]{{.NC}} Operation cancelled.\n"
+          exit 1
+        fi
+      - docker-compose -f docker-compose.dev.yaml down -v --remove-orphans
+      - printf "{{.GREEN}}[OK]{{.NC}} All services stopped and volumes removed.\n"
+
+  prune:
+    desc: "Remove all stopped containers, unused networks, dangling images, and build cache"
+    cmds:
+      - |
+        printf "{{.YELLOW}}[WARNING]{{.NC}} This will remove:\n"
+        printf "  - All stopped containers\n"
+        printf "  - All networks not used by at least one container\n"
+        printf "  - All dangling images\n"
+        printf "  - All dangling build cache\n"
+        read -p "Continue? (yes/no): " CONFIRM
+        if [ "$CONFIRM" != "yes" ]; then
+          printf "{{.RED}}[CANCELLED]{{.NC}} Operation cancelled.\n"
+          exit 1
+        fi
+      - docker system prune -f
+      - printf "{{.GREEN}}[OK]{{.NC}} Docker cleanup complete.\n"
 
   restart:
     desc: "Restart all services"
