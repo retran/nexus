@@ -4,8 +4,8 @@
   "private": true,
   "description": "PostgreSQL migrations and SQL tooling for Nexus",
   "scripts": {
-    "format": "prettier --write 'migrations/**/*.sql'",
-    "format:check": "prettier --check 'migrations/**/*.sql'",
+    "format": "sqlfluff fix migrations/",
+    "format:check": "sqlfluff lint migrations/",
     "lint": "sqlfluff lint migrations/",
     "lint:fix": "sqlfluff fix migrations/",
     "lint:check": "sqlfluff lint migrations/ --format github-annotation"
