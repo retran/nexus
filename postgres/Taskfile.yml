@@ -1,5 +1,5 @@
 # Copyright 2025 Andrew Vasilyev
-# SPDX-License-Identifier: APACHE-2.0
+# SPDX-License-Identifier: Apache-2.0
 
 version: "3"
 
@@ -64,7 +64,7 @@ tasks:
         FILENAME="migrations/${TIMESTAMP}_{{.CLI_ARGS}}.sql"
         cat > "$FILENAME" << 'EOF'
         -- Copyright 2025 Andrew Vasilyev
-        -- SPDX-License-Identifier: APACHE-2.0
+        -- SPDX-License-Identifier: Apache-2.0
 
         -- TODO: Add your migration SQL here
         EOF

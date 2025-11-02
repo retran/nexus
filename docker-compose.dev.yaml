@@ -34,7 +34,7 @@ services:
       postgres:
         condition: service_healthy
 
-  api:
+  api-server:
     build:
       context: ./backend
       dockerfile: Dockerfile.api-server.dev
@@ -50,19 +50,36 @@ services:
       - postgres
       - temporal
 
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker.dev
+    restart: always
+    env_file: .env
+    volumes:
+      - ./backend:/app
+    command: ["air", "-c", ".air.worker.toml"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      api-server:
+        condition: service_started
+
   ui:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
     restart: always
     ports:
-      - "3000:3000"
+      - "3000:3000" # TODO: Будет заменен на expose
     env_file: .env
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      - api
+      - api-server # Обновлена зависимость
 
   atlas:
     image: arigaio/atlas:latest

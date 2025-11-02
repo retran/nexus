@@ -52,7 +52,7 @@ type CreateAuditLogParams struct {
 }
 
 // Copyright 2025 Andrew Vasilyev
-// SPDX-License-Identifier: APACHE-2.0
+// SPDX-License-Identifier: Apache-2.0
 func (q *Queries) CreateAuditLog(ctx context.Context, arg CreateAuditLogParams) (AuditLog, error) {
 	row := q.db.QueryRow(ctx, CreateAuditLog,
 		arg.UserID,

@@ -94,7 +94,7 @@ WHERE id = $1 LIMIT 1
 `
 
 // Copyright 2025 Andrew Vasilyev
-// SPDX-License-Identifier: APACHE-2.0
+// SPDX-License-Identifier: Apache-2.0
 func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 	row := q.db.QueryRow(ctx, GetUser, id)
 	var i User
