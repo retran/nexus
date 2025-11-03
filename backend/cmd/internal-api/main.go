@@ -19,6 +19,7 @@ import (
 	"time"
 
 	vaultapi "github.com/hashicorp/vault/api"
+	temporalclient "go.temporal.io/sdk/client"
 
 	"github.com/retran/nexus/backend/internal/auth"
 	"github.com/retran/nexus/backend/internal/internalapi/handlers"
@@ -37,16 +38,30 @@ func run() error {
 	audienceEnv := getEnv("JWT_ALLOWED_AUDIENCES", "internal-api")
 	allowedRolesEnv := getEnv("INTERNAL_ALLOWED_ROLES", "none,member,admin")
 	kratosAdminURL := getEnv("KRATOS_ADMIN_URL", "http://kratos:4434")
+	temporalHost := getEnv("TEMPORAL_HOST", "temporal:7233")
+	temporalNamespace := getEnv("TEMPORAL_NAMESPACE", "default")
+	taskQueue := getEnv("TEMPORAL_TASK_QUEUE", "nexus-task-queue")
+	auditSubjects := getEnv("AUDIT_ALLOWED_SUBJECTS", "gateway")
 
 	log.Printf("GraphQL endpoint: %s", graphqlEndpoint)
 
-	jwtMiddleware, roleHandler, err := initServices(graphqlEndpoint, audienceEnv, allowedRolesEnv, kratosAdminURL)
+	temporalClient, err := newTemporalClient(temporalHost, temporalNamespace)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if temporalClient != nil {
+			temporalClient.Close()
+		}
+	}()
+
+	jwtMiddleware, roleHandler, auditHandler, err := initServices(graphqlEndpoint, audienceEnv, allowedRolesEnv, kratosAdminURL, temporalClient, taskQueue, auditSubjects)
 	if err != nil {
 		return err
 	}
 
 	mux := http.NewServeMux()
-	configureMux(mux, jwtMiddleware, roleHandler)
+	configureMux(mux, jwtMiddleware, roleHandler, auditHandler)
 
 	server := newHTTPServer(port, mux)
 	log.Printf("Starting internal API on port %s", port)
@@ -122,23 +137,27 @@ func parseCSV(raw string) []string {
 	}
 	return out
 }
-func configureMux(mux *http.ServeMux, jwtMiddleware *internalmiddleware.JWTMiddleware, roleHandler *handlers.AdminHandler) {
+func configureMux(mux *http.ServeMux, jwtMiddleware *internalmiddleware.JWTMiddleware, roleHandler *handlers.AdminHandler, auditHandler *handlers.AuditHandler) {
 	mux.HandleFunc("GET /health", healthHandler)
 
 	mux.Handle("GET /internal/healthz", jwtMiddleware.Require(http.HandlerFunc(internalHealthHandler)))
 	mux.Handle("POST /admin/users/{id}/role", jwtMiddleware.Require(adminRoleHandler(roleHandler)))
+	if auditHandler != nil {
+		mux.Handle("POST /internal/audit/events", jwtMiddleware.Require(http.HandlerFunc(auditHandler.HandleAuditEvent)))
+	}
 }
 
-func initServices(_ string, audienceEnv, allowedRolesEnv, kratosAdminURL string) (*internalmiddleware.JWTMiddleware, *handlers.AdminHandler, error) {
+func initServices(_ string, audienceEnv, allowedRolesEnv, kratosAdminURL string, temporalClient temporalclient.Client, taskQueue, auditSubjects string) (*internalmiddleware.JWTMiddleware, *handlers.AdminHandler, *handlers.AuditHandler, error) {
 	jwtVerifier, err := newJWTVerifierFromEnv()
 	if err != nil {
-		return nil, nil, fmt.Errorf("initialise JWT verifier: %w", err)
+		return nil, nil, nil, fmt.Errorf("initialise JWT verifier: %w", err)
 	}
 
 	jwtMiddleware := internalmiddleware.NewJWTMiddleware(jwtVerifier, parseCSV(audienceEnv))
 	roleHandler := handlers.NewAdminHandler(kratosAdminURL, parseCSV(allowedRolesEnv))
+	auditHandler := handlers.NewAuditHandler(temporalClient, taskQueue, parseCSV(auditSubjects))
 
-	return jwtMiddleware, roleHandler, nil
+	return jwtMiddleware, roleHandler, auditHandler, nil
 }
 
 func adminRoleHandler(roleHandler *handlers.AdminHandler) http.HandlerFunc {
@@ -172,6 +191,20 @@ func adminRoleHandler(roleHandler *handlers.AdminHandler) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+func newTemporalClient(host, namespace string) (temporalclient.Client, error) {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		return nil, errors.New("TEMPORAL_HOST is required")
+	}
+
+	opts := temporalclient.Options{HostPort: host, Namespace: strings.TrimSpace(namespace)}
+	cli, err := temporalclient.Dial(opts)
+	if err != nil {
+		return nil, fmt.Errorf("connect to Temporal: %w", err)
+	}
+	return cli, nil
 }
 
 func newHTTPServer(port string, handler http.Handler) *http.Server {
