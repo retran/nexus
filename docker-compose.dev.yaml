@@ -172,6 +172,8 @@ services:
     env_file: .env
     environment:
       - PORT=8083
+      - GRAPHQL_ENDPOINT=http://data-api:8081/graphql
+      - KRATOS_WEBHOOK_SECRET=${WEBHOOK_SECRET}
     volumes:
       - ./backend:/app
     command: ["air", "-c", ".air.internal-api.toml"]

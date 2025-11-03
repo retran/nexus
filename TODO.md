@@ -454,7 +454,7 @@ etc.)
 
 ---
 
-## Commit 13: Migrate Kratos webhook to Internal API
+## Commit 13 ✅: Migrate Kratos webhook to Internal API
 
 **Files**:
 

@@ -14,13 +14,26 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	gql "github.com/retran/nexus/backend/internal/client/graphql"
+	"github.com/retran/nexus/backend/internal/webhooks/kratos"
 )
 
 func main() {
 	port := getEnv("PORT", "8083")
+	graphqlEndpoint := getEnv("GRAPHQL_ENDPOINT", "http://localhost:8081/graphql")
+
+	log.Printf("GraphQL endpoint: %s", graphqlEndpoint)
+
+	gqlClient := gql.NewClient(graphqlEndpoint)
+	kratosHandler := kratos.NewHandler(gqlClient)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler)
+	mux.HandleFunc("POST /webhooks/kratos/registration", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Received Kratos webhook: method=%s path=%s from=%s", r.Method, r.URL.Path, r.RemoteAddr)
+		kratosHandler.HandleRegistration(w, r)
+	})
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),

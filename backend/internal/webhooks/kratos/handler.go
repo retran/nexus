@@ -105,15 +105,13 @@ func (h *Handler) HandleRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// User doesn't exist, create new user with role="none"
+	// User doesn't exist, create new user
 	fmt.Printf("DEBUG: Creating new user with email: %s\n", payload.Email)
-	role := clientgraphql.UserRoleNone
 	createResp, err := clientgraphql.CreateUser(ctx, h.graphqlClient, clientgraphql.CreateUserInput{
 		KratosIdentityId: kratosIdentityID,
 		Email:            payload.Email,
 		Name:             name,
 		Picture:          picture,
-		Role:             &role,
 	})
 	if err != nil {
 		fmt.Printf("ERROR: Failed to create user: %v\n", err)
@@ -127,7 +125,7 @@ func (h *Handler) HandleRegistration(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]interface{}{
 		"status":  "created",
 		"user_id": createResp.CreateUser.Id,
-		"message": "User created successfully with role=none (pending admin approval)",
+		"message": "User created successfully",
 	})
 }
 

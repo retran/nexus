@@ -30,7 +30,7 @@ const (
 type AuthInfo struct {
 	Email    string
 	FullName string
-	Role     clientgraphql.UserRole
+	Role     string
 	UserID   uuid.UUID
 }
 
@@ -108,7 +108,7 @@ func (m *AuthMiddleware) RequireAdmin(next http.Handler) http.Handler {
 			return
 		}
 
-		if authInfo.Role != clientgraphql.UserRoleAdmin {
+		if !strings.EqualFold(authInfo.Role, "admin") {
 			http.Error(w, "Forbidden: Admin access required", http.StatusForbidden)
 			return
 		}
@@ -192,7 +192,8 @@ func (m *AuthMiddleware) loadAuthInfo(ctx context.Context, claims *JWTClaims) (*
 		return nil, errUserNotFound
 	}
 
-	if userResp.User.Role == clientgraphql.UserRoleNone {
+	role := strings.ToLower(strings.TrimSpace(claims.Role))
+	if role == "" || role == "none" {
 		return nil, errPendingApproval
 	}
 
@@ -200,12 +201,21 @@ func (m *AuthMiddleware) loadAuthInfo(ctx context.Context, claims *JWTClaims) (*
 	if userResp.User.Name != nil {
 		name = *userResp.User.Name
 	}
+	if name == "" && claims.FullName != "" {
+		name = claims.FullName
+	}
+
+	// Fallbacks in case user record lacks email information
+	email := userResp.User.Email
+	if email == "" {
+		email = claims.Email
+	}
 
 	return &AuthInfo{
 		UserID:   userResp.User.Id,
-		Email:    userResp.User.Email,
+		Email:    email,
 		FullName: name,
-		Role:     userResp.User.Role,
+		Role:     role,
 	}, nil
 }
 

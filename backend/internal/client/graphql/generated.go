@@ -34,14 +34,6 @@ var AllAuditEventType = []AuditEventType{
 	AuditEventTypeRoleChanged,
 }
 
-// CountUsersByRoleResponse is returned by CountUsersByRole on success.
-type CountUsersByRoleResponse struct {
-	CountUsersByRole int `json:"countUsersByRole"`
-}
-
-// GetCountUsersByRole returns CountUsersByRoleResponse.CountUsersByRole, and is useful for accessing the field via an interface.
-func (v *CountUsersByRoleResponse) GetCountUsersByRole() int { return v.CountUsersByRole }
-
 // CountUsersResponse is returned by CountUsers on success.
 type CountUsersResponse struct {
 	CountUsers int `json:"countUsers"`
@@ -122,7 +114,6 @@ type CreateUserCreateUser struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
-	Role             UserRole  `json:"role"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -142,9 +133,6 @@ func (v *CreateUserCreateUser) GetName() *string { return v.Name }
 // GetPicture returns CreateUserCreateUser.Picture, and is useful for accessing the field via an interface.
 func (v *CreateUserCreateUser) GetPicture() *string { return v.Picture }
 
-// GetRole returns CreateUserCreateUser.Role, and is useful for accessing the field via an interface.
-func (v *CreateUserCreateUser) GetRole() UserRole { return v.Role }
-
 // GetCreatedAt returns CreateUserCreateUser.CreatedAt, and is useful for accessing the field via an interface.
 func (v *CreateUserCreateUser) GetCreatedAt() time.Time { return v.CreatedAt }
 
@@ -156,7 +144,6 @@ type CreateUserInput struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
-	Role             *UserRole `json:"role"`
 }
 
 // GetKratosIdentityId returns CreateUserInput.KratosIdentityId, and is useful for accessing the field via an interface.
@@ -170,9 +157,6 @@ func (v *CreateUserInput) GetName() *string { return v.Name }
 
 // GetPicture returns CreateUserInput.Picture, and is useful for accessing the field via an interface.
 func (v *CreateUserInput) GetPicture() *string { return v.Picture }
-
-// GetRole returns CreateUserInput.Role, and is useful for accessing the field via an interface.
-func (v *CreateUserInput) GetRole() *UserRole { return v.Role }
 
 // CreateUserResponse is returned by CreateUser on success.
 type CreateUserResponse struct {
@@ -247,7 +231,6 @@ type GetUserByEmailUserByEmailUser struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
-	Role             UserRole  `json:"role"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -266,9 +249,6 @@ func (v *GetUserByEmailUserByEmailUser) GetName() *string { return v.Name }
 
 // GetPicture returns GetUserByEmailUserByEmailUser.Picture, and is useful for accessing the field via an interface.
 func (v *GetUserByEmailUserByEmailUser) GetPicture() *string { return v.Picture }
-
-// GetRole returns GetUserByEmailUserByEmailUser.Role, and is useful for accessing the field via an interface.
-func (v *GetUserByEmailUserByEmailUser) GetRole() UserRole { return v.Role }
 
 // GetCreatedAt returns GetUserByEmailUserByEmailUser.CreatedAt, and is useful for accessing the field via an interface.
 func (v *GetUserByEmailUserByEmailUser) GetCreatedAt() time.Time { return v.CreatedAt }
@@ -293,7 +273,6 @@ type GetUserByKratosIdUserByKratosIdUser struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
-	Role             UserRole  `json:"role"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -314,9 +293,6 @@ func (v *GetUserByKratosIdUserByKratosIdUser) GetName() *string { return v.Name 
 
 // GetPicture returns GetUserByKratosIdUserByKratosIdUser.Picture, and is useful for accessing the field via an interface.
 func (v *GetUserByKratosIdUserByKratosIdUser) GetPicture() *string { return v.Picture }
-
-// GetRole returns GetUserByKratosIdUserByKratosIdUser.Role, and is useful for accessing the field via an interface.
-func (v *GetUserByKratosIdUserByKratosIdUser) GetRole() UserRole { return v.Role }
 
 // GetCreatedAt returns GetUserByKratosIdUserByKratosIdUser.CreatedAt, and is useful for accessing the field via an interface.
 func (v *GetUserByKratosIdUserByKratosIdUser) GetCreatedAt() time.Time { return v.CreatedAt }
@@ -339,7 +315,6 @@ type GetUserUser struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
-	Role             UserRole  `json:"role"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -358,9 +333,6 @@ func (v *GetUserUser) GetName() *string { return v.Name }
 
 // GetPicture returns GetUserUser.Picture, and is useful for accessing the field via an interface.
 func (v *GetUserUser) GetPicture() *string { return v.Picture }
-
-// GetRole returns GetUserUser.Role, and is useful for accessing the field via an interface.
-func (v *GetUserUser) GetRole() UserRole { return v.Role }
 
 // GetCreatedAt returns GetUserUser.CreatedAt, and is useful for accessing the field via an interface.
 func (v *GetUserUser) GetCreatedAt() time.Time { return v.CreatedAt }
@@ -408,52 +380,6 @@ type ListAuditLogsResponse struct {
 // GetAuditLogs returns ListAuditLogsResponse.AuditLogs, and is useful for accessing the field via an interface.
 func (v *ListAuditLogsResponse) GetAuditLogs() []ListAuditLogsAuditLogsAuditLog { return v.AuditLogs }
 
-// ListUsersByRoleResponse is returned by ListUsersByRole on success.
-type ListUsersByRoleResponse struct {
-	UsersByRole []ListUsersByRoleUsersByRoleUser `json:"usersByRole"`
-}
-
-// GetUsersByRole returns ListUsersByRoleResponse.UsersByRole, and is useful for accessing the field via an interface.
-func (v *ListUsersByRoleResponse) GetUsersByRole() []ListUsersByRoleUsersByRoleUser {
-	return v.UsersByRole
-}
-
-// ListUsersByRoleUsersByRoleUser includes the requested fields of the GraphQL type User.
-type ListUsersByRoleUsersByRoleUser struct {
-	Id               uuid.UUID `json:"id"`
-	KratosIdentityId uuid.UUID `json:"kratosIdentityId"`
-	Email            string    `json:"email"`
-	Name             *string   `json:"name"`
-	Picture          *string   `json:"picture"`
-	Role             UserRole  `json:"role"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
-}
-
-// GetId returns ListUsersByRoleUsersByRoleUser.Id, and is useful for accessing the field via an interface.
-func (v *ListUsersByRoleUsersByRoleUser) GetId() uuid.UUID { return v.Id }
-
-// GetKratosIdentityId returns ListUsersByRoleUsersByRoleUser.KratosIdentityId, and is useful for accessing the field via an interface.
-func (v *ListUsersByRoleUsersByRoleUser) GetKratosIdentityId() uuid.UUID { return v.KratosIdentityId }
-
-// GetEmail returns ListUsersByRoleUsersByRoleUser.Email, and is useful for accessing the field via an interface.
-func (v *ListUsersByRoleUsersByRoleUser) GetEmail() string { return v.Email }
-
-// GetName returns ListUsersByRoleUsersByRoleUser.Name, and is useful for accessing the field via an interface.
-func (v *ListUsersByRoleUsersByRoleUser) GetName() *string { return v.Name }
-
-// GetPicture returns ListUsersByRoleUsersByRoleUser.Picture, and is useful for accessing the field via an interface.
-func (v *ListUsersByRoleUsersByRoleUser) GetPicture() *string { return v.Picture }
-
-// GetRole returns ListUsersByRoleUsersByRoleUser.Role, and is useful for accessing the field via an interface.
-func (v *ListUsersByRoleUsersByRoleUser) GetRole() UserRole { return v.Role }
-
-// GetCreatedAt returns ListUsersByRoleUsersByRoleUser.CreatedAt, and is useful for accessing the field via an interface.
-func (v *ListUsersByRoleUsersByRoleUser) GetCreatedAt() time.Time { return v.CreatedAt }
-
-// GetUpdatedAt returns ListUsersByRoleUsersByRoleUser.UpdatedAt, and is useful for accessing the field via an interface.
-func (v *ListUsersByRoleUsersByRoleUser) GetUpdatedAt() time.Time { return v.UpdatedAt }
-
 // ListUsersResponse is returned by ListUsers on success.
 type ListUsersResponse struct {
 	Users []ListUsersUsersUser `json:"users"`
@@ -469,7 +395,6 @@ type ListUsersUsersUser struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
-	Role             UserRole  `json:"role"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -488,9 +413,6 @@ func (v *ListUsersUsersUser) GetName() *string { return v.Name }
 
 // GetPicture returns ListUsersUsersUser.Picture, and is useful for accessing the field via an interface.
 func (v *ListUsersUsersUser) GetPicture() *string { return v.Picture }
-
-// GetRole returns ListUsersUsersUser.Role, and is useful for accessing the field via an interface.
-func (v *ListUsersUsersUser) GetRole() UserRole { return v.Role }
 
 // GetCreatedAt returns ListUsersUsersUser.CreatedAt, and is useful for accessing the field via an interface.
 func (v *ListUsersUsersUser) GetCreatedAt() time.Time { return v.CreatedAt }
@@ -517,59 +439,6 @@ type UpdateUserResponse struct {
 // GetUpdateUser returns UpdateUserResponse.UpdateUser, and is useful for accessing the field via an interface.
 func (v *UpdateUserResponse) GetUpdateUser() UpdateUserUpdateUser { return v.UpdateUser }
 
-type UpdateUserRoleInput struct {
-	Role UserRole `json:"role"`
-}
-
-// GetRole returns UpdateUserRoleInput.Role, and is useful for accessing the field via an interface.
-func (v *UpdateUserRoleInput) GetRole() UserRole { return v.Role }
-
-// UpdateUserRoleResponse is returned by UpdateUserRole on success.
-type UpdateUserRoleResponse struct {
-	UpdateUserRole UpdateUserRoleUpdateUserRoleUser `json:"updateUserRole"`
-}
-
-// GetUpdateUserRole returns UpdateUserRoleResponse.UpdateUserRole, and is useful for accessing the field via an interface.
-func (v *UpdateUserRoleResponse) GetUpdateUserRole() UpdateUserRoleUpdateUserRoleUser {
-	return v.UpdateUserRole
-}
-
-// UpdateUserRoleUpdateUserRoleUser includes the requested fields of the GraphQL type User.
-type UpdateUserRoleUpdateUserRoleUser struct {
-	Id               uuid.UUID `json:"id"`
-	KratosIdentityId uuid.UUID `json:"kratosIdentityId"`
-	Email            string    `json:"email"`
-	Name             *string   `json:"name"`
-	Picture          *string   `json:"picture"`
-	Role             UserRole  `json:"role"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
-}
-
-// GetId returns UpdateUserRoleUpdateUserRoleUser.Id, and is useful for accessing the field via an interface.
-func (v *UpdateUserRoleUpdateUserRoleUser) GetId() uuid.UUID { return v.Id }
-
-// GetKratosIdentityId returns UpdateUserRoleUpdateUserRoleUser.KratosIdentityId, and is useful for accessing the field via an interface.
-func (v *UpdateUserRoleUpdateUserRoleUser) GetKratosIdentityId() uuid.UUID { return v.KratosIdentityId }
-
-// GetEmail returns UpdateUserRoleUpdateUserRoleUser.Email, and is useful for accessing the field via an interface.
-func (v *UpdateUserRoleUpdateUserRoleUser) GetEmail() string { return v.Email }
-
-// GetName returns UpdateUserRoleUpdateUserRoleUser.Name, and is useful for accessing the field via an interface.
-func (v *UpdateUserRoleUpdateUserRoleUser) GetName() *string { return v.Name }
-
-// GetPicture returns UpdateUserRoleUpdateUserRoleUser.Picture, and is useful for accessing the field via an interface.
-func (v *UpdateUserRoleUpdateUserRoleUser) GetPicture() *string { return v.Picture }
-
-// GetRole returns UpdateUserRoleUpdateUserRoleUser.Role, and is useful for accessing the field via an interface.
-func (v *UpdateUserRoleUpdateUserRoleUser) GetRole() UserRole { return v.Role }
-
-// GetCreatedAt returns UpdateUserRoleUpdateUserRoleUser.CreatedAt, and is useful for accessing the field via an interface.
-func (v *UpdateUserRoleUpdateUserRoleUser) GetCreatedAt() time.Time { return v.CreatedAt }
-
-// GetUpdatedAt returns UpdateUserRoleUpdateUserRoleUser.UpdatedAt, and is useful for accessing the field via an interface.
-func (v *UpdateUserRoleUpdateUserRoleUser) GetUpdatedAt() time.Time { return v.UpdatedAt }
-
 // UpdateUserUpdateUser includes the requested fields of the GraphQL type User.
 type UpdateUserUpdateUser struct {
 	Id               uuid.UUID `json:"id"`
@@ -577,7 +446,6 @@ type UpdateUserUpdateUser struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
-	Role             UserRole  `json:"role"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -597,36 +465,11 @@ func (v *UpdateUserUpdateUser) GetName() *string { return v.Name }
 // GetPicture returns UpdateUserUpdateUser.Picture, and is useful for accessing the field via an interface.
 func (v *UpdateUserUpdateUser) GetPicture() *string { return v.Picture }
 
-// GetRole returns UpdateUserUpdateUser.Role, and is useful for accessing the field via an interface.
-func (v *UpdateUserUpdateUser) GetRole() UserRole { return v.Role }
-
 // GetCreatedAt returns UpdateUserUpdateUser.CreatedAt, and is useful for accessing the field via an interface.
 func (v *UpdateUserUpdateUser) GetCreatedAt() time.Time { return v.CreatedAt }
 
 // GetUpdatedAt returns UpdateUserUpdateUser.UpdatedAt, and is useful for accessing the field via an interface.
 func (v *UpdateUserUpdateUser) GetUpdatedAt() time.Time { return v.UpdatedAt }
-
-type UserRole string
-
-const (
-	UserRoleNone   UserRole = "none"
-	UserRoleMember UserRole = "member"
-	UserRoleAdmin  UserRole = "admin"
-)
-
-var AllUserRole = []UserRole{
-	UserRoleNone,
-	UserRoleMember,
-	UserRoleAdmin,
-}
-
-// __CountUsersByRoleInput is used internally by genqlient
-type __CountUsersByRoleInput struct {
-	Role UserRole `json:"role"`
-}
-
-// GetRole returns __CountUsersByRoleInput.Role, and is useful for accessing the field via an interface.
-func (v *__CountUsersByRoleInput) GetRole() UserRole { return v.Role }
 
 // __CreateAuditLogInput is used internally by genqlient
 type __CreateAuditLogInput struct {
@@ -704,22 +547,6 @@ func (v *__ListAuditLogsInput) GetLimit() *int { return v.Limit }
 // GetOffset returns __ListAuditLogsInput.Offset, and is useful for accessing the field via an interface.
 func (v *__ListAuditLogsInput) GetOffset() *int { return v.Offset }
 
-// __ListUsersByRoleInput is used internally by genqlient
-type __ListUsersByRoleInput struct {
-	Role   UserRole `json:"role"`
-	Limit  *int     `json:"limit"`
-	Offset *int     `json:"offset"`
-}
-
-// GetRole returns __ListUsersByRoleInput.Role, and is useful for accessing the field via an interface.
-func (v *__ListUsersByRoleInput) GetRole() UserRole { return v.Role }
-
-// GetLimit returns __ListUsersByRoleInput.Limit, and is useful for accessing the field via an interface.
-func (v *__ListUsersByRoleInput) GetLimit() *int { return v.Limit }
-
-// GetOffset returns __ListUsersByRoleInput.Offset, and is useful for accessing the field via an interface.
-func (v *__ListUsersByRoleInput) GetOffset() *int { return v.Offset }
-
 // __ListUsersInput is used internally by genqlient
 type __ListUsersInput struct {
 	Limit  *int `json:"limit"`
@@ -744,18 +571,6 @@ func (v *__UpdateUserInput) GetId() uuid.UUID { return v.Id }
 // GetInput returns __UpdateUserInput.Input, and is useful for accessing the field via an interface.
 func (v *__UpdateUserInput) GetInput() UpdateUserInput { return v.Input }
 
-// __UpdateUserRoleInput is used internally by genqlient
-type __UpdateUserRoleInput struct {
-	Id    uuid.UUID           `json:"id"`
-	Input UpdateUserRoleInput `json:"input"`
-}
-
-// GetId returns __UpdateUserRoleInput.Id, and is useful for accessing the field via an interface.
-func (v *__UpdateUserRoleInput) GetId() uuid.UUID { return v.Id }
-
-// GetInput returns __UpdateUserRoleInput.Input, and is useful for accessing the field via an interface.
-func (v *__UpdateUserRoleInput) GetInput() UpdateUserRoleInput { return v.Input }
-
 // The query executed by CountUsers.
 const CountUsers_Operation = `
 query CountUsers {
@@ -773,38 +588,6 @@ func CountUsers(
 	}
 
 	data_ = &CountUsersResponse{}
-	resp_ := &graphql.Response{Data: data_}
-
-	err_ = client_.MakeRequest(
-		ctx_,
-		req_,
-		resp_,
-	)
-
-	return data_, err_
-}
-
-// The query executed by CountUsersByRole.
-const CountUsersByRole_Operation = `
-query CountUsersByRole ($role: UserRole!) {
-	countUsersByRole(role: $role)
-}
-`
-
-func CountUsersByRole(
-	ctx_ context.Context,
-	client_ graphql.Client,
-	role UserRole,
-) (data_ *CountUsersByRoleResponse, err_ error) {
-	req_ := &graphql.Request{
-		OpName: "CountUsersByRole",
-		Query:  CountUsersByRole_Operation,
-		Variables: &__CountUsersByRoleInput{
-			Role: role,
-		},
-	}
-
-	data_ = &CountUsersByRoleResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
@@ -865,7 +648,6 @@ mutation CreateUser ($input: CreateUserInput!) {
 		email
 		name
 		picture
-		role
 		createdAt
 		updatedAt
 	}
@@ -978,7 +760,6 @@ query GetUser ($id: UUID!) {
 		email
 		name
 		picture
-		role
 		createdAt
 		updatedAt
 	}
@@ -1019,7 +800,6 @@ query GetUserByEmail ($email: String!) {
 		email
 		name
 		picture
-		role
 		createdAt
 		updatedAt
 	}
@@ -1060,7 +840,6 @@ query GetUserByKratosId ($kratosIdentityId: UUID!) {
 		email
 		name
 		picture
-		role
 		createdAt
 		updatedAt
 	}
@@ -1147,7 +926,6 @@ query ListUsers ($limit: Int, $offset: Int) {
 		email
 		name
 		picture
-		role
 		createdAt
 		updatedAt
 	}
@@ -1181,51 +959,6 @@ func ListUsers(
 	return data_, err_
 }
 
-// The query executed by ListUsersByRole.
-const ListUsersByRole_Operation = `
-query ListUsersByRole ($role: UserRole!, $limit: Int, $offset: Int) {
-	usersByRole(role: $role, limit: $limit, offset: $offset) {
-		id
-		kratosIdentityId
-		email
-		name
-		picture
-		role
-		createdAt
-		updatedAt
-	}
-}
-`
-
-func ListUsersByRole(
-	ctx_ context.Context,
-	client_ graphql.Client,
-	role UserRole,
-	limit *int,
-	offset *int,
-) (data_ *ListUsersByRoleResponse, err_ error) {
-	req_ := &graphql.Request{
-		OpName: "ListUsersByRole",
-		Query:  ListUsersByRole_Operation,
-		Variables: &__ListUsersByRoleInput{
-			Role:   role,
-			Limit:  limit,
-			Offset: offset,
-		},
-	}
-
-	data_ = &ListUsersByRoleResponse{}
-	resp_ := &graphql.Response{Data: data_}
-
-	err_ = client_.MakeRequest(
-		ctx_,
-		req_,
-		resp_,
-	)
-
-	return data_, err_
-}
-
 // The mutation executed by UpdateUser.
 const UpdateUser_Operation = `
 mutation UpdateUser ($id: UUID!, $input: UpdateUserInput!) {
@@ -1235,7 +968,6 @@ mutation UpdateUser ($id: UUID!, $input: UpdateUserInput!) {
 		email
 		name
 		picture
-		role
 		createdAt
 		updatedAt
 	}
@@ -1258,49 +990,6 @@ func UpdateUser(
 	}
 
 	data_ = &UpdateUserResponse{}
-	resp_ := &graphql.Response{Data: data_}
-
-	err_ = client_.MakeRequest(
-		ctx_,
-		req_,
-		resp_,
-	)
-
-	return data_, err_
-}
-
-// The mutation executed by UpdateUserRole.
-const UpdateUserRole_Operation = `
-mutation UpdateUserRole ($id: UUID!, $input: UpdateUserRoleInput!) {
-	updateUserRole(id: $id, input: $input) {
-		id
-		kratosIdentityId
-		email
-		name
-		picture
-		role
-		createdAt
-		updatedAt
-	}
-}
-`
-
-func UpdateUserRole(
-	ctx_ context.Context,
-	client_ graphql.Client,
-	id uuid.UUID,
-	input UpdateUserRoleInput,
-) (data_ *UpdateUserRoleResponse, err_ error) {
-	req_ := &graphql.Request{
-		OpName: "UpdateUserRole",
-		Query:  UpdateUserRole_Operation,
-		Variables: &__UpdateUserRoleInput{
-			Id:    id,
-			Input: input,
-		},
-	}
-
-	data_ = &UpdateUserRoleResponse{}
 	resp_ := &graphql.Response{Data: data_}
 
 	err_ = client_.MakeRequest(
