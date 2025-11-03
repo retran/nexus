@@ -336,7 +336,7 @@ etc.)
 
 ---
 
-## Commit 07: Add role to Kratos schema
+## Commit 07 ✅: Add role to Kratos schema
 
 **Research**:
 

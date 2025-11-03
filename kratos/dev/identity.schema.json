@@ -51,6 +51,12 @@
         "picture": {
           "type": "string",
           "title": "Profile Picture URL"
+        },
+        "role": {
+          "type": "string",
+          "title": "Role",
+          "enum": ["none", "member", "admin"],
+          "default": "none"
         }
       },
       "required": ["email"],
