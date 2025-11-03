@@ -374,7 +374,7 @@ etc.)
 
 ---
 
-## Commit 09: Remove UserRole from GraphQL schema
+## Commit 09 ✅: Remove UserRole from GraphQL schema
 
 **Research**:
 

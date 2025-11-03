@@ -4,12 +4,6 @@
 scalar Time
 scalar UUID
 
-enum UserRole {
-  none
-  member
-  admin
-}
-
 enum AuditEventType {
   USER_CREATED
   USER_UPDATED
@@ -46,7 +40,6 @@ type User {
   email: String!
   name: String
   picture: String
-  role: UserRole!
   createdAt: Time!
   updatedAt: Time!
 }
@@ -57,18 +50,12 @@ input CreateUserInput {
   email: String!
   name: String
   picture: String
-  role: UserRole = none
 }
 
 input UpdateUserInput {
   name: String
   picture: String
 }
-
-input UpdateUserRoleInput {
-  role: UserRole!
-}
-
 
 type Query {
   # Get user by ID
@@ -83,14 +70,8 @@ type Query {
   # List all users with pagination
   users(limit: Int = 50, offset: Int = 0): [User!]!
 
-  # List users by role with pagination
-  usersByRole(role: UserRole!, limit: Int = 50, offset: Int = 0): [User!]!
-
   # Count total number of users
   countUsers: Int!
-
-  # Count users by role
-  countUsersByRole(role: UserRole!): Int!
 
   # Get audit logs with optional filtering
   auditLogs(userId: UUID, eventType: AuditEventType, limit: Int = 50, offset: Int = 0): [AuditLog!]!
@@ -105,9 +86,6 @@ type Mutation {
 
   # Update user profile (name, picture)
   updateUser(id: UUID!, input: UpdateUserInput!): User!
-
-  # Update user role (admin only)
-  updateUserRole(id: UUID!, input: UpdateUserRoleInput!): User!
 
   # Delete a user
   deleteUser(id: UUID!): Boolean!

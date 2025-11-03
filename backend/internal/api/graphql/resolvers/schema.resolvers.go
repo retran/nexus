@@ -73,9 +73,6 @@ func (r *mutationResolver) CreateUser(ctx context.Context, input model.CreateUse
 		Picture:          input.Picture,
 		UserRole:         postgres.UserRoleNone,
 	}
-	if input.Role != nil {
-		params.UserRole = *input.Role
-	}
 
 	user, err := r.Queries.CreateUser(ctx, params)
 	if err != nil {
@@ -100,25 +97,6 @@ func (r *mutationResolver) UpdateUser(ctx context.Context, id string, input mode
 	user, err := r.Queries.UpdateUser(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("update user: %w", err)
-	}
-	return &user, nil
-}
-
-// UpdateUserRole is the resolver for the updateUserRole field.
-func (r *mutationResolver) UpdateUserRole(ctx context.Context, id string, input model.UpdateUserRoleInput) (*postgres.User, error) {
-	userID, err := uuid.Parse(id)
-	if err != nil {
-		return nil, fmt.Errorf("invalid user id: %w", err)
-	}
-
-	params := postgres.UpdateUserRoleParams{
-		ID:       userID,
-		UserRole: input.Role,
-	}
-
-	user, err := r.Queries.UpdateUserRole(ctx, params)
-	if err != nil {
-		return nil, fmt.Errorf("update user role: %w", err)
 	}
 	return &user, nil
 }
@@ -237,54 +215,11 @@ func (r *queryResolver) Users(ctx context.Context, limit *int, offset *int) ([]*
 	return userPtrs, nil
 }
 
-// UsersByRole is the resolver for the usersByRole field.
-func (r *queryResolver) UsersByRole(ctx context.Context, role postgres.UserRole, limit *int, offset *int) ([]*postgres.User, error) {
-	params := postgres.ListUsersByRoleParams{
-		UserRole: role,
-		Limit:    50,
-		Offset:   0,
-	}
-	if limit != nil {
-		validatedLimit, err := paginationValue("limit", *limit)
-		if err != nil {
-			return nil, err
-		}
-		params.Limit = validatedLimit
-	}
-	if offset != nil {
-		validatedOffset, err := paginationValue("offset", *offset)
-		if err != nil {
-			return nil, err
-		}
-		params.Offset = validatedOffset
-	}
-
-	users, err := r.Queries.ListUsersByRole(ctx, params)
-	if err != nil {
-		return nil, fmt.Errorf("list users by role: %w", err)
-	}
-
-	userPtrs := make([]*postgres.User, len(users))
-	for i := range users {
-		userPtrs[i] = &users[i]
-	}
-	return userPtrs, nil
-}
-
 // CountUsers is the resolver for the countUsers field.
 func (r *queryResolver) CountUsers(ctx context.Context) (int, error) {
 	count, err := r.Queries.CountUsers(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("count users: %w", err)
-	}
-	return int(count), nil
-}
-
-// CountUsersByRole is the resolver for the countUsersByRole field.
-func (r *queryResolver) CountUsersByRole(ctx context.Context, role postgres.UserRole) (int, error) {
-	count, err := r.Queries.CountUsersByRole(ctx, role)
-	if err != nil {
-		return 0, fmt.Errorf("count users by role: %w", err)
 	}
 	return int(count), nil
 }
@@ -367,11 +302,6 @@ func (r *userResolver) Name(_ context.Context, obj *postgres.User) (*string, err
 	return obj.DisplayName, nil
 }
 
-// Role is the resolver for the role field.
-func (r *userResolver) Role(_ context.Context, obj *postgres.User) (postgres.UserRole, error) {
-	return obj.UserRole, nil
-}
-
 // AuditLog returns graphql1.AuditLogResolver implementation.
 func (r *Resolver) AuditLog() graphql1.AuditLogResolver { return &auditLogResolver{r} }
 
@@ -384,9 +314,7 @@ func (r *Resolver) Query() graphql1.QueryResolver { return &queryResolver{r} }
 // User returns graphql1.UserResolver implementation.
 func (r *Resolver) User() graphql1.UserResolver { return &userResolver{r} }
 
-type (
-	auditLogResolver struct{ *Resolver }
-	mutationResolver struct{ *Resolver }
-	queryResolver    struct{ *Resolver }
-	userResolver     struct{ *Resolver }
-)
+type auditLogResolver struct{ *Resolver }
+type mutationResolver struct{ *Resolver }
+type queryResolver struct{ *Resolver }
+type userResolver struct{ *Resolver }
