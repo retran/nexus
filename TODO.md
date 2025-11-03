@@ -280,7 +280,7 @@ etc.)
 
 ---
 
-## Commit 05: Create JWT verifier library with Vault
+## Commit 05 ✅: Create JWT verifier library with Vault
 
 **Research**:
 
