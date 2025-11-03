@@ -42,6 +42,7 @@ type Config struct {
 	GoogleClientSecret    string
 	VaultSigningKey       string
 	InternalAPIURL        string
+	KratosAdminURL        string
 	OathkeeperJWTIssuer   string
 	OathkeeperJWTAudience string
 	OathkeeperJWKSFile    string
@@ -166,7 +167,7 @@ func (s *Server) Start() error {
 	// 	s.config.JWTSecret,
 	// 	s.config.FrontendURL,
 	// )
-	meHandlers := handlers.NewMeHandlers(auditService)
+	meHandlers := handlers.NewMeHandlers(auditService, s.config.KratosAdminURL)
 
 	mux := http.NewServeMux()
 

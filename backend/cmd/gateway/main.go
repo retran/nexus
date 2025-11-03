@@ -45,6 +45,7 @@ func main() {
 		ServiceJWTAudience:    parseCSVEnv("SERVICE_JWT_AUDIENCE", "data-api"),
 		InternalAPIURL:        getEnv("INTERNAL_API_URL", "http://internal-api:8083"),
 		InternalAPIAudience:   parseCSVEnv("INTERNAL_API_AUDIENCE", "internal-api"),
+		KratosAdminURL:        getEnv("KRATOS_ADMIN_URL", "http://kratos:4434"),
 		ServiceJWTSubject:     getEnv("SERVICE_JWT_SUBJECT", "gateway"),
 		ServiceJWTIssuer:      getEnv("SERVICE_JWT_ISSUER", "nexus"),
 		ServiceJWTTTL:         getEnvDuration("SERVICE_JWT_TTL", 5*time.Minute),
