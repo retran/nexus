@@ -279,6 +279,16 @@ tasks:
       - task: frontend:security
       - printf "{{.GREEN}}[OK]{{.NC}} Security checks complete\n"
 
+  secrets:rotate:
+    desc: "Rotate shared Vault secrets with grace-period handling"
+    cmds:
+      - task: vault:rotate-shared-secrets
+
+  secrets:verify:
+    desc: "Verify required shared secrets exist in Vault"
+    cmds:
+      - task: vault:verify-shared-secrets
+
   # UTILITIES
   repo:format:
     desc: "Format repository root files (YAML, Markdown)"

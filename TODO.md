@@ -131,7 +131,7 @@ unsealed
 
 ---
 
-## Commit 01b: Add KV secrets rotation automation
+## Commit 01b ✅: Add KV secrets rotation automation
 
 **Research**:
 

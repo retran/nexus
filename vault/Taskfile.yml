@@ -5,3 +5,13 @@ tasks:
     desc: "Bootstrap the Vault dev instance (init, unseal, policies, AppRoles)"
     cmds:
       - bash scripts/bootstrap-dev.sh
+
+  rotate-shared-secrets:
+    desc: "Rotate shared KV secrets (graceful AppRole rollout)"
+    cmds:
+      - bash scripts/rotate-shared-secrets.sh
+
+  verify-shared-secrets:
+    desc: "Verify required shared secrets exist and are current"
+    cmds:
+      - bash scripts/verify-shared-secrets.sh
