@@ -53,6 +53,7 @@ type Config struct {
 	VaultAddress          string
 	ServiceJWTAudience    []string
 	AllowedOrigins        []string
+	AdminRoles            []string
 	ShutdownTimeout       time.Duration
 	WriteTimeout          time.Duration
 	ReadTimeout           time.Duration
@@ -168,6 +169,7 @@ func (s *Server) Start() error {
 	// 	s.config.FrontendURL,
 	// )
 	meHandlers := handlers.NewMeHandlers(auditService, s.config.KratosAdminURL)
+	authorizerHandler := handlers.NewAuthorizerHandler(s.config.AdminRoles)
 
 	mux := http.NewServeMux()
 
@@ -182,6 +184,9 @@ func (s *Server) Start() error {
 			log.Printf("health check write error: %v", err)
 		}
 	}))
+
+	// Internal RBAC authorizer for Oathkeeper - requires auth
+	mux.Handle("POST /api/internal/authorize", s.authMiddleware.RequireAuth(http.HandlerFunc(authorizerHandler.Authorize)))
 
 	// User endpoints - auth required, rate limited by Traefik
 	mux.Handle("GET /api/me", s.authMiddleware.RequireAuth(http.HandlerFunc(meHandlers.GetMe)))
