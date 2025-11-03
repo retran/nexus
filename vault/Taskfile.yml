@@ -11,6 +11,11 @@ tasks:
     cmds:
       - bash scripts/seed-dev-secrets.sh
 
+  init-oidc:
+    desc: "Configure Vault OIDC auth using Kratos as provider"
+    cmds:
+      - bash scripts/init-oidc.sh
+
   rotate-shared-secrets:
     desc: "Rotate shared KV secrets (graceful AppRole rollout)"
     cmds:

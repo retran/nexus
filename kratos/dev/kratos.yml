@@ -39,6 +39,9 @@ selfservice:
   allowed_return_urls:
     - http://nexus.local
     - http://api.nexus.local
+    - http://vault:8200
+    - http://localhost:8200
+    - http://localhost:8200/ui/vault/auth/oidc/oidc/callback
 
   methods:
     password:

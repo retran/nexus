@@ -9,6 +9,7 @@ STATE_DIR="${REPO_ROOT}/vault/.dev"
 VAULT_ADDR_IN_CONTAINER="http://127.0.0.1:8200"
 VAULT_SERVICE_NAME="vault"
 APPROLE_OUTPUT_DIR="${STATE_DIR}/approles"
+ENV_FILE="${ENV_FILE:-${REPO_ROOT}/.env}"
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "[ERROR] jq is required for Vault bootstrap automation" >&2
@@ -187,5 +188,12 @@ EOF
   chmod 600 "${output_file}"
   echo "[INFO] AppRole credentials written to ${output_file}"
 done
+
+echo "[INFO] Configuring OIDC auth for Vault UI..."
+VAULT_TOKEN="${root_token}" \
+  VAULT_ADDR="${VAULT_ADDR_IN_CONTAINER}" \
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN}" \
+  ENV_FILE="${ENV_FILE}" \
+  "${SCRIPT_DIR}/init-oidc.sh"
 
 echo "[SUCCESS] Vault bootstrap complete. Root token stored at ${root_token_file}"

@@ -294,6 +294,11 @@ tasks:
     cmds:
       - task: vault:seed-dev-secrets
 
+  sso:init:
+    desc: "Configure Vault OIDC via Kratos"
+    cmds:
+      - task: vault:init-oidc
+
   # UTILITIES
   repo:format:
     desc: "Format repository root files (YAML, Markdown)"

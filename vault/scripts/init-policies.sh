@@ -114,4 +114,14 @@ EOF
   echo "[INFO] Policy '${policy_name}' applied."
 done
 
+admin_policy_file="${tmpdir}/vault-admin.hcl"
+cat > "${admin_policy_file}" <<EOF
+path "*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+EOF
+
+apply_policy "vault-admin" "${admin_policy_file}"
+echo "[INFO] Policy 'vault-admin' applied."
+
 echo "[INFO] Policies up to date."

@@ -184,7 +184,7 @@ etc.)
 
 ---
 
-## Commit 02a: Configure Vault OIDC auth with Kratos
+## Commit 02a ✅: Configure Vault OIDC auth with Kratos
 
 **Research**:
 
