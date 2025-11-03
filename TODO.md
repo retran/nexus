@@ -746,7 +746,7 @@ Commit: fix(iam): step-21a - activate Oathkeeper JWT verification in gateway
 
 ---
 
-## Commit 29: Add admin access rules
+## Commit 29 ✅: Add admin access rules
 
 **Research**:
 
@@ -765,7 +765,7 @@ Commit: fix(iam): step-21a - activate Oathkeeper JWT verification in gateway
 
 ---
 
-## Commit 30: Add dev-mode Traefik labels
+## Commit 30 ✅: Add dev-mode Traefik labels
 
 **Files**: `docker-compose.dev.yaml`
 
