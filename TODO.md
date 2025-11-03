@@ -220,7 +220,7 @@ etc.)
 
 ---
 
-## Commit 03: Add Vault Go client library
+## Commit 03 ✅: Add Vault Go client library
 
 **Research**:
 
