@@ -46,6 +46,8 @@ func main() {
 		VaultTransitMountPath: getEnv("VAULT_TRANSIT_MOUNT_PATH", "transit"),
 		VaultSigningKey:       getEnv("VAULT_SIGNING_KEY", "service-jwt-key"),
 		ServiceJWTAudience:    parseCSVEnv("SERVICE_JWT_AUDIENCE", "data-api"),
+		InternalAPIURL:        getEnv("INTERNAL_API_URL", "http://internal-api:8083"),
+		InternalAPIAudience:   parseCSVEnv("INTERNAL_API_AUDIENCE", "internal-api"),
 		ServiceJWTSubject:     getEnv("SERVICE_JWT_SUBJECT", "gateway"),
 		ServiceJWTIssuer:      getEnv("SERVICE_JWT_ISSUER", "nexus"),
 		ServiceJWTTTL:         getEnvDuration("SERVICE_JWT_TTL", 5*time.Minute),

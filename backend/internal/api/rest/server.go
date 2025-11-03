@@ -15,7 +15,6 @@ import (
 
 	"github.com/Khan/genqlient/graphql"
 	"github.com/redis/go-redis/v9"
-	"go.temporal.io/sdk/client"
 
 	"github.com/retran/nexus/backend/internal/api/rest/handlers"
 	"github.com/retran/nexus/backend/internal/api/rest/middleware"
@@ -44,6 +43,8 @@ type Config struct {
 	ServiceJWTSubject     string
 	GoogleClientSecret    string
 	VaultSigningKey       string
+	InternalAPIURL        string
+	InternalAPIAudience   []string
 	VaultAuthMountPath    string
 	VaultTransitMountPath string
 	VaultKVMountPath      string
@@ -62,16 +63,16 @@ type Config struct {
 
 // Server represents the REST API Gateway HTTP server.
 type Server struct {
-	gqlClient graphql.Client
-	pool      interface {
+	gqlClient   graphql.Client
+	auditClient *services.TemporalAuditService
+	pool        interface {
 		postgres.DBTX
 		Close()
 	}
-	temporalClient client.Client
-	httpServer     *http.Server
-	redisClient    *redis.Client
-	db             *postgres.Queries
-	config         Config
+	httpServer  *http.Server
+	redisClient *redis.Client
+	db          *postgres.Queries
+	config      Config
 }
 
 // New creates a new Server instance.
@@ -80,10 +81,18 @@ func New(cfg *Config) (*Server, error) {
 		return nil, errors.New("config is nil")
 	}
 
-	gqlClient, err := createGraphQLClient(cfg)
+	tokenClient, err := newTokenClient(cfg)
 	if err != nil {
 		return nil, err
 	}
+
+	gqlClient, err := createGraphQLClient(cfg, tokenClient)
+	if err != nil {
+		return nil, err
+	}
+
+	internalAPIClient := createInternalAPIClient(cfg, tokenClient)
+	auditService := services.NewTemporalAuditService(internalAPIClient, cfg.InternalAPIURL)
 
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", cfg.RedisHost, cfg.RedisPort),
@@ -106,28 +115,13 @@ func New(cfg *Config) (*Server, error) {
 
 	db := postgres.New(pool)
 
-	var temporalClient client.Client
-	if cfg.TemporalHost != "" {
-		log.Printf("Connecting to Temporal at %s...", cfg.TemporalHost)
-		temporalClient, err = client.Dial(client.Options{
-			HostPort:  cfg.TemporalHost,
-			Namespace: cfg.TemporalNamespace,
-		})
-		if err != nil {
-			log.Printf("Warning: Failed to connect to Temporal: %v. Audit logging will be disabled.", err)
-			temporalClient = nil
-		} else {
-			log.Println("Connected to Temporal")
-		}
-	}
-
 	return &Server{
-		config:         *cfg,
-		gqlClient:      gqlClient,
-		redisClient:    redisClient,
-		db:             db,
-		pool:           pool,
-		temporalClient: temporalClient,
+		config:      *cfg,
+		gqlClient:   gqlClient,
+		auditClient: auditService,
+		redisClient: redisClient,
+		db:          db,
+		pool:        pool,
 	}, nil
 }
 
@@ -136,12 +130,9 @@ func (s *Server) Start() error {
 	// Rate limiting removed - now handled by Traefik at edge level
 	// All requests are rate limited by Traefik before reaching this service
 
-	var auditService *services.TemporalAuditService
-	if s.temporalClient != nil {
-		auditService = services.NewTemporalAuditService(s.temporalClient, s.config.TemporalTaskQueue)
-	} else {
-		log.Println("Warning: Temporal client not available, audit logging disabled")
-		auditService = nil
+	auditService := s.auditClient
+	if auditService == nil {
+		log.Println("Warning: audit service not available, audit logging disabled")
 	}
 
 	userHandlers := handlers.NewUserHandlers(s.gqlClient)
@@ -227,7 +218,7 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func createGraphQLClient(cfg *Config) (graphql.Client, error) {
+func newTokenClient(cfg *Config) (*auth.TokenClient, error) {
 	if strings.TrimSpace(cfg.VaultAddress) == "" {
 		return nil, errors.New("vault address is required")
 	}
@@ -239,21 +230,6 @@ func createGraphQLClient(cfg *Config) (graphql.Client, error) {
 	}
 	if strings.TrimSpace(cfg.VaultSigningKey) == "" {
 		return nil, errors.New("vault signing key is required")
-	}
-
-	subject := strings.TrimSpace(cfg.ServiceJWTSubject)
-	if subject == "" {
-		return nil, errors.New("service jwt subject is required")
-	}
-
-	audience := make([]string, 0, len(cfg.ServiceJWTAudience))
-	for _, aud := range cfg.ServiceJWTAudience {
-		if trimmed := strings.TrimSpace(aud); trimmed != "" {
-			audience = append(audience, trimmed)
-		}
-	}
-	if len(audience) == 0 {
-		return nil, errors.New("service jwt audience is required")
 	}
 
 	secretsClient, err := secrets.NewClient(&secrets.Config{
@@ -278,6 +254,20 @@ func createGraphQLClient(cfg *Config) (graphql.Client, error) {
 		return nil, fmt.Errorf("create service token client: %w", err)
 	}
 
+	return tokenClient, nil
+}
+
+func createGraphQLClient(cfg *Config, tokenClient *auth.TokenClient) (graphql.Client, error) {
+	subject := strings.TrimSpace(cfg.ServiceJWTSubject)
+	if subject == "" {
+		return nil, errors.New("service jwt subject is required")
+	}
+
+	audience := normalizeAudience(cfg.ServiceJWTAudience)
+	if len(audience) == 0 {
+		return nil, errors.New("service jwt audience is required")
+	}
+
 	tokenTransport := newServiceTokenTransport(nil, tokenClient, subject, audience, cfg.ServiceJWTTTL)
 	httpClient := &http.Client{
 		Transport: tokenTransport,
@@ -285,4 +275,28 @@ func createGraphQLClient(cfg *Config) (graphql.Client, error) {
 	}
 
 	return gql.NewClientWithHTTPClient(cfg.GraphQLEndpoint, httpClient), nil
+}
+
+func createInternalAPIClient(cfg *Config, tokenClient *auth.TokenClient) *http.Client {
+	audience := normalizeAudience(cfg.InternalAPIAudience)
+	if len(audience) == 0 {
+		audience = []string{"internal-api"}
+	}
+
+	subject := strings.TrimSpace(cfg.ServiceJWTSubject)
+	transport := newServiceTokenTransport(nil, tokenClient, subject, audience, cfg.ServiceJWTTTL)
+	return &http.Client{
+		Transport: transport,
+		Timeout:   10 * time.Second,
+	}
+}
+
+func normalizeAudience(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		if trimmed := strings.TrimSpace(v); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
 }

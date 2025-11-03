@@ -5,63 +5,63 @@
 package services
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
-	"go.temporal.io/sdk/client"
 
 	"github.com/retran/nexus/backend/internal/domain"
 )
 
-// TemporalAuditService sends audit events to Temporal workflows.
+const auditEndpointPath = "/internal/audit/events"
+
+// TemporalAuditService sends audit events to the internal API.
 type TemporalAuditService struct {
-	temporalClient client.Client
-	taskQueue      string
+	httpClient *http.Client
+	endpoint   string
 }
 
-// NewTemporalAuditService creates a new Temporal-based audit service.
-func NewTemporalAuditService(temporalClient client.Client, taskQueue string) *TemporalAuditService {
+// NewTemporalAuditService creates a new audit service that forwards events to the internal API.
+func NewTemporalAuditService(httpClient *http.Client, baseURL string) *TemporalAuditService {
+	base := strings.TrimSpace(baseURL)
+	if httpClient == nil || base == "" {
+		return nil
+	}
+
 	return &TemporalAuditService{
-		temporalClient: temporalClient,
-		taskQueue:      taskQueue,
+		httpClient: httpClient,
+		endpoint:   strings.TrimRight(base, "/") + auditEndpointPath,
 	}
 }
 
-// LogEvent sends an audit event to Temporal workflow asynchronously.
+// LogEvent sends an audit event asynchronously via the internal API.
 func (s *TemporalAuditService) LogEvent(ctx context.Context, r *http.Request, userID *uuid.UUID, eventType string, metadata map[string]interface{}) error {
-	event := domain.AuditEvent{
-		UserID:    userID,
-		EventType: eventType,
-		IPAddress: extractIPAddress(r),
-		UserAgent: r.UserAgent(),
-		Metadata:  metadata,
-		Source:    "rest-gateway",
+	if s == nil {
+		return nil
 	}
 
-	// Start workflow with unique ID based on timestamp and event type
-	workflowID := fmt.Sprintf("audit-%s-%d", eventType, ctx.Value("request_id"))
-
-	workflowOptions := client.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: s.taskQueue,
-	}
-
-	// Execute workflow asynchronously (fire and forget)
-	_, err := s.temporalClient.ExecuteWorkflow(ctx, workflowOptions, "AuditLogWorkflow", event)
-	if err != nil {
-		// Log error but don't fail the request
-		// Audit logging failure should not impact user experience
-		return fmt.Errorf("failed to start audit workflow: %w", err)
-	}
-
-	return nil
+	event := s.buildEvent(r, userID, eventType, metadata)
+	return s.postEvent(ctx, &event)
 }
 
-// LogEventSync sends an audit event and waits for completion (use sparingly).
+// LogEventSync sends an audit event synchronously, returning any error from the internal API.
 func (s *TemporalAuditService) LogEventSync(ctx context.Context, r *http.Request, userID *uuid.UUID, eventType string, metadata map[string]interface{}) error {
-	event := domain.AuditEvent{
+	if s == nil {
+		return nil
+	}
+
+	event := s.buildEvent(r, userID, eventType, metadata)
+	return s.postEvent(ctx, &event)
+}
+
+func (s *TemporalAuditService) buildEvent(r *http.Request, userID *uuid.UUID, eventType string, metadata map[string]interface{}) domain.AuditEvent {
+	return domain.AuditEvent{
 		UserID:    userID,
 		EventType: eventType,
 		IPAddress: extractIPAddress(r),
@@ -69,24 +69,36 @@ func (s *TemporalAuditService) LogEventSync(ctx context.Context, r *http.Request
 		Metadata:  metadata,
 		Source:    "rest-gateway",
 	}
+}
 
-	workflowID := fmt.Sprintf("audit-%s-sync-%d", eventType, ctx.Value("request_id"))
-
-	workflowOptions := client.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: s.taskQueue,
+func (s *TemporalAuditService) postEvent(ctx context.Context, event *domain.AuditEvent) error {
+	if event == nil {
+		return errors.New("audit event is required")
 	}
 
-	// Execute and wait for result
-	run, err := s.temporalClient.ExecuteWorkflow(ctx, workflowOptions, "AuditLogWorkflow", event)
+	payload, err := json.Marshal(event)
 	if err != nil {
-		return fmt.Errorf("failed to start audit workflow: %w", err)
+		return fmt.Errorf("marshal audit event: %w", err)
 	}
 
-	// Wait for workflow completion
-	err = run.Get(ctx, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.endpoint, bytes.NewReader(payload))
 	if err != nil {
-		return fmt.Errorf("audit workflow failed: %w", err)
+		return fmt.Errorf("build audit request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("send audit request: %w", err)
+	}
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			log.Printf("audit service: close response body: %v", cerr)
+		}
+	}()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("internal api returned status %d", resp.StatusCode)
 	}
 
 	return nil
@@ -94,14 +106,11 @@ func (s *TemporalAuditService) LogEventSync(ctx context.Context, r *http.Request
 
 // extractIPAddress extracts the client's IP address from the request.
 func extractIPAddress(r *http.Request) string {
-	// Check for X-Forwarded-For header (behind proxy)
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
 		return forwarded
 	}
-	// Check for X-Real-IP header
 	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
 		return realIP
 	}
-	// Fallback to RemoteAddr
 	return r.RemoteAddr
 }
