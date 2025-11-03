@@ -71,7 +71,6 @@ func (r *mutationResolver) CreateUser(ctx context.Context, input model.CreateUse
 		Email:            input.Email,
 		DisplayName:      input.Name,
 		Picture:          input.Picture,
-		UserRole:         postgres.UserRoleNone,
 	}
 
 	user, err := r.Queries.CreateUser(ctx, params)

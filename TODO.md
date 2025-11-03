@@ -396,7 +396,7 @@ etc.)
 
 ---
 
-## Commit 10: Update sqlc queries to remove role
+## Commit 10 ✅: Update sqlc queries to remove role
 
 **Research**:
 

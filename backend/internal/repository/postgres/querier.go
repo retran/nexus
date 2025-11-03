@@ -13,7 +13,6 @@ import (
 type Querier interface {
 	CountAuditLogs(ctx context.Context, arg CountAuditLogsParams) (int64, error)
 	CountUsers(ctx context.Context) (int64, error)
-	CountUsersByRole(ctx context.Context, userRole UserRole) (int64, error)
 	// Copyright 2025 Andrew Vasilyev
 	// SPDX-License-Identifier: Apache-2.0
 	CreateAuditLog(ctx context.Context, arg CreateAuditLogParams) (AuditLog, error)
@@ -27,9 +26,7 @@ type Querier interface {
 	GetUserByKratosID(ctx context.Context, kratosIdentityID uuid.UUID) (User, error)
 	ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([]AuditLog, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
-	ListUsersByRole(ctx context.Context, arg ListUsersByRoleParams) ([]User, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
-	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error)
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)
 }
 

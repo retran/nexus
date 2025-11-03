@@ -18,21 +18,14 @@ SELECT * FROM users
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2;
 
--- name: ListUsersByRole :many
-SELECT * FROM users
-WHERE user_role = $1
-ORDER BY created_at DESC
-LIMIT $2 OFFSET $3;
-
 -- name: CreateUser :one
 INSERT INTO users (
   kratos_identity_id,
   email,
   display_name,
-  picture,
-  user_role
+  picture
 ) VALUES (
-  $1, $2, $3, $4, $5
+  $1, $2, $3, $4
 )
 RETURNING *;
 
@@ -41,10 +34,9 @@ INSERT INTO users (
   kratos_identity_id,
   email,
   display_name,
-  picture,
-  user_role
+  picture
 ) VALUES (
-  $1, $2, $3, $4, $5
+  $1, $2, $3, $4
 )
 ON CONFLICT (kratos_identity_id) DO UPDATE
 SET
@@ -63,21 +55,9 @@ SET
 WHERE id = $1
 RETURNING *;
 
--- name: UpdateUserRole :one
-UPDATE users
-SET
-  user_role = $2,
-  updated_at = NOW()
-WHERE id = $1
-RETURNING *;
-
 -- name: DeleteUser :exec
 DELETE FROM users
 WHERE id = $1;
 
 -- name: CountUsers :one
 SELECT COUNT(*) FROM users;
-
--- name: CountUsersByRole :one
-SELECT COUNT(*) FROM users
-WHERE user_role = $1;

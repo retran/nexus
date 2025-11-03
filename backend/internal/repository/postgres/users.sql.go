@@ -22,29 +22,16 @@ func (q *Queries) CountUsers(ctx context.Context) (int64, error) {
 	return count, err
 }
 
-const CountUsersByRole = `-- name: CountUsersByRole :one
-SELECT COUNT(*) FROM users
-WHERE user_role = $1
-`
-
-func (q *Queries) CountUsersByRole(ctx context.Context, userRole UserRole) (int64, error) {
-	row := q.db.QueryRow(ctx, CountUsersByRole, userRole)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const CreateUser = `-- name: CreateUser :one
 INSERT INTO users (
   kratos_identity_id,
   email,
   display_name,
-  picture,
-  user_role
+  picture
 ) VALUES (
-  $1, $2, $3, $4, $5
+  $1, $2, $3, $4
 )
-RETURNING id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at
+RETURNING id, kratos_identity_id, email, display_name, picture, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -52,7 +39,6 @@ type CreateUserParams struct {
 	Email            string    `json:"email"`
 	DisplayName      *string   `json:"display_name"`
 	Picture          *string   `json:"picture"`
-	UserRole         UserRole  `json:"user_role"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -61,7 +47,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.Email,
 		arg.DisplayName,
 		arg.Picture,
-		arg.UserRole,
 	)
 	var i User
 	err := row.Scan(
@@ -70,7 +55,6 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.DisplayName,
 		&i.Picture,
-		&i.UserRole,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -89,7 +73,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
 
 const GetUser = `-- name: GetUser :one
 
-SELECT id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at FROM users
+SELECT id, kratos_identity_id, email, display_name, picture, created_at, updated_at FROM users
 WHERE id = $1 LIMIT 1
 `
 
@@ -104,7 +88,6 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.Email,
 		&i.DisplayName,
 		&i.Picture,
-		&i.UserRole,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -112,7 +95,7 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 }
 
 const GetUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at FROM users
+SELECT id, kratos_identity_id, email, display_name, picture, created_at, updated_at FROM users
 WHERE email = $1 LIMIT 1
 `
 
@@ -125,7 +108,6 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Email,
 		&i.DisplayName,
 		&i.Picture,
-		&i.UserRole,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -133,7 +115,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const GetUserByKratosID = `-- name: GetUserByKratosID :one
-SELECT id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at FROM users
+SELECT id, kratos_identity_id, email, display_name, picture, created_at, updated_at FROM users
 WHERE kratos_identity_id = $1 LIMIT 1
 `
 
@@ -146,7 +128,6 @@ func (q *Queries) GetUserByKratosID(ctx context.Context, kratosIdentityID uuid.U
 		&i.Email,
 		&i.DisplayName,
 		&i.Picture,
-		&i.UserRole,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -154,7 +135,7 @@ func (q *Queries) GetUserByKratosID(ctx context.Context, kratosIdentityID uuid.U
 }
 
 const ListUsers = `-- name: ListUsers :many
-SELECT id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at FROM users
+SELECT id, kratos_identity_id, email, display_name, picture, created_at, updated_at FROM users
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -179,49 +160,6 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.Email,
 			&i.DisplayName,
 			&i.Picture,
-			&i.UserRole,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const ListUsersByRole = `-- name: ListUsersByRole :many
-SELECT id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at FROM users
-WHERE user_role = $1
-ORDER BY created_at DESC
-LIMIT $2 OFFSET $3
-`
-
-type ListUsersByRoleParams struct {
-	UserRole UserRole `json:"user_role"`
-	Limit    int32    `json:"limit"`
-	Offset   int32    `json:"offset"`
-}
-
-func (q *Queries) ListUsersByRole(ctx context.Context, arg ListUsersByRoleParams) ([]User, error) {
-	rows, err := q.db.Query(ctx, ListUsersByRole, arg.UserRole, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []User{}
-	for rows.Next() {
-		var i User
-		if err := rows.Scan(
-			&i.ID,
-			&i.KratosIdentityID,
-			&i.Email,
-			&i.DisplayName,
-			&i.Picture,
-			&i.UserRole,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -242,7 +180,7 @@ SET
   picture = COALESCE($3, picture),
   updated_at = NOW()
 WHERE id = $1
-RETURNING id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at
+RETURNING id, kratos_identity_id, email, display_name, picture, created_at, updated_at
 `
 
 type UpdateUserParams struct {
@@ -260,37 +198,6 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 		&i.Email,
 		&i.DisplayName,
 		&i.Picture,
-		&i.UserRole,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const UpdateUserRole = `-- name: UpdateUserRole :one
-UPDATE users
-SET
-  user_role = $2,
-  updated_at = NOW()
-WHERE id = $1
-RETURNING id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at
-`
-
-type UpdateUserRoleParams struct {
-	ID       uuid.UUID `json:"id"`
-	UserRole UserRole  `json:"user_role"`
-}
-
-func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error) {
-	row := q.db.QueryRow(ctx, UpdateUserRole, arg.ID, arg.UserRole)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.KratosIdentityID,
-		&i.Email,
-		&i.DisplayName,
-		&i.Picture,
-		&i.UserRole,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -302,10 +209,9 @@ INSERT INTO users (
   kratos_identity_id,
   email,
   display_name,
-  picture,
-  user_role
+  picture
 ) VALUES (
-  $1, $2, $3, $4, $5
+  $1, $2, $3, $4
 )
 ON CONFLICT (kratos_identity_id) DO UPDATE
 SET
@@ -313,7 +219,7 @@ SET
   display_name = EXCLUDED.display_name,
   picture = EXCLUDED.picture,
   updated_at = NOW()
-RETURNING id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at
+RETURNING id, kratos_identity_id, email, display_name, picture, created_at, updated_at
 `
 
 type UpsertUserParams struct {
@@ -321,7 +227,6 @@ type UpsertUserParams struct {
 	Email            string    `json:"email"`
 	DisplayName      *string   `json:"display_name"`
 	Picture          *string   `json:"picture"`
-	UserRole         UserRole  `json:"user_role"`
 }
 
 func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error) {
@@ -330,7 +235,6 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, e
 		arg.Email,
 		arg.DisplayName,
 		arg.Picture,
-		arg.UserRole,
 	)
 	var i User
 	err := row.Scan(
@@ -339,7 +243,6 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, e
 		&i.Email,
 		&i.DisplayName,
 		&i.Picture,
-		&i.UserRole,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

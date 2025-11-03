@@ -89,67 +89,6 @@ func AllAuditEventTypeValues() []AuditEventType {
 	}
 }
 
-type UserRole string
-
-const (
-	UserRoleNone   UserRole = "none"
-	UserRoleMember UserRole = "member"
-	UserRoleAdmin  UserRole = "admin"
-)
-
-func (e *UserRole) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = UserRole(s)
-	case string:
-		*e = UserRole(s)
-	default:
-		return fmt.Errorf("unsupported scan type for UserRole: %T", src)
-	}
-	return nil
-}
-
-type NullUserRole struct {
-	UserRole UserRole `json:"user_role"`
-	Valid    bool     `json:"valid"` // Valid is true if UserRole is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullUserRole) Scan(value interface{}) error {
-	if value == nil {
-		ns.UserRole, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.UserRole.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullUserRole) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.UserRole), nil
-}
-
-func (e UserRole) Valid() bool {
-	switch e {
-	case UserRoleNone,
-		UserRoleMember,
-		UserRoleAdmin:
-		return true
-	}
-	return false
-}
-
-func AllUserRoleValues() []UserRole {
-	return []UserRole{
-		UserRoleNone,
-		UserRoleMember,
-		UserRoleAdmin,
-	}
-}
-
 // Audit trail for user actions and security events
 type AuditLog struct {
 	ID        uuid.UUID      `json:"id"`
@@ -171,9 +110,7 @@ type User struct {
 	// Display name cached from Kratos traits.name
 	DisplayName *string `json:"display_name"`
 	// Profile picture URL cached from Kratos traits.picture
-	Picture *string `json:"picture"`
-	// User role: none (pending approval), member, admin. Cached from Kratos traits.role
-	UserRole  UserRole  `json:"user_role"`
+	Picture   *string   `json:"picture"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
