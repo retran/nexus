@@ -1,0 +1,7 @@
+version: "3"
+
+tasks:
+  init:
+    desc: "Bootstrap the Vault dev instance (init, unseal, policies, AppRoles)"
+    cmds:
+      - bash scripts/bootstrap-dev.sh

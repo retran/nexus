@@ -20,6 +20,9 @@ includes:
   postgres:
     taskfile: postgres/Taskfile.yml
     dir: postgres
+  vault:
+    taskfile: vault/Taskfile.yml
+    dir: vault
 
 silent: true
 
