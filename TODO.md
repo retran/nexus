@@ -243,7 +243,7 @@ etc.)
 
 ---
 
-## Commit 04: Configure Vault Transit engine for JWT signing
+## Commit 04 ✅: Configure Vault Transit engine for JWT signing
 
 **Research**:
 

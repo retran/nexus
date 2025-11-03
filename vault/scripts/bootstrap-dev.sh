@@ -153,6 +153,12 @@ VAULT_TOKEN="${root_token}" \
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN}" \
   "${SCRIPT_DIR}/init-policies.sh"
 
+echo "[INFO] Configuring Vault transit engine for JWT signing..."
+VAULT_TOKEN="${root_token}" \
+  VAULT_ADDR="${VAULT_ADDR_IN_CONTAINER}" \
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN}" \
+  "${SCRIPT_DIR}/init-transit.sh"
+
 services=(data-api gateway worker webhooks)
 
 for service in "${services[@]}"; do

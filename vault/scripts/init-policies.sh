@@ -105,6 +105,14 @@ path "transit/verify/service-jwt-key" {
   capabilities = ["update"]
 }
 
+path "transit/keys/service-jwt-key" {
+  capabilities = ["read"]
+}
+
+path "transit/keys/service-jwt-key/*" {
+  capabilities = ["read"]
+}
+
 path "sys/health" {
   capabilities = ["read"]
 }

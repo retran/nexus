@@ -6,6 +6,11 @@ tasks:
     cmds:
       - bash scripts/bootstrap-dev.sh
 
+  init-transit:
+    desc: "Enable Vault transit engine and configure JWT signing key"
+    cmds:
+      - bash scripts/init-transit.sh
+
   seed-dev-secrets:
     desc: "Seed development secrets into Vault KV from .env"
     cmds:
@@ -20,6 +25,11 @@ tasks:
     desc: "Rotate shared KV secrets (graceful AppRole rollout)"
     cmds:
       - bash scripts/rotate-shared-secrets.sh
+
+  rotate-transit-key:
+    desc: "Rotate Vault transit signing key"
+    cmds:
+      - bash scripts/rotate-transit-key.sh
 
   verify-shared-secrets:
     desc: "Verify required shared secrets exist and are current"

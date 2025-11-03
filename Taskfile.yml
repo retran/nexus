@@ -294,6 +294,11 @@ tasks:
     cmds:
       - task: vault:seed-dev-secrets
 
+  vault:rotate-transit-key:
+    desc: "Rotate Vault transit signing key"
+    cmds:
+      - bash vault/scripts/rotate-transit-key.sh
+
   sso:init:
     desc: "Configure Vault OIDC via Kratos"
     cmds:
