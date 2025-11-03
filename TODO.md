@@ -308,7 +308,7 @@ etc.)
 
 ---
 
-## Commit 06: Create Vault token client library
+## Commit 06 ✅: Create Vault token client library
 
 **Research**:
 
