@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Khan/genqlient/graphql"
@@ -19,32 +20,44 @@ import (
 	"github.com/retran/nexus/backend/internal/api/rest/handlers"
 	"github.com/retran/nexus/backend/internal/api/rest/middleware"
 	"github.com/retran/nexus/backend/internal/api/rest/services"
+	"github.com/retran/nexus/backend/internal/auth"
 	gql "github.com/retran/nexus/backend/internal/client/graphql"
 	"github.com/retran/nexus/backend/internal/repository/postgres"
+	"github.com/retran/nexus/backend/internal/secrets"
 )
 
 // Config contains REST API Gateway server configuration.
 type Config struct {
-	TemporalNamespace  string
-	GoogleClientSecret string
-	TemporalTaskQueue  string
-	TemporalHost       string
-	GoogleClientID     string
-	GraphQLEndpoint    string
-	DatabaseURL        string
-	RedisHost          string
-	GoogleRedirectURL  string
-	Host               string
-	RedisPassword      string
-	FrontendURL        string
-	AllowedOrigins     []string
-	RedisPort          int
-	RedisDB            int
-	ShutdownTimeout    time.Duration
-	WriteTimeout       time.Duration
-	Port               int
-	ReadTimeout        time.Duration
-	// Rate limiting removed - now handled by Traefik
+	VaultSecretID         string
+	VaultRoleID           string
+	TemporalTaskQueue     string
+	TemporalHost          string
+	GoogleClientID        string
+	GraphQLEndpoint       string
+	DatabaseURL           string
+	RedisHost             string
+	GoogleRedirectURL     string
+	Host                  string
+	RedisPassword         string
+	FrontendURL           string
+	ServiceJWTIssuer      string
+	ServiceJWTSubject     string
+	GoogleClientSecret    string
+	VaultSigningKey       string
+	VaultAuthMountPath    string
+	VaultTransitMountPath string
+	VaultKVMountPath      string
+	VaultAddress          string
+	TemporalNamespace     string
+	ServiceJWTAudience    []string
+	AllowedOrigins        []string
+	ShutdownTimeout       time.Duration
+	WriteTimeout          time.Duration
+	ReadTimeout           time.Duration
+	Port                  int
+	RedisDB               int
+	RedisPort             int
+	ServiceJWTTTL         time.Duration
 }
 
 // Server represents the REST API Gateway HTTP server.
@@ -67,7 +80,10 @@ func New(cfg *Config) (*Server, error) {
 		return nil, errors.New("config is nil")
 	}
 
-	gqlClient := gql.NewClient(cfg.GraphQLEndpoint)
+	gqlClient, err := createGraphQLClient(cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	redisClient := redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", cfg.RedisHost, cfg.RedisPort),
@@ -209,4 +225,64 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func createGraphQLClient(cfg *Config) (graphql.Client, error) {
+	if strings.TrimSpace(cfg.VaultAddress) == "" {
+		return nil, errors.New("vault address is required")
+	}
+	if strings.TrimSpace(cfg.VaultRoleID) == "" {
+		return nil, errors.New("vault role id is required")
+	}
+	if strings.TrimSpace(cfg.VaultSecretID) == "" {
+		return nil, errors.New("vault secret id is required")
+	}
+	if strings.TrimSpace(cfg.VaultSigningKey) == "" {
+		return nil, errors.New("vault signing key is required")
+	}
+
+	subject := strings.TrimSpace(cfg.ServiceJWTSubject)
+	if subject == "" {
+		return nil, errors.New("service jwt subject is required")
+	}
+
+	audience := make([]string, 0, len(cfg.ServiceJWTAudience))
+	for _, aud := range cfg.ServiceJWTAudience {
+		if trimmed := strings.TrimSpace(aud); trimmed != "" {
+			audience = append(audience, trimmed)
+		}
+	}
+	if len(audience) == 0 {
+		return nil, errors.New("service jwt audience is required")
+	}
+
+	secretsClient, err := secrets.NewClient(&secrets.Config{
+		Address:       cfg.VaultAddress,
+		RoleID:        cfg.VaultRoleID,
+		SecretID:      cfg.VaultSecretID,
+		AuthMountPath: cfg.VaultAuthMountPath,
+		KVMountPath:   cfg.VaultKVMountPath,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create vault secrets client: %w", err)
+	}
+
+	tokenClient, err := auth.NewTokenClient(&auth.TokenClientConfig{
+		SecretsClient:    secretsClient,
+		SigningKeyName:   cfg.VaultSigningKey,
+		TransitMountPath: cfg.VaultTransitMountPath,
+		Issuer:           cfg.ServiceJWTIssuer,
+		VersionCacheTTL:  time.Minute,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create service token client: %w", err)
+	}
+
+	tokenTransport := newServiceTokenTransport(nil, tokenClient, subject, audience, cfg.ServiceJWTTTL)
+	httpClient := &http.Client{
+		Transport: tokenTransport,
+		Timeout:   10 * time.Second,
+	}
+
+	return gql.NewClientWithHTTPClient(cfg.GraphQLEndpoint, httpClient), nil
 }

@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,25 +19,36 @@ import (
 
 func main() {
 	cfg := rest.Config{
-		Port:               8080,
-		Host:               "0.0.0.0",
-		ReadTimeout:        10 * time.Second,
-		WriteTimeout:       10 * time.Second,
-		ShutdownTimeout:    30 * time.Second,
-		GraphQLEndpoint:    getEnv("GRAPHQL_ENDPOINT", "http://localhost:8081/graphql"),
-		AllowedOrigins:     getAllowedOrigins(),
-		DatabaseURL:        getDatabaseURL(),
-		RedisHost:          getEnv("REDIS_HOST", "localhost"),
-		RedisPort:          getEnvInt("REDIS_PORT", 6379),
-		RedisPassword:      getEnv("REDIS_PASSWORD", ""),
-		RedisDB:            getEnvInt("REDIS_DB", 0),
-		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
-		GoogleRedirectURL:  getEnv("GOOGLE_REDIRECT_URL", "http://api.nexus.local/api/auth/google/callback"),
-		FrontendURL:        getEnv("FRONTEND_URL", "http://nexus.local"),
-		TemporalHost:       getEnv("TEMPORAL_HOST", "localhost:7233"),
-		TemporalNamespace:  getEnv("TEMPORAL_NAMESPACE", "default"),
-		TemporalTaskQueue:  getEnv("TEMPORAL_TASK_QUEUE", "nexus-task-queue"),
+		Port:                  8080,
+		Host:                  "0.0.0.0",
+		ReadTimeout:           10 * time.Second,
+		WriteTimeout:          10 * time.Second,
+		ShutdownTimeout:       30 * time.Second,
+		GraphQLEndpoint:       getEnv("GRAPHQL_ENDPOINT", "http://localhost:8081/graphql"),
+		AllowedOrigins:        getAllowedOrigins(),
+		DatabaseURL:           getDatabaseURL(),
+		RedisHost:             getEnv("REDIS_HOST", "localhost"),
+		RedisPort:             getEnvInt("REDIS_PORT", 6379),
+		RedisPassword:         getEnv("REDIS_PASSWORD", ""),
+		RedisDB:               getEnvInt("REDIS_DB", 0),
+		GoogleClientID:        getEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret:    getEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleRedirectURL:     getEnv("GOOGLE_REDIRECT_URL", "http://api.nexus.local/api/auth/google/callback"),
+		FrontendURL:           getEnv("FRONTEND_URL", "http://nexus.local"),
+		TemporalHost:          getEnv("TEMPORAL_HOST", "localhost:7233"),
+		TemporalNamespace:     getEnv("TEMPORAL_NAMESPACE", "default"),
+		TemporalTaskQueue:     getEnv("TEMPORAL_TASK_QUEUE", "nexus-task-queue"),
+		VaultAddress:          getEnv("VAULT_ADDR", "http://vault:8200"),
+		VaultRoleID:           getEnv("VAULT_ROLE_ID", ""),
+		VaultSecretID:         getEnv("VAULT_SECRET_ID", ""),
+		VaultAuthMountPath:    getEnv("VAULT_AUTH_MOUNT_PATH", "approle"),
+		VaultKVMountPath:      getEnv("VAULT_KV_MOUNT_PATH", "kv"),
+		VaultTransitMountPath: getEnv("VAULT_TRANSIT_MOUNT_PATH", "transit"),
+		VaultSigningKey:       getEnv("VAULT_SIGNING_KEY", "service-jwt-key"),
+		ServiceJWTAudience:    parseCSVEnv("SERVICE_JWT_AUDIENCE", "data-api"),
+		ServiceJWTSubject:     getEnv("SERVICE_JWT_SUBJECT", "gateway"),
+		ServiceJWTIssuer:      getEnv("SERVICE_JWT_ISSUER", "nexus"),
+		ServiceJWTTTL:         getEnvDuration("SERVICE_JWT_TTL", 5*time.Minute),
 		// Rate limiting removed - now handled by Traefik at edge level
 	}
 
@@ -93,30 +105,11 @@ func getAllowedOrigins() []string {
 		return []string{"*"}
 	}
 
-	result := []string{}
-	for _, origin := range splitByComma(origins) {
-		if origin != "" {
-			result = append(result, origin)
-		}
-	}
-	return result
+	return parseCSV(origins)
 }
 
-func splitByComma(s string) []string {
-	result := []string{}
-	current := ""
-	for _, c := range s {
-		if c == ',' {
-			result = append(result, current)
-			current = ""
-		} else {
-			current += string(c)
-		}
-	}
-	if current != "" {
-		result = append(result, current)
-	}
-	return result
+func parseCSVEnv(key, defaultValue string) []string {
+	return parseCSV(getEnv(key, defaultValue))
 }
 
 func getDatabaseURL() string {
@@ -135,4 +128,29 @@ func getDatabaseURL() string {
 		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
 		user, password, host, port, dbname, sslmode,
 	)
+}
+
+func parseCSV(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if parsed, err := time.ParseDuration(value); err == nil {
+			return parsed
+		}
+		log.Printf("Invalid duration for %s: %q, using default %s", key, value, defaultValue)
+	}
+	return defaultValue
 }
