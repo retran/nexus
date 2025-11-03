@@ -113,11 +113,23 @@ selfservice:
       lifespan: 10m
       after:
         default_browser_return_url: http://nexus.local/
+        hooks:
+          - hook: web_hook
+            config:
+              url: http://internal-api:8083/webhooks/kratos/login
+              method: POST
+              body: file:///etc/config/kratos/webhook.jsonnet
+              auth:
+                type: api_key
+                config:
+                  name: X-Webhook-Secret
+                  value: to-be-configured
+                  in: header
         oidc:
           hooks:
             - hook: web_hook
               config:
-                url: http://internal-api:8083/webhooks/kratos/registration
+                url: http://internal-api:8083/webhooks/kratos/login
                 method: POST
                 body: file:///etc/config/kratos/webhook.jsonnet
                 auth:

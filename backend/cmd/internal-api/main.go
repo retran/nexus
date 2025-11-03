@@ -55,13 +55,13 @@ func run() error {
 		}
 	}()
 
-	jwtMiddleware, roleHandler, auditHandler, err := initServices(graphqlEndpoint, audienceEnv, allowedRolesEnv, kratosAdminURL, temporalClient, taskQueue, auditSubjects)
+	jwtMiddleware, roleHandler, auditHandler, kratosWebhookHandler, err := initServices(graphqlEndpoint, audienceEnv, allowedRolesEnv, kratosAdminURL, temporalClient, taskQueue, auditSubjects)
 	if err != nil {
 		return err
 	}
 
 	mux := http.NewServeMux()
-	configureMux(mux, jwtMiddleware, roleHandler, auditHandler)
+	configureMux(mux, jwtMiddleware, roleHandler, auditHandler, kratosWebhookHandler)
 
 	server := newHTTPServer(port, mux)
 	log.Printf("Starting internal API on port %s", port)
@@ -137,7 +137,7 @@ func parseCSV(raw string) []string {
 	}
 	return out
 }
-func configureMux(mux *http.ServeMux, jwtMiddleware *internalmiddleware.JWTMiddleware, roleHandler *handlers.AdminHandler, auditHandler *handlers.AuditHandler) {
+func configureMux(mux *http.ServeMux, jwtMiddleware *internalmiddleware.JWTMiddleware, roleHandler *handlers.AdminHandler, auditHandler *handlers.AuditHandler, kratosWebhookHandler *handlers.KratosWebhookHandler) {
 	mux.HandleFunc("GET /health", healthHandler)
 
 	mux.Handle("GET /internal/healthz", jwtMiddleware.Require(http.HandlerFunc(internalHealthHandler)))
@@ -145,19 +145,31 @@ func configureMux(mux *http.ServeMux, jwtMiddleware *internalmiddleware.JWTMiddl
 	if auditHandler != nil {
 		mux.Handle("POST /internal/audit/events", jwtMiddleware.Require(http.HandlerFunc(auditHandler.HandleAuditEvent)))
 	}
+
+	// Kratos webhooks (no JWT required, authenticated via webhook secret)
+	if kratosWebhookHandler != nil {
+		mux.HandleFunc("POST /webhooks/kratos/registration", kratosWebhookHandler.HandleRegistration)
+		mux.HandleFunc("POST /webhooks/kratos/login", kratosWebhookHandler.HandleLogin)
+	}
 }
 
-func initServices(_ string, audienceEnv, allowedRolesEnv, kratosAdminURL string, temporalClient temporalclient.Client, taskQueue, auditSubjects string) (*internalmiddleware.JWTMiddleware, *handlers.AdminHandler, *handlers.AuditHandler, error) {
+func initServices(_ string, audienceEnv, allowedRolesEnv, kratosAdminURL string, temporalClient temporalclient.Client, taskQueue, auditSubjects string) (*internalmiddleware.JWTMiddleware, *handlers.AdminHandler, *handlers.AuditHandler, *handlers.KratosWebhookHandler, error) {
 	jwtVerifier, err := newJWTVerifierFromEnv()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("initialise JWT verifier: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("initialise JWT verifier: %w", err)
+	}
+
+	webhookSecret := getEnv("KRATOS_WEBHOOK_SECRET", "")
+	if webhookSecret == "" {
+		log.Println("Warning: KRATOS_WEBHOOK_SECRET not set, webhook validation disabled")
 	}
 
 	jwtMiddleware := internalmiddleware.NewJWTMiddleware(jwtVerifier, parseCSV(audienceEnv))
 	roleHandler := handlers.NewAdminHandler(kratosAdminURL, parseCSV(allowedRolesEnv))
 	auditHandler := handlers.NewAuditHandler(temporalClient, taskQueue, parseCSV(auditSubjects))
+	kratosWebhookHandler := handlers.NewKratosWebhookHandler(temporalClient, taskQueue, webhookSecret)
 
-	return jwtMiddleware, roleHandler, auditHandler, nil
+	return jwtMiddleware, roleHandler, auditHandler, kratosWebhookHandler, nil
 }
 
 func adminRoleHandler(roleHandler *handlers.AdminHandler) http.HandlerFunc {
