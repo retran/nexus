@@ -31,7 +31,6 @@ type Config struct {
 	TemporalHost       string
 	GoogleClientID     string
 	GraphQLEndpoint    string
-	JWTSecret          string
 	DatabaseURL        string
 	RedisHost          string
 	GoogleRedirectURL  string
@@ -118,8 +117,6 @@ func New(cfg *Config) (*Server, error) {
 
 // Start configures the HTTP routing stack and starts serving requests.
 func (s *Server) Start() error {
-	authMiddleware := middleware.NewAuthMiddleware(s.gqlClient, s.config.JWTSecret)
-
 	// Rate limiting removed - now handled by Traefik at edge level
 	// All requests are rate limited by Traefik before reaching this service
 
@@ -160,18 +157,17 @@ func (s *Server) Start() error {
 	}))
 
 	// User endpoints - auth required, rate limited by Traefik
-	mux.Handle("GET /api/me", authMiddleware.RequireAuth(http.HandlerFunc(meHandlers.GetMe)))
-	mux.Handle("POST /api/auth/logout", authMiddleware.RequireAuth(http.HandlerFunc(meHandlers.Logout)))
+	mux.Handle("GET /api/me", http.HandlerFunc(meHandlers.GetMe))
+	mux.Handle("POST /api/auth/logout", http.HandlerFunc(meHandlers.Logout))
 	mux.Handle("GET /api/auth/token", http.HandlerFunc(meHandlers.GetToken))
 
-	mux.Handle("GET /api/users", authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.ListUsers)))
-	mux.Handle("GET /api/users/{id}", authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.GetUser)))
-	mux.Handle("GET /api/users/email/{email}", authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.GetUserByEmail)))
+	mux.Handle("GET /api/users", http.HandlerFunc(userHandlers.ListUsers))
+	mux.Handle("GET /api/users/{id}", http.HandlerFunc(userHandlers.GetUser))
+	mux.Handle("GET /api/users/email/{email}", http.HandlerFunc(userHandlers.GetUserByEmail))
 
-	// Admin endpoints - admin auth required, rate limited by Traefik
-	mux.Handle("POST /api/users", authMiddleware.RequireAdmin(http.HandlerFunc(userHandlers.CreateUser)))
-	mux.Handle("PUT /api/users/{id}", authMiddleware.RequireAdmin(http.HandlerFunc(userHandlers.UpdateUser)))
-	mux.Handle("DELETE /api/users/{id}", authMiddleware.RequireAdmin(http.HandlerFunc(userHandlers.DeleteUser)))
+	mux.Handle("POST /api/users", http.HandlerFunc(userHandlers.CreateUser))
+	mux.Handle("PUT /api/users/{id}", http.HandlerFunc(userHandlers.UpdateUser))
+	mux.Handle("DELETE /api/users/{id}", http.HandlerFunc(userHandlers.DeleteUser))
 
 	var handler http.Handler = mux
 	handler = middleware.Recovery(handler)

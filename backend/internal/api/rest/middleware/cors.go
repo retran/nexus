@@ -1,6 +1,7 @@
 // Copyright 2025 Andrew Vasilyev
 // SPDX-License-Identifier: Apache-2.0
 
+// Package middleware contains reusable HTTP middleware for the REST gateway.
 package middleware
 
 import "net/http"

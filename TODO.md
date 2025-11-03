@@ -572,7 +572,7 @@ etc.)
 
 ---
 
-## Commit 21: Delete old JWT user auth code
+## Commit 21 ✅: Delete old JWT user auth code
 
 **Files**:
 

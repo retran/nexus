@@ -33,7 +33,6 @@ func main() {
 		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
 		GoogleRedirectURL:  getEnv("GOOGLE_REDIRECT_URL", "http://api.nexus.local/api/auth/google/callback"),
-		JWTSecret:          getEnv("JWT_SECRET", "change-me-in-production-use-a-strong-secret"),
 		FrontendURL:        getEnv("FRONTEND_URL", "http://nexus.local"),
 		TemporalHost:       getEnv("TEMPORAL_HOST", "localhost:7233"),
 		TemporalNamespace:  getEnv("TEMPORAL_NAMESPACE", "default"),
