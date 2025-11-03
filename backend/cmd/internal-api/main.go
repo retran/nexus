@@ -21,10 +21,8 @@ import (
 	vaultapi "github.com/hashicorp/vault/api"
 
 	"github.com/retran/nexus/backend/internal/auth"
-	gql "github.com/retran/nexus/backend/internal/client/graphql"
 	"github.com/retran/nexus/backend/internal/internalapi/handlers"
 	internalmiddleware "github.com/retran/nexus/backend/internal/internalapi/middleware"
-	"github.com/retran/nexus/backend/internal/webhooks/kratos"
 )
 
 func main() {
@@ -42,13 +40,13 @@ func run() error {
 
 	log.Printf("GraphQL endpoint: %s", graphqlEndpoint)
 
-	kratosHandler, jwtMiddleware, roleHandler, err := initServices(graphqlEndpoint, audienceEnv, allowedRolesEnv, kratosAdminURL)
+	jwtMiddleware, roleHandler, err := initServices(graphqlEndpoint, audienceEnv, allowedRolesEnv, kratosAdminURL)
 	if err != nil {
 		return err
 	}
 
 	mux := http.NewServeMux()
-	configureMux(mux, kratosHandler, jwtMiddleware, roleHandler)
+	configureMux(mux, jwtMiddleware, roleHandler)
 
 	server := newHTTPServer(port, mux)
 	log.Printf("Starting internal API on port %s", port)
@@ -124,29 +122,23 @@ func parseCSV(raw string) []string {
 	}
 	return out
 }
-func configureMux(mux *http.ServeMux, kratosHandler *kratos.Handler, jwtMiddleware *internalmiddleware.JWTMiddleware, roleHandler *handlers.AdminHandler) {
+func configureMux(mux *http.ServeMux, jwtMiddleware *internalmiddleware.JWTMiddleware, roleHandler *handlers.AdminHandler) {
 	mux.HandleFunc("GET /health", healthHandler)
-	mux.HandleFunc("POST /webhooks/kratos/registration", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Received Kratos webhook: method=%s path=%s from=%s", r.Method, r.URL.Path, r.RemoteAddr)
-		kratosHandler.HandleRegistration(w, r)
-	})
 
 	mux.Handle("GET /internal/healthz", jwtMiddleware.Require(http.HandlerFunc(internalHealthHandler)))
 	mux.Handle("POST /admin/users/{id}/role", jwtMiddleware.Require(adminRoleHandler(roleHandler)))
 }
 
-func initServices(graphqlEndpoint, audienceEnv, allowedRolesEnv, kratosAdminURL string) (*kratos.Handler, *internalmiddleware.JWTMiddleware, *handlers.AdminHandler, error) {
+func initServices(_ string, audienceEnv, allowedRolesEnv, kratosAdminURL string) (*internalmiddleware.JWTMiddleware, *handlers.AdminHandler, error) {
 	jwtVerifier, err := newJWTVerifierFromEnv()
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("initialise JWT verifier: %w", err)
+		return nil, nil, fmt.Errorf("initialise JWT verifier: %w", err)
 	}
 
 	jwtMiddleware := internalmiddleware.NewJWTMiddleware(jwtVerifier, parseCSV(audienceEnv))
-	gqlClient := gql.NewClient(graphqlEndpoint)
-	kratosHandler := kratos.NewHandler(gqlClient)
 	roleHandler := handlers.NewAdminHandler(kratosAdminURL, parseCSV(allowedRolesEnv))
 
-	return kratosHandler, jwtMiddleware, roleHandler, nil
+	return jwtMiddleware, roleHandler, nil
 }
 
 func adminRoleHandler(roleHandler *handlers.AdminHandler) http.HandlerFunc {

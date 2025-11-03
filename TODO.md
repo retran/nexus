@@ -519,7 +519,7 @@ etc.)
 
 ---
 
-## Commit 17: Remove old webhooks service
+## Commit 17 ✅: Remove old webhooks service
 
 **Files**:
 
@@ -536,7 +536,7 @@ etc.)
 
 ---
 
-## Commit 18: Update Gateway AuthMiddleware
+## Commit 18 ✅: Update Gateway AuthMiddleware
 
 **Files**: `backend/internal/api/rest/middleware/auth.go`
 
