@@ -42,6 +42,9 @@ type Config struct {
 	GoogleClientSecret    string
 	VaultSigningKey       string
 	InternalAPIURL        string
+	OathkeeperJWTIssuer   string
+	OathkeeperJWTAudience string
+	OathkeeperJWKSFile    string
 	InternalAPIAudience   []string
 	VaultAuthMountPath    string
 	VaultTransitMountPath string
@@ -60,9 +63,10 @@ type Config struct {
 
 // Server represents the REST API Gateway HTTP server.
 type Server struct {
-	gqlClient   graphql.Client
-	auditClient *services.TemporalAuditService
-	pool        interface {
+	gqlClient      graphql.Client
+	auditClient    *services.TemporalAuditService
+	authMiddleware *middleware.AuthMiddleware
+	pool           interface {
 		postgres.DBTX
 		Close()
 	}
@@ -112,13 +116,31 @@ func New(cfg *Config) (*Server, error) {
 
 	db := postgres.New(pool)
 
+	// Create JWT verifier for Oathkeeper tokens
+	jwksVerifier, err := auth.NewJWKSVerifier(cfg.OathkeeperJWKSFile)
+	if err != nil {
+		return nil, fmt.Errorf("create JWKS verifier: %w", err)
+	}
+
+	// Create auth middleware
+	authMiddleware, err := middleware.NewAuthMiddleware(middleware.Config{
+		Verifier: jwksVerifier,
+		Issuer:   cfg.OathkeeperJWTIssuer,
+		Subject:  "", // Oathkeeper doesn't set a specific subject
+		Audience: []string{cfg.OathkeeperJWTAudience},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create auth middleware: %w", err)
+	}
+
 	return &Server{
-		config:      *cfg,
-		gqlClient:   gqlClient,
-		auditClient: auditService,
-		redisClient: redisClient,
-		db:          db,
-		pool:        pool,
+		config:         *cfg,
+		gqlClient:      gqlClient,
+		auditClient:    auditService,
+		authMiddleware: authMiddleware,
+		redisClient:    redisClient,
+		db:             db,
+		pool:           pool,
 	}, nil
 }
 
@@ -161,17 +183,17 @@ func (s *Server) Start() error {
 	}))
 
 	// User endpoints - auth required, rate limited by Traefik
-	mux.Handle("GET /api/me", http.HandlerFunc(meHandlers.GetMe))
-	mux.Handle("POST /api/auth/logout", http.HandlerFunc(meHandlers.Logout))
-	mux.Handle("GET /api/auth/token", http.HandlerFunc(meHandlers.GetToken))
+	mux.Handle("GET /api/me", s.authMiddleware.RequireAuth(http.HandlerFunc(meHandlers.GetMe)))
+	mux.Handle("POST /api/auth/logout", s.authMiddleware.RequireAuth(http.HandlerFunc(meHandlers.Logout)))
+	mux.Handle("GET /api/auth/token", s.authMiddleware.RequireAuth(http.HandlerFunc(meHandlers.GetToken)))
 
-	mux.Handle("GET /api/users", http.HandlerFunc(userHandlers.ListUsers))
-	mux.Handle("GET /api/users/{id}", http.HandlerFunc(userHandlers.GetUser))
-	mux.Handle("GET /api/users/email/{email}", http.HandlerFunc(userHandlers.GetUserByEmail))
+	mux.Handle("GET /api/users", s.authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.ListUsers)))
+	mux.Handle("GET /api/users/{id}", s.authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.GetUser)))
+	mux.Handle("GET /api/users/email/{email}", s.authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.GetUserByEmail)))
 
-	mux.Handle("POST /api/users", http.HandlerFunc(userHandlers.CreateUser))
-	mux.Handle("PUT /api/users/{id}", http.HandlerFunc(userHandlers.UpdateUser))
-	mux.Handle("DELETE /api/users/{id}", http.HandlerFunc(userHandlers.DeleteUser))
+	mux.Handle("POST /api/users", s.authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.CreateUser)))
+	mux.Handle("PUT /api/users/{id}", s.authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.UpdateUser)))
+	mux.Handle("DELETE /api/users/{id}", s.authMiddleware.RequireAuth(http.HandlerFunc(userHandlers.DeleteUser)))
 
 	var handler http.Handler = mux
 	handler = middleware.Recovery(handler)

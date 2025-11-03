@@ -188,8 +188,12 @@ services:
       - POSTGRES_HOST=postgres
       - REDIS_HOST=redis
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redis_password}
+      - OATHKEEPER_JWT_ISSUER=http://auth.nexus.local
+      - OATHKEEPER_JWT_AUDIENCE=gateway
+      - OATHKEEPER_JWKS_FILE=/etc/oathkeeper/id_token.jwks.json
     volumes:
       - ./backend:/app
+      - ./kratos/dev/id_token.jwks.json:/etc/oathkeeper/id_token.jwks.json:ro
     command: ["air", "-c", ".air.gateway.toml"]
     # NO Traefik labels - accessed via Oathkeeper only
     depends_on:
