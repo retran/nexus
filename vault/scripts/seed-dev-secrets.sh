@@ -243,11 +243,6 @@ put_secret "services/worker" \
   "temporal_task_queue=${TEMPORAL_TASK_QUEUE}" \
   "jwt_secret=${JWT_SECRET}"
 
-put_secret "services/webhooks" \
-  "graphql_endpoint=${GRAPHQL_ENDPOINT:-http://data-api:8081/graphql}" \
-  "kratos_webhook_secret=${WEBHOOK_SECRET:-}" \
-  "jwt_secret=${JWT_SECRET}"
-
 put_secret "services/kratos" \
   "cookie_secret=${KRATOS_COOKIE_SECRET}" \
   "cipher_secret=${KRATOS_CIPHER_SECRET}" \

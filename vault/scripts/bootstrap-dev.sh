@@ -159,7 +159,7 @@ VAULT_TOKEN="${root_token}" \
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN}" \
   "${SCRIPT_DIR}/init-transit.sh"
 
-services=(data-api gateway worker webhooks)
+services=(data-api gateway worker)
 
 for service in "${services[@]}"; do
   role_name="app-${service}"
