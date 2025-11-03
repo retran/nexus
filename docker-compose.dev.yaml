@@ -179,7 +179,6 @@ services:
     env_file: .env
     environment:
       - GRAPHQL_ENDPOINT=http://data-api:8081/graphql
-      - TEMPORAL_HOST=temporal:7233
       - POSTGRES_HOST=postgres
       - REDIS_HOST=redis
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redis_password}
@@ -189,8 +188,6 @@ services:
     # NO Traefik labels - accessed via Oathkeeper only
     depends_on:
       data-api:
-        condition: service_started
-      temporal:
         condition: service_started
       postgres:
         condition: service_healthy

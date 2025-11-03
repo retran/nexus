@@ -599,7 +599,7 @@ etc.)
 
 ---
 
-## Commit 23: Remove Temporal client from Gateway
+## Commit 23 ✅: Remove Temporal client from Gateway
 
 **Files**:
 

@@ -227,10 +227,7 @@ put_secret "services/gateway" \
   "jwt_secret=${JWT_SECRET}" \
   "google_client_id=${GOOGLE_CLIENT_ID:-}" \
   "google_client_secret=${GOOGLE_CLIENT_SECRET:-}" \
-  "frontend_url=${FRONTEND_URL:-http://nexus.local}" \
-  "temporal_host=${TEMPORAL_HOST:-temporal:7233}" \
-  "temporal_namespace=${TEMPORAL_NAMESPACE}" \
-  "temporal_task_queue=${TEMPORAL_TASK_QUEUE}"
+  "frontend_url=${FRONTEND_URL:-http://nexus.local}"
 
 put_secret "services/worker" \
   "postgres_host=${POSTGRES_HOST}" \

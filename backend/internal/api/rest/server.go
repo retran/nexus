@@ -29,8 +29,6 @@ import (
 type Config struct {
 	VaultSecretID         string
 	VaultRoleID           string
-	TemporalTaskQueue     string
-	TemporalHost          string
 	GoogleClientID        string
 	GraphQLEndpoint       string
 	DatabaseURL           string
@@ -49,7 +47,6 @@ type Config struct {
 	VaultTransitMountPath string
 	VaultKVMountPath      string
 	VaultAddress          string
-	TemporalNamespace     string
 	ServiceJWTAudience    []string
 	AllowedOrigins        []string
 	ShutdownTimeout       time.Duration
