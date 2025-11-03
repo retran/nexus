@@ -20,6 +20,39 @@
   mutators:
     - handler: noop
 
+- id: "protected:api:admin"
+  upstream:
+    preserve_host: false
+    url: "http://gateway:8080"
+    strip_path: /.ory/kratos/public
+  match:
+    url: "http://<{api,127.0.0.1,localhost}{,:4455}>/api/admin/<**>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: "http://gateway:8080/api/internal/authorize"
+      forward_response_headers_to_upstream:
+        - X-User
+        - X-User-Email
+        - X-User-Role
+      headers:
+        Authorization: 'Bearer {{ print .MatchContext.Header.Get "Authorization" }}'
+  mutators:
+    - handler: id_token
+    - handler: header
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
+
 - id: "protected:api"
   upstream:
     preserve_host: false
