@@ -6,7 +6,6 @@
 # Production deployment uses separate compose files with:
 # - HTTPS/TLS certificates (Let's Encrypt)
 # - Actual domains (not .local)
-# - HashiCorp Vault for secrets
 # - Cloudflare Tunnel for external access
 # - Production-grade logging and monitoring
 
@@ -59,6 +58,28 @@ services:
     env_file: .env # Dev: from .env; Prod: from Vault
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  vault:
+    image: hashicorp/vault:1.17.6
+    restart: always
+    ports:
+      - "8200:8200"
+    volumes:
+      - ./vault/config.hcl:/vault/config/config.hcl:ro
+      - vault_dev_data:/vault/data
+    cap_add:
+      - IPC_LOCK
+    environment:
+      - VAULT_API_ADDR=http://0.0.0.0:8200
+    command:
+      - vault
+      - server
+      - -config=/vault/config/config.hcl
+    healthcheck:
+      test: ["CMD", "vault", "status", "-format=json"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -302,3 +323,4 @@ services:
 volumes:
   postgres_dev_data:
   redis_dev_data:
+  vault_dev_data:
