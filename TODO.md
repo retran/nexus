@@ -629,7 +629,9 @@ etc.)
 
 ---
 
-Commit 21a: Activate Oathkeeper JWT verification in Gateway (FIX) Research:
+## Commit 21a ✅: Activate Oathkeeper JWT verification in Gateway (FIX)
+
+**Research**:
 
 Review id_token mutator in Oathkeeper:
 <https://www.ory.sh/docs/oathkeeper/pipeline/mutator#id_token>
@@ -680,7 +682,7 @@ Commit: fix(iam): step-21a - activate Oathkeeper JWT verification in gateway
 
 ---
 
-## Commit 25: Add Kratos login webhook
+## Commit 25 ✅: Add Kratos login webhook
 
 **Research**:
 
@@ -702,7 +704,7 @@ Commit: fix(iam): step-21a - activate Oathkeeper JWT verification in gateway
 
 ---
 
-## Commit 26: Update logout to revoke session
+## Commit 26 ✅: Update logout to revoke session
 
 **Files**: `backend/internal/api/rest/handlers/me.go`
 
@@ -714,7 +716,7 @@ Commit: fix(iam): step-21a - activate Oathkeeper JWT verification in gateway
 
 ---
 
-## Commit 27: Add logout webhook
+## Commit 27 ✅: Add logout webhook
 
 **Files**:
 
@@ -729,7 +731,7 @@ Commit: fix(iam): step-21a - activate Oathkeeper JWT verification in gateway
 
 ---
 
-## Commit 28: Add RBAC authorizer endpoint
+## Commit 28 ✅: Add RBAC authorizer endpoint
 
 **Files**:
 
