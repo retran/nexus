@@ -507,7 +507,7 @@ etc.)
 
 ---
 
-## Commit 16: Update Kratos webhook URL
+## Commit 16 ✅: Update Kratos webhook URL
 
 **Files**: `kratos/dev/kratos.yml`
 
