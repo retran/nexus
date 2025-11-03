@@ -469,7 +469,7 @@ etc.)
 
 ---
 
-## Commit 14: Add JWT middleware to Internal API
+## Commit 14 ✅: Add JWT middleware to Internal API
 
 **Files**:
 

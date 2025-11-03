@@ -174,6 +174,11 @@ services:
       - PORT=8083
       - GRAPHQL_ENDPOINT=http://data-api:8081/graphql
       - KRATOS_WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=${VAULT_ROOT_TOKEN}
+      - VAULT_SIGNING_KEY=service-jwt-key
+      - VAULT_TRANSIT_MOUNT_PATH=transit
+      - JWT_ALLOWED_AUDIENCES=internal-api
     volumes:
       - ./backend:/app
     command: ["air", "-c", ".air.internal-api.toml"]
