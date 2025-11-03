@@ -164,7 +164,7 @@ unsealed
 
 ---
 
-## Commit 02: Add Vault secrets seeding script
+## Commit 02 ✅: Add Vault secrets seeding script
 
 **Research**:
 

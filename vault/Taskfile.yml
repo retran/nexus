@@ -6,6 +6,11 @@ tasks:
     cmds:
       - bash scripts/bootstrap-dev.sh
 
+  seed-dev-secrets:
+    desc: "Seed development secrets into Vault KV from .env"
+    cmds:
+      - bash scripts/seed-dev-secrets.sh
+
   rotate-shared-secrets:
     desc: "Rotate shared KV secrets (graceful AppRole rollout)"
     cmds:
