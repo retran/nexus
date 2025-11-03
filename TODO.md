@@ -355,7 +355,7 @@ etc.)
 
 ---
 
-## Commit 08: Create migration to remove role column
+## Commit 08 ✅: Create migration to remove role column
 
 **Research**:
 
