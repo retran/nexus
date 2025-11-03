@@ -560,7 +560,7 @@ etc.)
 
 ---
 
-## Commit 20: Add JWT middleware to Data API
+## Commit 20 ✅: Add JWT middleware to Data API
 
 **Files**: `backend/cmd/data-api/main.go`
 
