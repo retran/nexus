@@ -162,6 +162,24 @@ services:
         condition: service_started
     # NO Traefik labels - internal only, not exposed to public
 
+  internal-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.internal-api.dev
+    restart: always
+    expose:
+      - "8083"
+    env_file: .env
+    environment:
+      - PORT=8083
+    volumes:
+      - ./backend:/app
+    command: ["air", "-c", ".air.internal-api.toml"]
+    depends_on:
+      data-api:
+        condition: service_started
+    # Internal only - no Traefik labels
+
   gateway:
     build:
       context: ./backend
