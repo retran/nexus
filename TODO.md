@@ -629,6 +629,57 @@ etc.)
 
 ---
 
+Commit 21a: Activate Oathkeeper JWT verification in Gateway (FIX) Research:
+
+Review id_token mutator in Oathkeeper:
+<https://www.ory.sh/docs/oathkeeper/pipeline/mutator#id_token>
+
+Check cookie_session authenticator docs for session data structure.
+
+Review internal/api/rest/middleware/auth.go logic.
+
+Files:
+
+kratos/dev/access-rules.yml
+
+backend/internal/api/rest/server.go
+
+docker-compose.dev.yaml
+
+backend/internal/api/rest/middleware/auth.go
+
+Changes:
+
+Oathkeeper: Change mutator for protected:api (gateway) and protected:graphql
+(data-api) from header to id_token.
+
+Gateway:
+
+В server.go импортировать и создать AuthMiddleware (из middleware/auth.go).
+
+Обернуть все защищенные маршруты (/api/me, /api/users/\*) в
+authMiddleware.RequireAuth(...).
+
+Config: Убедиться, что gateway получает все необходимые JWT_ISSUER, JWT_AUDIENCE
+и VAULT_ADDR для JWTVerifier.
+
+Benefits:
+
+✅ Zero-Trust: gateway больше не доверяет слепо хедерам.
+
+✅ Defense-in-Depth: gateway активно верифицирует, что запрос прошел через
+Oathkeeper и несет валидный, подписанный им JWT.
+
+✅ Consistency: Реализация теперь соответствует плану (Commit 18) и написанному
+коду.
+
+Test: Запросы к /api/me без сессии (cookie) корректно редиректят на Kratos.
+Запросы с сессией успешно проходят верификацию JWT в gateway.
+
+Commit: fix(iam): step-21a - activate Oathkeeper JWT verification in gateway
+
+---
+
 ## Commit 25: Add Kratos login webhook
 
 **Research**:

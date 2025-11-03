@@ -62,6 +62,11 @@ func (h *KratosWebhookHandler) HandleLogin(w http.ResponseWriter, r *http.Reques
 	h.handleWebhook(w, r, "user.login", "login")
 }
 
+// HandleLogout handles user logout webhooks from Kratos.
+func (h *KratosWebhookHandler) HandleLogout(w http.ResponseWriter, r *http.Request) {
+	h.handleWebhook(w, r, "user.logout", "logout")
+}
+
 func (h *KratosWebhookHandler) handleWebhook(w http.ResponseWriter, r *http.Request, eventType, eventName string) {
 	if !h.validateWebhookSecret(r) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)

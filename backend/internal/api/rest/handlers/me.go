@@ -16,13 +16,15 @@ import (
 
 // MeHandlers handles /me endpoint for current user info.
 type MeHandlers struct {
+	auditService   *services.TemporalAuditService
 	kratosAdminURL string
 }
 
 // NewMeHandlers creates new me handlers.
-func NewMeHandlers(_ *services.TemporalAuditService, kratosAdminURL string) *MeHandlers {
+func NewMeHandlers(auditService *services.TemporalAuditService, kratosAdminURL string) *MeHandlers {
 	return &MeHandlers{
 		kratosAdminURL: kratosAdminURL,
+		auditService:   auditService,
 	}
 }
 
@@ -69,6 +71,20 @@ func (h *MeHandlers) Logout(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Kratos session revoke returned unexpected status: %d", resp.StatusCode)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
+	}
+
+	// Log logout event to audit trail
+	if h.auditService != nil {
+		metadata := map[string]interface{}{
+			"identity_id": authInfo.UserID.String(),
+			"email":       authInfo.Email,
+			"session_id":  authInfo.SessionID,
+		}
+
+		if err := h.auditService.LogEvent(r.Context(), r, &authInfo.UserID, "user.logout", metadata); err != nil {
+			log.Printf("Failed to log logout audit event: %v", err)
+			// Don't fail the logout if audit logging fails
+		}
 	}
 
 	// Session revoked successfully

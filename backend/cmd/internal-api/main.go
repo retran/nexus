@@ -150,6 +150,7 @@ func configureMux(mux *http.ServeMux, jwtMiddleware *internalmiddleware.JWTMiddl
 	if kratosWebhookHandler != nil {
 		mux.HandleFunc("POST /webhooks/kratos/registration", kratosWebhookHandler.HandleRegistration)
 		mux.HandleFunc("POST /webhooks/kratos/login", kratosWebhookHandler.HandleLogin)
+		mux.HandleFunc("POST /webhooks/kratos/logout", kratosWebhookHandler.HandleLogout)
 	}
 }
 
