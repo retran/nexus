@@ -179,6 +179,8 @@ services:
       - VAULT_SIGNING_KEY=service-jwt-key
       - VAULT_TRANSIT_MOUNT_PATH=transit
       - JWT_ALLOWED_AUDIENCES=internal-api
+      - KRATOS_ADMIN_URL=http://kratos:4434
+      - INTERNAL_ALLOWED_ROLES=none,member,admin
     volumes:
       - ./backend:/app
     command: ["air", "-c", ".air.internal-api.toml"]

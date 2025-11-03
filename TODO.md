@@ -485,7 +485,7 @@ etc.)
 
 ---
 
-## Commit 15: Add role management endpoint
+## Commit 15 ✅: Add role management endpoint
 
 **Research**:
 

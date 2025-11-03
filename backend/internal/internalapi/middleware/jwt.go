@@ -20,6 +20,7 @@ const tokenInfoKey contextKey = "internal-api-jwt"
 type TokenInfo struct {
 	Token    string
 	Subject  string
+	Role     string
 	Audience []string
 }
 
@@ -50,7 +51,11 @@ func (m *JWTMiddleware) Require(next http.Handler) http.Handler {
 			return
 		}
 
-		claims := &jwt.RegisteredClaims{}
+		claims := &struct {
+			jwt.RegisteredClaims
+			Role string `json:"role"`
+		}{}
+
 		if _, err := m.verifier.Verify(r.Context(), token, claims); err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -65,6 +70,7 @@ func (m *JWTMiddleware) Require(next http.Handler) http.Handler {
 			Token:    token,
 			Subject:  claims.Subject,
 			Audience: claimStringsToSlice(claims.Audience),
+			Role:     strings.ToLower(strings.TrimSpace(claims.Role)),
 		}
 
 		ctx := context.WithValue(r.Context(), tokenInfoKey, info)
