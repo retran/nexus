@@ -117,7 +117,12 @@ services:
     volumes:
       - ./backend:/app
     command: ["air", "-c", ".air.data-api.toml"]
-    # NO Traefik labels - accessed via Oathkeeper only
+    labels:
+      - "traefik.enable=true"
+      # Dev-mode direct access (bypassing Oathkeeper for debugging)
+      - "traefik.http.routers.data-api-direct.rule=Host(`data-api.nexus.local`)"
+      - "traefik.http.routers.data-api-direct.priority=50"
+      - "traefik.http.services.data-api-direct.loadbalancer.server.port=8081"
     depends_on:
       - postgres
       - temporal
@@ -168,12 +173,17 @@ services:
     volumes:
       - ./backend:/app
     command: ["air", "-c", ".air.internal-api.toml"]
+    labels:
+      - "traefik.enable=true"
+      # Dev-mode direct access (for debugging internal endpoints)
+      - "traefik.http.routers.internal-api-direct.rule=Host(`internal-api.nexus.local`)"
+      - "traefik.http.routers.internal-api-direct.priority=50"
+      - "traefik.http.services.internal-api-direct.loadbalancer.server.port=8083"
     depends_on:
       data-api:
         condition: service_started
       temporal:
         condition: service_started
-    # Internal only - no Traefik labels
 
   gateway:
     build:
@@ -195,7 +205,12 @@ services:
       - ./backend:/app
       - ./kratos/dev/id_token.jwks.json:/etc/oathkeeper/id_token.jwks.json:ro
     command: ["air", "-c", ".air.gateway.toml"]
-    # NO Traefik labels - accessed via Oathkeeper only
+    labels:
+      - "traefik.enable=true"
+      # Dev-mode direct access (bypassing Oathkeeper for debugging)
+      - "traefik.http.routers.gateway-direct.rule=Host(`gateway.nexus.local`)"
+      - "traefik.http.routers.gateway-direct.priority=50"
+      - "traefik.http.services.gateway-direct.loadbalancer.server.port=8080"
     depends_on:
       data-api:
         condition: service_started
@@ -215,7 +230,12 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    # NO Traefik labels - accessed via Oathkeeper only
+    labels:
+      - "traefik.enable=true"
+      # Dev-mode direct access (bypassing Oathkeeper for debugging)
+      - "traefik.http.routers.ui-direct.rule=Host(`ui.nexus.local`)"
+      - "traefik.http.routers.ui-direct.priority=50"
+      - "traefik.http.services.ui-direct.loadbalancer.server.port=3000"
     depends_on:
       - gateway
 
