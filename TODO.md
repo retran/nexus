@@ -352,6 +352,45 @@ docker run --rm --network nexus_default \
 
 ---
 
+#### ✅ Commit 34 (COMPLETED): Vault Agent Sidecars
+
+**Status**: ✅ Завершено (hash: `363258d`)
+
+**Files**:
+
+- `vault/scripts/bootstrap-dev.sh` (обновлен)
+- `docker-compose.dev.yaml` (обновлен)
+
+**Результат**:
+
+- ✅ `bootstrap-dev.sh` экспортирует AppRole credentials в `.env`:
+  - `GATEWAY_ROLE_ID`, `GATEWAY_SECRET_ID`
+  - `DATA_API_ROLE_ID`, `DATA_API_SECRET_ID`
+  - `INTERNAL_API_ROLE_ID`, `INTERNAL_API_SECRET_ID`
+  - `WORKER_ROLE_ID`, `WORKER_SECRET_ID`
+  - `OATHKEEPER_ROLE_ID`, `OATHKEEPER_SECRET_ID`
+  - `KRATOS_ROLE_ID`, `KRATOS_SECRET_ID`
+- ✅ Добавлено 6 tmpfs volumes для in-memory хранения сертификатов
+- ✅ Добавлено 6 vault-agent sidecar контейнеров:
+  - Используют `hashicorp/vault:1.21.0` image
+  - Монтируют `/vault/agent/template.hcl` конфигурацию
+  - Рендерят сертификаты в shared tmpfs volume
+- ✅ Обновлены все основные сервисы:
+  - `hostname: [service].service.local`
+  - `volumes: [service]-secrets:/secrets:ro`
+  - `depends_on: vault-agent-[service]`
+- ✅ Протестировано: все sidecars успешно рендерят сертификаты
+
+**Test Command**:
+
+```bash
+docker-compose -f docker-compose.dev.yaml up -d vault-agent-gateway
+docker logs nexus-vault-agent-gateway-1 | grep rendered
+docker exec nexus-vault-agent-gateway-1 ls -lh /secrets/
+```
+
+---
+
 ### Фаза 3: 🔌 Переключение Сервисов на mTLS
 
 #### Commit 35 (НОВЫЙ): Перевести Go-сервисы на `ListenAndServeTLS`
