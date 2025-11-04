@@ -1,779 +1,347 @@
-# Nexus IAM Implementation - Atomic Commits (Vault-Only)
+**Конечная цель:**
 
-## Overview
+1. **Никаких S2S JWT.** `Gateway`, `data-api`, `internal-api` и `worker`
+   общаются друг с другом _только_ по `https`.
+2. **`Vault Agent` (Sidecar):** Каждый сервис (`gateway`, `data-api` и т.д.)
+   получает свой TLS-сертификат (с CN `gateway.service.local`) от `Vault PKI`
+   через `vault-agent`.
+3. **`Gateway` (BFF):** Доверяет `Oathkeeper` не по S2S JWT, а потому что
+   `Oathkeeper` предъявляет свой mTLS-сертификат
+   (`cn=oathkeeper.service.local`).
+4. **`internal-api` (Webhooks):** Kratos _по-прежнему_ использует
+   `X-Webhook-Secret`. `Oathkeeper` выступает "переводчиком": он принимает
+   `X-Webhook-Secret`, проверяет его, а затем вызывает `internal-api` от своего
+   имени, используя свой `mTLS` сертификат.
 
-Complete IAM, Logging & Observability implementation as series of **42
-independent, atomic commits**.
+Это устраняет _все_ JWT для S2S-связей и _весь_ "Network-Level Trust", заменяя
+его криптографическим `mTLS`.
 
-**Key Principles**:
-
-- Each step = 1 commit = 1 deployable unit
-- All commits buildable and testable independently
-- Can revert any commit without breaking others
-- Commit format: `feat(iam): step-XX - description`
-- Automation-first approach with `go-task`
-- Single Sign-On (SSO) for all admin tools
-
-**Timeline**: 7-9 weeks (5-6 commits/week)
-
-**Automation Commits** (01a, 01b):
-
-- Vault bootstrap automation (AppRole, Transit, KV)
-- Shared KV secrets rotation
-
-**SSO Integration** (02a):
-
-- Kratos OIDC for Vault UI access
-
-**Simplified Architecture**:
-
-- ✅ **Vault** as the single source of truth for all secrets.
-- ✅ **Vault Transit Engine** for JWT signing (replaces `token-service`).
-- ✅ **Vault KV Engine** for static secrets (e.g., webhook secrets).
-- ✅ **Vault AppRole** for service-to-service authentication against Vault.
-- ✅ Fewer moving parts, easier maintenance.
-
-## ⚠️ IMPORTANT: Before Each Commit
-
-**ALWAYS check for latest versions and documentation:**
-
-1. **Docker Images**: Check Docker Hub for latest stable tags
-
-- HashiCorp Vault:
-  [https://hub.docker.com/\_/vault](https://hub.docker.com/_/vault)
-- PostgreSQL:
-  [https://hub.docker.com/\_/postgres](https://hub.docker.com/_/postgres)
-- Others as needed
-
-1. **Go Dependencies**: Check latest versions before `go get`
-
-- golang-jwt/jwt:
-  [https://github.com/golang-jwt/jwt](https://github.com/golang-jwt/jwt)
-- HashiCorp Vault API:
-  [https://github.com/hashicorp/vault/tree/main/api](https://github.com/hashicorp/vault/tree/main/api)
-- Other libraries: check GitHub releases
-
-1. **Official Documentation**: Review current docs (not cached)
-
-- HashiCorp Vault: <https://developer.hashicorp.com/vault/docs>
-- Ory Kratos: <https://www.ory.sh/docs/kratos>
-- Ory Oathkeeper: <https://www.ory.sh/docs/oathkeeper>
-- JWT Best Practices: <https://datatracker.ietf.org/doc/html/rfc8725>
-- Go slog: <https://pkg.go.dev/log/slog>
-- VictoriaMetrics: <https://docs.victoriametrics.com/>
-- Grafana: <https://grafana.com/docs/grafana/latest/>
-
-1. **Breaking Changes**: Check CHANGELOG/migration guides for major version
-   updates
-
-**Why?** Using outdated versions can cause:
-
-- Security vulnerabilities
-- Incompatibility issues
-- Missing features
-- Deprecated API usage
+Вот **новый план** (начиная с `Commit 31`), который заменит всю вашу S2S
+JWT-логику (`id_token`, `vault_token_client`, `jwks_verifier` и кастомный
+плагин).
 
 ---
 
-## Commit 01 ✅: Add HashiCorp Vault service
-
-**Research**:
-
-- Check latest Vault Docker image version:
-  [https://hub.docker.com/\_/vault/tags](https://hub.docker.com/_/vault/tags)
-- Review official docs:
-  [https://developer.hashicorp.com/vault/docs](https://developer.hashicorp.com/vault/docs)
-- Check Vault dev mode vs production mode setup
-- Review storage backend options (file, PostgreSQL, Consul)
-
-**Files**: `docker-compose.dev.yaml`, `vault/config.hcl`
-
-**Changes**: Add `vault` service (port 8200) with file storage backend
-
-**Test**: `docker-compose up vault` starts successfully, vault status shows
-unsealed
-
-**Commit**:
-`feat(iam): step-01 - add HashiCorp Vault secrets management service`
+## 📅 План перехода на mTLS (Vault PKI Engine)
 
 ---
 
-## Commit 01a ✅: Add Vault bootstrap automation
+### Фаза 1: 🔐 Настройка Vault PKI (Центр Сертификации)
 
-**Research**:
+Commit 28 (НОВЫЙ): Добавить Ory Keto в docker-compose Research:
 
-- Review `go-task` best practices:
-  [https://taskfile.dev/usage/](https://taskfile.dev/usage/)
-- Check Vault auto-unseal options:
-  [https://developer.hashicorp.com/vault/docs/concepts/seal](https://developer.hashicorp.com/vault/docs/concepts/seal)
-- Review Vault init and unseal automation for dev mode
-- Check Vault KV secrets engine v2
+Изучить oryd/keto <https://www.ory.sh/docs/keto/getting-started/install-docker>.
 
-**Files**:
-
-- `Taskfile.yml` (root)
-- `vault/Taskfile.yml`
-- `vault/scripts/bootstrap-dev.sh`
-- `vault/scripts/init-policies.sh`
-- `docker-compose.dev.yaml`
-
-**Changes**:
-
-- Add `task vault:init` command
-- Script auto-unseals Vault in dev mode
-- Create KV secrets engine v2
-- Generate AppRole credentials for each service
-- Setup policies for least-privilege access (KV read, Transit sign)
-
-**Test**: `task vault:init` sets up Vault completely, services can authenticate
-
-**Commit**: `feat(iam): step-01a - automate Vault bootstrap and AppRole setup`
-
----
-
-## Commit 01b ✅: Add KV secrets rotation automation
-
-**Research**:
-
-- Review secret rotation best practices
-- Check Vault KV v2 secret versioning API
-- Review zero-downtime rotation patterns
-
-**Files**:
-
-- `vault/scripts/rotate-shared-secrets.sh`
-- `Taskfile.yml`
-
-**Changes**:
-
-- Script generates new shared secrets (e.g., Kratos webhook secret)
-- Updates secrets in Vault KV engine (creates new version)
-- Triggers graceful service restarts (e.g.,
-  `docker-compose restart internal-api`)
-- Logs rotation in audit trail
-
-**Commands**:
-
-- `task secrets:rotate` - Rotate all shared KV secrets
-- `task secrets:verify` - Verify all secrets are valid
-
-**Test**: `task secrets:rotate` rotates secrets without downtime
-
-**Commit**:
-`feat(iam): step-01b - add shared KV secrets rotation automation for Vault`
-
----
-
-## Commit 02 ✅: Add Vault secrets seeding script
-
-**Research**:
-
-- Review Vault KV v2 API:
-  [https://developer.hashicorp.com/vault/api-docs/secret/kv/kv-v2](https://developer.hashicorp.com/vault/api-docs/secret/kv/kv-v2)
-- Check Vault CLI usage patterns
-- Review secret versioning and metadata
-
-**Files**: `vault/scripts/seed-dev-secrets.sh`, `.env.example`
-
-**Changes**: Script auto-populates dev secrets (database passwords, API keys,
-etc.)
-
-**Test**: Script runs without errors, secrets readable by services
-
-**Commit**: `feat(iam): step-02 - add Vault dev secrets seeding script`
-
----
-
-## Commit 02a ✅: Configure Vault OIDC auth with Kratos
-
-**Research**:
-
-- Review Vault OIDC auth method:
-  [https://developer.hashicorp.com/vault/docs/auth/jwt](https://developer.hashicorp.com/vault/docs/auth/jwt)
-- Check Kratos as OIDC provider:
-  [https://www.ory.sh/docs/kratos/social-signin/overview](https://www.ory.sh/docs/kratos/social-signin/overview)
-- Review OIDC role mapping in Vault
-
-**Files**:
-
-- `vault/config.hcl`
-- `vault/scripts/init-oidc.sh`
-- `kratos/dev/kratos.yml`
-
-**Changes**:
-
-- Enable OIDC auth method in Vault
-- Configure Kratos as OIDC provider
-- Map Kratos roles to Vault policies
-- Auto-provision users on first SSO login
-
-**Benefits**:
-
-- ✅ Single sign-on to Vault UI via Kratos
-- ✅ Centralized user management in Kratos
-- ✅ Role-based Vault policies from Kratos traits
-- ✅ No separate Vault user management
-
-**Test**: Can login to Vault UI using Nexus credentials via Kratos SSO
-
-**Commit**: `feat(iam): step-02a - configure Vault OIDC auth via Kratos`
-
----
-
-## Commit 03 ✅: Add Vault Go client library
-
-**Research**:
-
-- Check official Vault Go API:
-  [https://github.com/hashicorp/vault/tree/main/api](https://github.com/hashicorp/vault/tree/main/api)
-- Review AppRole authentication flow
-- Check KV v2 secrets engine API usage
-
-**Files**:
-
-- `backend/internal/secrets/client.go`
-- `backend/internal/secrets/client_test.go`
-- `backend/go.mod`
-
-**Changes**: Shared library for reading KV secrets via AppRole auth
-
-**Test**: Unit tests pass, can authenticate and read secrets from Vault
-
-**Commit**: `feat(iam): step-03 - add Vault Go client library with AppRole auth`
-
----
-
-## Commit 04 ✅: Configure Vault Transit engine for JWT signing
-
-**Research**:
-
-- Review Vault Transit Secrets Engine:
-  [https://developer.hashicorp.com/vault/docs/secrets/transit](https://developer.hashicorp.com/vault/docs/secrets/transit)
-- Check Transit sign/verify operations:
-  [https://developer.hashicorp.com/vault/api-docs/secret/transit](https://developer.hashicorp.com/vault/api-docs/secret/transit)
-- Review RSA-4096 for JWT signing
-- Check Vault policy requirements for Transit
-
-**Files**:
-
-- `vault/scripts/init-transit.sh` (as part of `vault:init`)
-- `vault/scripts/init-policies.sh` (updated)
-- `Taskfile.yml`
-
-**Changes**:
-
-- Enable Transit engine with RSA-4096 key (`service-jwt-key`)
-- Update AppRole policies to allow signing
-- Automatic key rotation support built-in via Vault
-- Add `task vault:rotate-transit-key`
-
-**Benefits**:
-
-- ✅ No separate Token Service needed
-- ✅ Vault handles key management and rotation
-- ✅ Cryptographic operations audited by Vault
-- ✅ Built-in key versioning and rotation
-
-**Test**: `task vault:init` enables Transit, can sign data via API
-
-**Commit**: `feat(iam): step-04 - configure Vault Transit for JWT signing`
-
----
-
-## Commit 05 ✅: Create JWT verifier library with Vault
-
-**Research**:
-
-- Review JWT validation best practices (exp, aud, signature checks)
-- Check Vault Transit verify operation:
-  [https://developer.hashicorp.com/vault/api-docs/secret/transit\#verify-signed-data](https://developer.hashicorp.com/vault/api-docs/secret/transit#verify-signed-data)
-- Review local JWK caching pattern from Vault Transit public keys
-
-**Files**:
-
-- `backend/internal/auth/jwt_verifier.go`
-- `backend/internal/auth/jwt_verifier_test.go`
-
-**Changes**:
-
-- Shared lib for verifying service JWT tokens
-- **Hot Path**: Verifies locally using a cached JWKSet from Vault.
-- **Cold Path**: On unknown `kid`, re-fetches JWKSet from Vault Transit.
-- This avoids a network call to Vault for _every_ verification.
-
-**Test**: Verifies valid tokens, rejects invalid, handles key rotation
-
-**Commit**:
-`feat(iam): step-05 - create JWT verifier library with Vault Transit`
-
----
-
-## Commit 06 ✅: Create Vault token client library
-
-**Research**:
-
-- Review Vault AppRole login:
-  [https://developer.hashicorp.com/vault/api-docs/auth/approle](https://developer.hashicorp.com/vault/api-docs/auth/approle)
-- Check Vault token renewal strategies
-- Review Vault Transit sign operation to create a JWT
-
-**Files**:
-
-- `backend/internal/auth/vault_token_client.go`
-- `backend/internal/auth/vault_token_client_test.go`
-
-**Changes**:
-
-- Shared lib for requesting JWT tokens
-- 1. Authenticates to Vault using AppRole (from `secrets` lib)
-- 1. Builds JWT claims (sub, aud, exp)
-- 1. Sends claims to Vault Transit `sign` endpoint
-- 1. Returns the signed JWT
-
-**Test**: Can obtain and refresh tokens, tokens verified by `jwt_verifier`
-
-**Commit**: `feat(iam): step-06 - create Vault token client library`
-
----
-
-## Commit 07 ✅: Add role to Kratos schema
-
-**Research**:
-
-- Review Ory Kratos identity schema docs:
-  [https://www.ory.sh/docs/kratos/manage-identities/customize-identity-schema](https://www.ory.sh/docs/kratos/manage-identities/customize-identity-schema)
-- Check JSON Schema enum validation examples
-- Review Kratos v1.3+ schema changes
-
-**Files**: `kratos/dev/identity.schema.json`
-
-**Changes**: Add `traits.role` enum (none, member, admin)
-
-**Test**: Can create identity with role in Kratos UI
-
-**Commit**: `feat(iam): step-07 - add role field to Kratos identity schema`
-
----
-
-## Commit 08 ✅: Create migration to remove role column
-
-**Research**:
-
-- Review go-migrate best practices:
-  [https://github.com/golang-migrate/migrate](https://github.com/golang-migrate/migrate)
-- Check PostgreSQL `DROP COLUMN` syntax for v16+
-- Review safe migration patterns (rollback support)
-
-**Files**: `postgres/migrations/20251103000000_remove_role_column.sql`
-
-**Changes**: Drop `role` column and `user_role` enum from users table
-
-**Test**: Migration runs and can rollback
-
-**Commit**: `feat(iam): step-08 - create migration to remove role from users`
-
----
-
-## Commit 09 ✅: Remove UserRole from GraphQL schema
-
-**Research**:
-
-- Review `gqlgen` latest version:
-  [https://github.com/99designs/gqlgen](https://github.com/99designs/gqlgen)
-- Check `gqlgen` code generation commands
-- Review GraphQL schema best practices for breaking changes
-
-**Files**:
-
-- `backend/internal/api/graphql/schema.graphql`
-- `backend/internal/api/graphql/generated.go` (regenerated)
-
-**Changes**: Delete `UserRole` enum and related mutations
-
-**Test**: GraphQL queries work without role field
-
-**Commit**: `feat(iam): step-09 - remove UserRole enum from GraphQL schema`
-
----
-
-## Commit 10 ✅: Update sqlc queries to remove role
-
-**Research**:
-
-- Check `sqlc` latest version:
-  [https://github.com/sqlc-dev/sqlc](https://github.com/sqlc-dev/sqlc)
-- Review `sqlc` v1.27+ configuration and generation
-- Check `sqlc.yaml` syntax changes
-
-**Files**:
-
-- `backend/internal/repository/postgres/queries/users.sql`
-- `backend/internal/repository/postgres/users.sql.go` (regenerated)
-
-**Changes**: Remove role from all SQL queries
-
-**Test**: All queries compile
-
-**Commit**: `feat(iam): step-10 - update sqlc queries to remove role`
-
----
-
-## Commit 11 ✅: Add X-User-Role to Oathkeeper mutator
-
-**Research**:
-
-- Review Ory Oathkeeper mutators:
-  [https://www.ory.sh/docs/oathkeeper/pipeline/mutator](https://www.ory.sh/docs/oathkeeper/pipeline/mutator)
-- Check header mutator template syntax and available variables
-- Review Oathkeeper v0.40+ configuration changes
-
-**Files**: `kratos/dev/oathkeeper.yml`
-
-**Changes**: Pass role from Kratos session to Gateway via `X-User-Role` header
-
-**Test**: `X-User-Role` appears in Gateway requests
-
-**Commit**: `feat(iam): step-11 - add X-User-Role header to Oathkeeper`
-
----
-
-## Commit 12 ✅: Create Internal API skeleton
-
-**Files**:
-
-- `backend/cmd/internal-api/main.go`
-- `backend/Dockerfile.internal-api.dev`
-- `backend/.air.internal-api.toml`
-- `docker-compose.dev.yaml`
-
-**Changes**: Empty service with health endpoint
-
-**Test**: Health endpoint responds
-
-**Commit**: `feat(iam): step-12 - create Internal API skeleton`
-
----
-
-## Commit 13 ✅: Migrate Kratos webhook to Internal API
-
-**Files**:
-
-- `backend/cmd/internal-api/main.go`
-- `backend/internal/webhooks/kratos/handler.go`
-
-**Changes**: Move registration webhook from (old) `webhooks` service
-
-**Test**: Webhook works, creates users
-
-**Commit**: `feat(iam): step-13 - migrate Kratos webhook to Internal API`
-
----
-
-## Commit 14 ✅: Add JWT middleware to Internal API
-
-**Files**:
-
-- `backend/cmd/internal-api/main.go`
-- `backend/internal/api/internal/middleware/jwt.go`
-
-**Changes**: Protect internal endpoints with JWT verification (using
-`jwt_verifier`)
-
-**Test**: Requests without JWT fail, with JWT succeed
-
-**Commit**: `feat(iam): step-14 - add JWT verification middleware`
-
----
-
-## Commit 15 ✅: Add role management endpoint
-
-**Research**:
-
-- Review Kratos Admin API:
-  [https://www.ory.sh/docs/kratos/reference/api](https://www.ory.sh/docs/kratos/reference/api)
-- Check `PATCH /admin/identities/{id}` endpoint documentation
-- Review identity traits update patterns
-
-**Files**:
-
-- `backend/cmd/internal-api/main.go`
-- `backend/internal/api/internal/handlers/admin.go`
-
-**Changes**: `POST /admin/users/{id}/role` updates Kratos traits
-
-**Test**: Can change role via API
-
-**Commit**: `feat(iam): step-15 - add role management endpoint`
-
----
-
-## Commit 16 ✅: Update Kratos webhook URL
-
-**Files**: `kratos/dev/kratos.yml`
-
-**Changes**: Point registration webhook to `internal-api:8083`
-
-**Test**: Registration still creates users
-
-**Commit**: `feat(iam): step-16 - update Kratos webhook URL`
-
----
-
-## Commit 17 ✅: Remove old webhooks service
-
-**Files**:
-
-- DELETE `backend/cmd/webhooks/`
-- DELETE `backend/Dockerfile.webhooks.dev`
-- DELETE `backend/.air.webhooks.toml`
-- `docker-compose.dev.yaml`
-
-**Changes**: Delete obsolete service completely
-
-**Test**: System works without webhooks service
-
-**Commit**: `feat(iam): step-17 - remove obsolete webhooks service`
-
----
-
-## Commit 18 ✅: Update Gateway AuthMiddleware
-
-**Files**: `backend/internal/api/rest/middleware/auth.go`
-
-**Changes**: Verify Oathkeeper JWT, read `X-User-*` headers safely
-
-**Test**: Gateway auth still works
-
-**Commit**: `feat(iam): step-18 - verify Oathkeeper JWT in Gateway`
-
----
-
-## Commit 19 ✅: Add token client to Gateway
-
-**Files**: `backend/cmd/gateway/main.go`
-
-**Changes**: Request JWT (using `vault_token_client`) before calling Data API
-
-**Test**: Data API receives JWT from Gateway
-
-**Commit**: `feat(iam): step-19 - add JWT token client to Gateway`
-
----
-
-## Commit 20 ✅: Add JWT middleware to Data API
-
-**Files**: `backend/cmd/data-api/main.go`
-
-**Changes**: Protect GraphQL with JWT verification (using `jwt_verifier`)
-
-**Test**: Data API rejects requests without JWT
-
-**Commit**: `feat(iam): step-20 - add JWT verification to Data API`
-
----
-
-## Commit 21 ✅: Delete old JWT user auth code
-
-**Files**:
-
-- `backend/internal/api/rest/middleware/auth.go`
-- `backend/go.mod`
-
-**Changes**: Remove unused JWT validation for user tokens
-
-**Test**: All tests still pass
-
-**Commit**: `feat(iam): step-21 - remove old JWT user authentication`
-
----
-
-## Commit 22 ✅: Refactor audit to call Internal API
-
-**Files**: `backend/internal/api/rest/services/temporal_audit.go`
-
-**Changes**: Call Internal API instead of Temporal directly
-
-**Test**: Audit events still logged
-
-**Commit**: `feat(iam): step-22 - refactor audit to use Internal API`
-
----
-
-## Commit 23 ✅: Remove Temporal client from Gateway
-
-**Files**:
-
-- `backend/cmd/gateway/main.go`
-- `backend/go.mod`
-
-**Changes**: Gateway no longer imports Temporal
-
-**Test**: Gateway builds and runs
-
-**Commit**: `feat(iam): step-23 - remove Temporal dependency from Gateway`
-
----
-
-## Commit 24 ✅: Add audit handler to Internal API
-
-**Files**:
-
-- `backend/cmd/internal-api/main.go`
-- `backend/internal/api/internal/handlers/audit.go`
-
-**Changes**: Receive audit events, trigger Temporal workflows
-
-**Test**: Audit events processed via Temporal
-
-**Commit**: `feat(iam): step-24 - add audit workflow handler`
-
----
-
-## Commit 21a ✅: Activate Oathkeeper JWT verification in Gateway (FIX)
-
-**Research**:
-
-Review id_token mutator in Oathkeeper:
-<https://www.ory.sh/docs/oathkeeper/pipeline/mutator#id_token>
-
-Check cookie_session authenticator docs for session data structure.
-
-Review internal/api/rest/middleware/auth.go logic.
+Keto требует собственных миграций, как и Kratos.
 
 Files:
 
-kratos/dev/access-rules.yml
-
-backend/internal/api/rest/server.go
-
 docker-compose.dev.yaml
 
-backend/internal/api/rest/middleware/auth.go
+kratos/dev/keto.yml (новый)
+
+.env.dev.example (добавить KETO_DSN)
+
+postgres/init-kratos-db.sh (обновить, чтобы создавал и keto_db)
 
 Changes:
 
-Oathkeeper: Change mutator for protected:api (gateway) and protected:graphql
-(data-api) from header to id_token.
+docker-compose.dev.yaml:
 
-Gateway:
+Добавить сервис keto-migrate (keto migrate sql -e --yes).
 
-В server.go импортировать и создать AuthMiddleware (из middleware/auth.go).
+Добавить сервис keto (keto serve -c ...).
 
-Обернуть все защищенные маршруты (/api/me, /api/users/\*) в
-authMiddleware.RequireAuth(...).
+keto должен зависеть от keto-migrate.
 
-Config: Убедиться, что gateway получает все необходимые JWT_ISSUER, JWT_AUDIENCE
-и VAULT_ADDR для JWTVerifier.
+keto.yml: Создать конфиг, указывающий на KETO_DSN.
 
-Benefits:
+Test: task up запускает keto и keto-migrate без ошибок.
 
-✅ Zero-Trust: gateway больше не доверяет слепо хедерам.
+Commit: feat(iam): step-28 - add Ory Keto service skeleton
 
-✅ Defense-in-Depth: gateway активно верифицирует, что запрос прошел через
-Oathkeeper и несет валидный, подписанный им JWT.
+Commit 29 (НОВЫЙ): Cоздать и загрузить политики Keto Research:
 
-✅ Consistency: Реализация теперь соответствует плану (Commit 18) и написанному
-коду.
+Изучить синтаксис Ory Keto Policies
+<https://www.ory.sh/docs/keto/concepts/policies>.
 
-Test: Запросы к /api/me без сессии (cookie) корректно редиректят на Kratos.
-Запросы с сессией успешно проходят верификацию JWT в gateway.
+Изучить ory create policy CLI.
 
-Commit: fix(iam): step-21a - activate Oathkeeper JWT verification in gateway
+Files:
 
----
+kratos/dev/policies/admin.json (новый)
 
-## Commit 25 ✅: Add Kratos login webhook
+Taskfile.yml (обновлен)
+
+vault/Taskfile.yml (добавить keto:seed)
+
+Changes:
+
+admin.json: Создать базовую политику (Ory ACP):
+
+JSON
+
+{ "id": "policy-admin-access", "subjects": ["<role:admin>"], "actions":
+["create", "read", "update", "delete"], "resources": ["api:admin:<.*>"],
+"effect": "allow" } Taskfile.yml: Добавить task keto:seed.
+
+Скрипт keto:seed должен вызывать docker-compose exec keto ory create policy ....
+
+Test: task keto:seed успешно загружает политику.
+
+#### Commit 31 (НОВЫЙ): Настроить Vault PKI Engine
 
 **Research**:
 
-- Review Kratos webhooks:
-  [https://www.ory.sh/docs/kratos/hooks/configure-hooks](https://www.ory.sh/docs/kratos/hooks/configure-hooks)
-- Check available webhook events (e.g., `after.login`)
-- Review webhook payload structure and security
+- `vault secrets enable pki`
+- `vault pki root generate internal`
+- `vault pki int generate internal`
 
 **Files**:
 
-- `backend/cmd/internal-api/main.go`
-- `kratos/dev/kratos.yml`
+- `vault/scripts/init-pki.sh` (новый)
+- `vault/scripts/bootstrap-dev.sh` (обновлен)
 
-**Changes**: Log user login events
+**Changes**:
 
-**Test**: Login events appear in audit log
+1. **`init-pki.sh`**:
+   - `vault secrets enable -path=pki_int pki` (Промежуточный CA)
+   - `vault pki tune -max-lease-ttl=43800h pki_int` (TTL для CA)
+   - `vault write pki_int/intermediate/generate/internal common_name="Nexus Dev Intermediate CA"`
+2. **`bootstrap-dev.sh`**:
+   - Добавить вызов `bash scripts/init-pki.sh`.
 
-**Commit**: `feat(iam): step-25 - add Kratos login webhook`
+**Test**: `task vault:init` создает Intermediate CA в `Vault`.
 
----
-
-## Commit 26 ✅: Update logout to revoke session
-
-**Files**: `backend/internal/api/rest/handlers/me.go`
-
-**Changes**: Call Kratos `DELETE /sessions` API
-
-**Test**: Logout invalidates Kratos session
-
-**Commit**: `feat(iam): step-26 - revoke Kratos session on logout`
+**Commit**: `feat(iam): step-31 - configure Vault PKI engine for mTLS`
 
 ---
 
-## Commit 27 ✅: Add logout webhook
+#### Commit 32 (НОВЫЙ): Создать PKI-роли и политики для сервисов
+
+**Research**:
+
+- `vault write pki_int/roles/...` (для выдачи сертов)
+- Обновить политики AppRole (для запроса сертов)
 
 **Files**:
 
-- `backend/cmd/internal-api/main.go`
-- `kratos/dev/kratos.yml`
+- `vault/scripts/init-pki.sh` (обновлен)
+- `vault/scripts/init-policies.sh` (обновлен)
 
-**Changes**: Log user logout events
+**Changes**:
 
-**Test**: Logout events appear in audit log
+1. **`init-pki.sh`**:
+   - **Создать PKI-роли:**
+     - `vault write pki_int/roles/oathkeeper-role allowed_domains="oathkeeper.service.local" ttl="1h"`
+     - `vault write pki_int/roles/gateway-role allowed_domains="gateway.service.local" ttl="1h"`
+     - `vault write pki_int/roles/data-api-role allowed_domains="data-api.service.local" ttl="1h"`
+     - `vault write pki_int/roles/internal-api-role allowed_domains="internal-api.service.local" ttl="1h"`
+     - `vault write pki_int/roles/worker-role allowed_domains="worker.service.local" ttl="1h"`
+2. **`init-policies.sh`**:
+   - **Удалить** права на `transit/sign/*`.
+   - **Добавить** права на PKI:
+     - Политика `app-gateway` должна включать:
+       `path "pki_int/issue/gateway-role" { capabilities = ["update"] }`
+     - Политика `app-data-api` должна включать:
+       `path "pki_int/issue/data-api-role" { capabilities = ["update"] }`
+     - ...и так далее для всех сервисов.
 
-**Commit**: `feat(iam): step-27 - add logout webhook for audit`
+**Test**: `task vault:init` создает PKI-роли.
+
+**Commit**: `feat(iam): step-32 - define PKI roles and policies for mTLS`
 
 ---
 
-## Commit 28 ✅: Add RBAC authorizer endpoint
+### Фаза 2: 🚗 Внедрение Vault Agent Sidecar (для всех)
+
+#### Commit 33 (НОВЫЙ): Создать конфиг Vault Agent для mTLS
 
 **Files**:
 
-- `backend/internal/api/rest/handlers/authorizer.go`
+- `vault/agent/template.hcl` (новый)
+- `vault/agent/cert.tpl` (новый)
+- `vault/agent/key.tpl` (новый)
+- `vault/agent/ca.tpl` (новый)
+- `vault/agent/webhook.tpl` (новый, для `kratos-agent`)
+
+**Changes**:
+
+1. **`template.hcl`**: Общий HCL-конфиг для `vault-agent`:
+
+   ```hcl
+   vault { address = "http://vault:8200" }
+   auto_auth { method "approle" { config = { ... } } }
+
+   // Рендерит CA (один раз)
+   template {
+     source = "/config/ca.tpl"
+     destination = "/secrets/vault-ca.pem"
+     command = "touch /secrets/.ca-ready"
+   }
+
+   // Рендерит серт (и ротирует)
+   template {
+     source = "/config/cert.tpl"
+     destination = "/secrets/tls.crt"
+     command = "touch /secrets/.cert-ready"
+   }
+   // ... (и для .key)
+   ```
+
+2. **`ca.tpl`**:
+   `{{- with secret "pki_int/ca/pem" -}}{{ .Data.certificate }}{{- end -}}`
+3. **`cert.tpl`**:
+   `{{- $role := env "PKI_ROLE" -}} ... {{- with secret (printf "pki_int/issue/%s" $role) "common_name=..." -}}{{ .Data.certificate }}{{- end -}}`
+   (аналогично для `key.tpl`).
+4. **`webhook.tpl`** (для `kratos-agent`):
+   `{{- with secret "kv/data/shared/webhook" -}}{{ .Data.data.current }}{{- end -}}`
+
+**Commit**:
+`feat(iam): step-33 - create Vault Agent templates for mTLS & webhooks`
+
+---
+
+#### Commit 34 (НОВЫЙ): Внедрить Sidecar-контейнеры
+
+**Files**:
+
+- `docker-compose.dev.yaml`
+- `.env.dev.example`
+- `vault/scripts/bootstrap-dev.sh` (обновлен)
+
+**Changes**:
+
+1. **`bootstrap-dev.sh`**: Обновить скрипт, чтобы он _читал_ `role_id/secret_id`
+   из `vault/.dev/approles/*.json` и _записывал_ их в `.env` (например,
+   `GATEWAY_ROLE_ID=...`). `docker-compose` будет читать их из `.env`.
+2. **`docker-compose.dev.yaml`**:
+   - Создать 6 `tmpfs` volumes: `gateway-secrets`, `data-api-secrets` и т.д.
+   - Для **каждого** сервиса (`gateway`, `data-api`, `internal-api`, `worker`,
+     `oathkeeper`, `kratos`):
+     - **Добавить `vault-agent-*` sidecar** (`image: hashicorp/vault`).
+     - `command: vault agent -config=/config/template.hcl`
+     - `volumes`: `./vault/agent:/config:ro`, `[service]-secrets:/secrets`.
+     - `environment`: `PKI_ROLE=[service]-role`,
+       `COMMON_NAME=[service].service.local`, `VAULT_ROLE_ID=...` (из `.env`).
+     - **Обновить основной сервис**:
+       - `hostname: [service].service.local`
+       - `volumes`: `[service]-secrets:/secrets:ro`
+       - `depends_on`: `vault-agent-[service]`.
+       - `command`: Добавить `wait-for`-скрипт (ожидание
+         `/secrets/.cert-ready`).
+
+**Commit**: `feat(iam): step-34 - implement mTLS Sidecars for all services`
+
+---
+
+### Фаза 3: 🔌 Переключение Сервисов на mTLS
+
+#### Commit 35 (НОВЫЙ): Перевести Go-сервисы на `ListenAndServeTLS`
+
+**Files**:
+
 - `backend/cmd/gateway/main.go`
+- `backend/cmd/data-api/main.go`
+- `backend/cmd/internal-api/main.go`
+- `backend/cmd/worker/main.go`
 
-**Changes**: `/api/internal/authorize` for Oathkeeper `remote_json`
+**Changes**:
 
-**Test**: Returns 200 for admin, 403 for non-admin
+- **Все `main.go`**:
+  - Заменить `http.ListenAndServe` на
+    `http.ListenAndServeTLS("/secrets/tls.crt", "/secrets/tls.key")`.
+  - Настроить `tls.Config` сервера, чтобы он _требовал_ клиентские сертификаты:
+    - `ClientAuth: tls.RequireAndVerifyClientCert`
+    - `ClientCAs`: Загрузить `/secrets/vault-ca.pem`.
+- **Все S2S-клиенты** (в `gateway`, `worker`):
+  - `http.Client` должен использовать `http.Transport` с `tls.Config`, который
+    загружает _свой_ клиентский сертификат (`/secrets/tls.crt`) и CA.
+- **Удалить** всю S2S JWT-логику: `vault_token_client.go`,
+  `service_token_transport.go`, `jwt_verifier.go`.
 
-**Commit**: `feat(iam): step-28 - add RBAC authorizer endpoint`
-
----
-
-## Commit 29 ✅: Add admin access rules
-
-**Research**:
-
-- Review Ory Oathkeeper authorizers:
-  [https://www.ory.sh/docs/oathkeeper/pipeline/authn](https://www.ory.sh/docs/oathkeeper/pipeline/authn)
-- Check `remote_json` authorizer configuration examples
-- Review access rules matching patterns and priority
-
-**Files**: `kratos/dev/access-rules.yml`
-
-**Changes**: Protect admin endpoints with role check
-
-**Test**: Admin operations require admin role
-
-**Commit**: `feat(iam): step-29 - add admin RBAC rules to Oathkeeper`
+**Commit**: `feat(iam): step-35 - enable mTLS server/client in all Go services`
 
 ---
 
-## Commit 30 ✅: Add dev-mode Traefik labels
+#### Commit 36 (НОВЫЙ): Переписать AuthN Middleware на mTLS (CN Check)
 
-**Files**: `docker-compose.dev.yaml`
+**Files**:
 
-**Changes**: Direct access to internal services in dev
+- `backend/internal/api/rest/middleware/auth.go` (`gateway`)
+- `backend/cmd/data-api/main.go` (добавить `mTLSAuthMiddleware`)
+- `backend/cmd/internal-api/main.go` (обновить `mTLSAuthMiddleware`)
+- `backend/internal/auth/jwks_verifier.go` (УДАЛИТЬ)
 
-**Test**: Can access services directly in dev
+**Changes**:
 
-**Commit**: `feat(iam): step-30 - add dev-mode direct access labels`
+1. **Удалить `jwks_verifier.go`**.
+2. **`gateway` (`auth.go`):**
+   - `AuthMiddleware` теперь проверяет
+     `r.TLS.PeerCertificates[0].Subject.CommonName`.
+   - Если `cn != "oathkeeper.service.local"`, то `403 Forbidden`.
+   - Если `cn == "oathkeeper.service.local"`, то читаем `X-User-ID` /
+     `X-User-Role` (Trusted Subsystem).
+3. **`data-api` (`main.go`):**
+   - Добавить `mTLSAuthMiddleware`: `cn == "gateway.service.local"` ИЛИ
+     `cn == "worker.service.local"` -\> `allow`.
+4. **`internal-api` (`main.go`):**
+   - Добавить `mTLSAuthMiddleware`:
+     - `cn == "gateway.service.local"` (для `/admin/*`) -\> `allow`.
+     - _Пока_ оставить `WebhookAuthMiddleware` (для `X-Webhook-Secret`), он
+       будет заменен в `Commit 37`.
+
+**Commit**:
+`refactor(iam): step-36 - switch AuthN middleware from JWT to mTLS CN validation`
+
+---
+
+#### Commit 37 (НОВЫЙ): Переключить Oathkeeper и Kratos Webhooks
+
+**Files**:
+
+- `kratos/dev/kratos.yml`
+- `kratos/dev/oathkeeper.yml`
+- `kratos/dev/access-rules.yml`
+- `backend/cmd/internal-api/main.go`
+
+**Changes**:
+
+1. **`kratos.yml`**:
+   - `url:` вебхука:
+     `http://oathkeeper:4455/api/v1/internal/webhooks/kratos/registration`
+   - `auth:` (вебхук): `type: api_key`, `value: file:///secrets/webhook.key`
+     (этот файл рендерит `vault-agent-kratos`).
+2. **`oathkeeper.yml`**:
+   - `upstream:` (для `gateway`): настроить на mTLS
+     (`httpsS://gateway.service.local:8080`, используя
+     `tls.client_certificate_path: /secrets/tls.crt` от
+     `vault-agent-oathkeeper`).
+3. **`access-rules.yml`**:
+   - **Правило "Admin" (`protected:api:admin`):**
+     - `authenticator: cookie_session`
+     - `authorizer: keto_engine_acp_ory` (настроен на `keto:4466`)
+     - `mutators: [header]`
+     - `upstream`: `https://gateway.service.local:8080` (уже настроен в
+       `oathkeeper.yml`)
+   - **Правило "Kratos Webhook" (НОВОЕ):**
+     - `id: webhook-kratos`
+     - `match`: `host: <любой, т.к. Kratos идет по имени сервиса>`,
+       `path: /api/v1/internal/webhooks/kratos/<*>`
+     - `authenticator: api_key` (проверяет `X-Webhook-Secret`, который Kratos
+       прочитал из `/secrets/webhook.key`)
+     - `authorizer: allow`
+     - `mutators: noop`
+     - `upstream`: `httpshttps://internal-api.service.local:8083` (Oathkeeper
+       использует свой mTLS-серт для вызова).
+4. **`internal-api` (`main.go`):**
+   - **Удалить** `WebhookAuthMiddleware` (проверку `X-Webhook-Secret`).
+   - **Обновить `mTLSAuthMiddleware`:**
+     - `cn == "gateway.service.local"` -\> `allow`.
+     - `cn == "oathkeeper.service.local"` (для `/webhooks/*`) -\> `allow`.
+
+**Commit**:
+`feat(iam): step-37 - reroute Kratos webhooks via mTLS-enabled Oathkeeper`
 
 ---
 
