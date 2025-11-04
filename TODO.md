@@ -28,39 +28,44 @@ JWT-логику (`id_token`, `vault_token_client`, `jwks_verifier` и каст�
 
 ### Фаза 1: 🔐 Настройка Vault PKI (Центр Сертификации)
 
-Commit 28 (НОВЫЙ): Добавить Ory Keto в docker-compose Research:
+#### ✅ Commit 28: Добавить Ory Keto в docker-compose
+
+**Status**: ✅ COMPLETED (2025-11-04)
+
+**Research**:
 
 Изучить oryd/keto <https://www.ory.sh/docs/keto/getting-started/install-docker>.
 
 Keto требует собственных миграций, как и Kratos.
 
-Files:
+**Files**:
 
-docker-compose.dev.yaml
+- `docker-compose.dev.yaml`
+- `kratos/dev/keto.yml` (новый)
+- `kratos/dev/namespaces.yml` (новый)
+- `.env` (добавить KETO_DSN)
+- `postgres/init-kratos-db.sh` (обновить, чтобы создавал и keto_db)
 
-kratos/dev/keto.yml (новый)
+**Changes**:
 
-.env.dev.example (добавить KETO_DSN)
+- `docker-compose.dev.yaml`:
+  - Добавить сервис `keto-migrate` (keto migrate up --yes)
+  - Добавить сервис `keto` (keto serve -c ...)
+  - keto должен зависеть от keto-migrate
+  - Использовать версию `oryd/keto:v0.14.0`
+- `keto.yml`: Создать конфиг, указывающий на KETO_DSN
+- `namespaces.yml`: Создать базовый namespace для role-based access control
+- `postgres/init-kratos-db.sh`: Добавить создание `keto_db`
 
-postgres/init-kratos-db.sh (обновить, чтобы создавал и keto_db)
+**Test**: ✅ keto и keto-migrate запускаются без ошибок, health check проходит
 
-Changes:
+**Commit**: `feat(iam): step-28 - add Ory Keto service skeleton`
 
-docker-compose.dev.yaml:
+---
 
-Добавить сервис keto-migrate (keto migrate sql -e --yes).
+#### Commit 29 (НОВЫЙ): Cоздать и загрузить политики Keto
 
-Добавить сервис keto (keto serve -c ...).
-
-keto должен зависеть от keto-migrate.
-
-keto.yml: Создать конфиг, указывающий на KETO_DSN.
-
-Test: task up запускает keto и keto-migrate без ошибок.
-
-Commit: feat(iam): step-28 - add Ory Keto service skeleton
-
-Commit 29 (НОВЫЙ): Cоздать и загрузить политики Keto Research:
+**Research**:
 
 Изучить синтаксис Ory Keto Policies
 <https://www.ory.sh/docs/keto/concepts/policies>.

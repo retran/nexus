@@ -53,7 +53,7 @@ serve:
       allow_credentials: true
 
 namespaces:
-  location: file:///etc/config/keto/namespaces.yml
+  location: file:///etc/config/keto/namespaces.ts
 
 log:
   level: debug
