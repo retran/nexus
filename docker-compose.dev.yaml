@@ -282,7 +282,7 @@ services:
       - VAULT_SIGNING_KEY=service-jwt-key
       - VAULT_TRANSIT_MOUNT_PATH=transit
       - JWT_ALLOWED_AUDIENCES=internal-api
-      - KRATOS_ADMIN_URL=http://kratos:4434
+      - KRATOS_ADMIN_URL=https://kratos.service.local:4434
       - INTERNAL_ALLOWED_ROLES=none,member,admin
       - TEMPORAL_HOST=temporal:7233
       - TEMPORAL_NAMESPACE=default

@@ -32,7 +32,12 @@ serve:
         - Set-Cookie
       allow_credentials: true
   admin:
-    base_url: http://kratos:4434
+    base_url: https://kratos.service.local:4434
+    tls:
+      key:
+        path: /secrets/cert.key
+      cert:
+        path: /secrets/cert.crt
 
 selfservice:
   default_browser_return_url: http://nexus.local/
