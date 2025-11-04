@@ -299,6 +299,19 @@ tasks:
     cmds:
       - task: vault:init-oidc
 
+  sso:clients:
+    desc: "Bootstrap OIDC clients in Kratos for SSO integrations (Temporal, Grafana)"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Bootstrapping OIDC clients in Kratos...\n"
+        if [ -f .env ]; then
+          set -a
+          source .env
+          set +a
+        fi
+        export KRATOS_ADMIN_URL="${KRATOS_ADMIN_URL:-http://localhost:4434}"
+        ./ory/scripts/bootstrap_oidc_clients.sh
+
   # UTILITIES
   repo:format:
     desc: "Format repository root files (YAML, Markdown)"
