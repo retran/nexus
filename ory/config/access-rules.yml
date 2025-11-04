@@ -81,10 +81,10 @@
 # Gateway service calls data:8081 directly via Docker network
 # No external access via Oathkeeper/Traefik
 
-- id: "protected:ui"
+- id: "protected:frontend"
   upstream:
     preserve_host: false
-    url: "http://ui:3000"
+    url: "http://frontend:3000"
   match:
     url: "http://<{nexus,127.0.0.1,localhost}{,:4455}>/<**>"
     methods:

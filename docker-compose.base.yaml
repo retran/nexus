@@ -99,7 +99,7 @@ services:
       vault:
         condition: service_healthy
 
-  ui:
+  frontend:
     restart: always
     env_file: .env
 

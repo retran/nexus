@@ -130,7 +130,7 @@ services:
       - VAULT_TOKEN=root
       - AIR_BUILD_DIR=/app/tmp
 
-  ui:
+  frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
@@ -142,7 +142,7 @@ services:
     environment:
       - VITE_API_URL=http://api.nexus.local
       - VITE_AUTH_URL=http://auth.nexus.local
-    # Note: UI access via nexus.local is routed through Oathkeeper (see access-rules.yml protected:ui)
+    # Note: Frontend access via nexus.local is routed through Oathkeeper (see access-rules.yml protected:frontend)
 
   kratos:
     ports:
