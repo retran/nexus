@@ -163,7 +163,7 @@ VAULT_TOKEN="${root_token}" \
   VAULT_ADDR="${VAULT_ADDR_IN_CONTAINER}" \
   "${SCRIPT_DIR}/init-pki.sh"
 
-services=(data-api gateway worker)
+services=(data-api gateway worker internal-api oathkeeper kratos)
 
 for service in "${services[@]}"; do
   role_name="app-${service}"
@@ -198,6 +198,41 @@ EOF
   chmod 600 "${output_file}"
   echo "[INFO] AppRole credentials written to ${output_file}"
 done
+
+# Export AppRole credentials to .env for docker-compose
+echo ""
+echo "[INFO] Exporting AppRole credentials to .env file..."
+ENV_FILE_PATH="${REPO_ROOT}/.env"
+
+for service in "${services[@]}"; do
+  approle_file="${APPROLE_OUTPUT_DIR}/${service}.json"
+
+  if [ ! -f "${approle_file}" ]; then
+    echo "[WARN] AppRole file not found: ${approle_file}, skipping..."
+    continue
+  fi
+
+  role_id=$(jq -r '.role_id' "${approle_file}")
+  secret_id=$(jq -r '.secret_id' "${approle_file}")
+
+  # Convert service name to uppercase with underscores for env var
+  service_upper=$(echo "${service}" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+
+  # Remove old entries if they exist
+  sed -i.bak "/^${service_upper}_ROLE_ID=/d" "${ENV_FILE_PATH}" 2>/dev/null || true
+  sed -i.bak "/^${service_upper}_SECRET_ID=/d" "${ENV_FILE_PATH}" 2>/dev/null || true
+
+  # Append new entries
+  echo "${service_upper}_ROLE_ID=${role_id}" >> "${ENV_FILE_PATH}"
+  echo "${service_upper}_SECRET_ID=${secret_id}" >> "${ENV_FILE_PATH}"
+
+  echo "[INFO] Exported ${service_upper}_ROLE_ID and ${service_upper}_SECRET_ID to .env"
+done
+
+# Clean up backup files
+rm -f "${ENV_FILE_PATH}.bak"
+
+echo "[SUCCESS] AppRole credentials exported to ${ENV_FILE_PATH}"
 
 echo "[INFO] Configuring OIDC auth for Vault UI..."
 VAULT_TOKEN="${root_token}" \

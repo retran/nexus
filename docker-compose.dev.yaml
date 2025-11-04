@@ -101,10 +101,33 @@ services:
       postgres:
         condition: service_healthy
 
+  # Vault Agent sidecar for data-api
+  vault-agent-data-api:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - PKI_ROLE=data-api-role
+      - COMMON_NAME=data-api.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - data-api-secrets:/secrets
+    entrypoint: >
+      sh -c "
+      echo \"$$DATA_API_ROLE_ID\" > /vault/role-id &&
+      echo \"$$DATA_API_SECRET_ID\" > /vault/secret-id &&
+      exec vault agent -config=/config/template.hcl
+      "
+    depends_on:
+      vault:
+        condition: service_started
+
   data-api:
     build:
       context: ./backend
       dockerfile: Dockerfile.data-api.dev
+    hostname: data-api.service.local
     restart: always
     expose:
       - "8081"
@@ -116,6 +139,7 @@ services:
       - POSTGRES_HOST=postgres
     volumes:
       - ./backend:/app
+      - data-api-secrets:/secrets:ro
     command: ["air", "-c", ".air.data-api.toml"]
     labels:
       - "traefik.enable=true"
@@ -124,13 +148,40 @@ services:
       - "traefik.http.routers.data-api-direct.priority=50"
       - "traefik.http.services.data-api-direct.loadbalancer.server.port=8081"
     depends_on:
-      - postgres
-      - temporal
+      vault-agent-data-api:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+
+  # Vault Agent sidecar for worker
+  vault-agent-worker:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - PKI_ROLE=worker-role
+      - COMMON_NAME=worker.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - worker-secrets:/secrets
+    entrypoint: >
+      sh -c "
+      echo \"$$WORKER_ROLE_ID\" > /vault/role-id &&
+      echo \"$$WORKER_SECRET_ID\" > /vault/secret-id &&
+      exec vault agent -config=/config/template.hcl
+      "
+    depends_on:
+      vault:
+        condition: service_started
 
   worker:
     build:
       context: ./backend
       dockerfile: Dockerfile.worker.dev
+    hostname: worker.service.local
     restart: always
     env_file: .env
     environment:
@@ -138,8 +189,11 @@ services:
       - API_URL=http://data-api:8081/graphql # Worker reaches the API server
     volumes:
       - ./backend:/app
+      - worker-secrets:/secrets:ro
     command: ["air", "-c", ".air.worker.toml"]
     depends_on:
+      vault-agent-worker:
+        condition: service_started
       postgres:
         condition: service_healthy
       temporal:
@@ -147,10 +201,33 @@ services:
       data-api:
         condition: service_started
 
+  # Vault Agent sidecar for internal-api
+  vault-agent-internal-api:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - PKI_ROLE=internal-api-role
+      - COMMON_NAME=internal-api.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - internal-api-secrets:/secrets
+    entrypoint: >
+      sh -c "
+      echo \"$$INTERNAL_API_ROLE_ID\" > /vault/role-id &&
+      echo \"$$INTERNAL_API_SECRET_ID\" > /vault/secret-id &&
+      exec vault agent -config=/config/template.hcl
+      "
+    depends_on:
+      vault:
+        condition: service_started
+
   internal-api:
     build:
       context: ./backend
       dockerfile: Dockerfile.internal-api.dev
+    hostname: internal-api.service.local
     restart: always
     expose:
       - "8083"
@@ -172,6 +249,7 @@ services:
       - AUDIT_ALLOWED_SUBJECTS=gateway
     volumes:
       - ./backend:/app
+      - internal-api-secrets:/secrets:ro
     command: ["air", "-c", ".air.internal-api.toml"]
     labels:
       - "traefik.enable=true"
@@ -180,15 +258,41 @@ services:
       - "traefik.http.routers.internal-api-direct.priority=50"
       - "traefik.http.services.internal-api-direct.loadbalancer.server.port=8083"
     depends_on:
+      vault-agent-internal-api:
+        condition: service_started
       data-api:
         condition: service_started
       temporal:
+        condition: service_started
+
+  # Vault Agent sidecar for gateway - provisions mTLS certificates
+  vault-agent-gateway:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - PKI_ROLE=gateway-role
+      - COMMON_NAME=gateway.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - gateway-secrets:/secrets
+    # Create temporary files for AppRole credentials from env vars
+    entrypoint: >
+      sh -c "
+      echo \"$$GATEWAY_ROLE_ID\" > /vault/role-id &&
+      echo \"$$GATEWAY_SECRET_ID\" > /vault/secret-id &&
+      exec vault agent -config=/config/template.hcl
+      "
+    depends_on:
+      vault:
         condition: service_started
 
   gateway:
     build:
       context: ./backend
       dockerfile: Dockerfile.gateway.dev
+    hostname: gateway.service.local
     restart: always
     expose:
       - "8080"
@@ -204,6 +308,7 @@ services:
     volumes:
       - ./backend:/app
       - ./kratos/dev/id_token.jwks.json:/etc/oathkeeper/id_token.jwks.json:ro
+      - gateway-secrets:/secrets:ro
     command: ["air", "-c", ".air.gateway.toml"]
     labels:
       - "traefik.enable=true"
@@ -212,6 +317,8 @@ services:
       - "traefik.http.routers.gateway-direct.priority=50"
       - "traefik.http.services.gateway-direct.loadbalancer.server.port=8080"
     depends_on:
+      vault-agent-gateway:
+        condition: service_started
       data-api:
         condition: service_started
       postgres:
@@ -239,6 +346,28 @@ services:
     depends_on:
       - gateway
 
+  # Vault Agent sidecar for kratos
+  vault-agent-kratos:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - PKI_ROLE=kratos-role
+      - COMMON_NAME=kratos.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - kratos-secrets:/secrets
+    entrypoint: >
+      sh -c "
+      echo \"$$KRATOS_ROLE_ID\" > /vault/role-id &&
+      echo \"$$KRATOS_SECRET_ID\" > /vault/secret-id &&
+      exec vault agent -config=/config/template.hcl
+      "
+    depends_on:
+      vault:
+        condition: service_started
+
   kratos-migrate:
     image: oryd/kratos:v1.3.1
     restart: on-failure
@@ -254,6 +383,7 @@ services:
 
   kratos:
     image: oryd/kratos:v1.3.1
+    hostname: kratos.service.local
     restart: always
     expose:
       - "4433" # Public API
@@ -270,6 +400,7 @@ services:
     command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier # --dev flag for development only!
     volumes:
       - ./kratos/dev:/etc/config/kratos:ro
+      - kratos-secrets:/secrets:ro
     labels:
       - "traefik.enable=true"
       # Route for Kratos API endpoints (self-service flows)
@@ -282,6 +413,8 @@ services:
       - "traefik.http.middlewares.kratos-ratelimit.ratelimit.burst=20"
       - "traefik.http.routers.kratos-public.middlewares=kratos-ratelimit"
     depends_on:
+      vault-agent-kratos:
+        condition: service_started
       kratos-migrate:
         condition: service_completed_successfully
 
@@ -353,8 +486,31 @@ services:
       keto-migrate:
         condition: service_completed_successfully
 
+  # Vault Agent sidecar for oathkeeper
+  vault-agent-oathkeeper:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - PKI_ROLE=oathkeeper-role
+      - COMMON_NAME=oathkeeper.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - oathkeeper-secrets:/secrets
+    entrypoint: >
+      sh -c "
+      echo \"$$OATHKEEPER_ROLE_ID\" > /vault/role-id &&
+      echo \"$$OATHKEEPER_SECRET_ID\" > /vault/secret-id &&
+      exec vault agent -config=/config/template.hcl
+      "
+    depends_on:
+      vault:
+        condition: service_started
+
   oathkeeper:
     image: oryd/oathkeeper:v0.40.9
+    hostname: oathkeeper.service.local
     restart: always
     expose:
       - "4455" # Proxy port
@@ -362,6 +518,7 @@ services:
     command: serve -c /etc/config/oathkeeper/oathkeeper.yml
     volumes:
       - ./kratos/dev:/etc/config/oathkeeper:ro
+      - oathkeeper-secrets:/secrets:ro
     labels:
       - "traefik.enable=true"
       # Route all protected domains through Oathkeeper
@@ -375,11 +532,18 @@ services:
       - "traefik.http.middlewares.oathkeeper-ratelimit.ratelimit.burst=100"
       - "traefik.http.routers.oathkeeper.middlewares=oathkeeper-ratelimit"
     depends_on:
-      - kratos
-      - keto
-      - gateway
-      - ui
-      - data-api
+      vault-agent-oathkeeper:
+        condition: service_started
+      kratos:
+        condition: service_started
+      keto:
+        condition: service_started
+      gateway:
+        condition: service_started
+      ui:
+        condition: service_started
+      data-api:
+        condition: service_started
 
   atlas:
     image: arigaio/atlas:latest
@@ -397,3 +561,40 @@ volumes:
   postgres_dev_data:
   redis_dev_data:
   vault_dev_data:
+
+  # tmpfs volumes for mTLS certificates (in-memory, not persisted)
+  gateway-secrets:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+
+  data-api-secrets:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+
+  internal-api-secrets:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+
+  worker-secrets:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+
+  oathkeeper-secrets:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+
+  kratos-secrets:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
