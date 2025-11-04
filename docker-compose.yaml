@@ -1,34 +1,33 @@
 # Copyright 2025 Andrew Vasilyev
 # SPDX-License-Identifier: Apache-2.0
 
-# Docker Compose - DEVELOPMENT ENVIRONMENT
-# This configuration is for local development only.
-# Production deployment uses separate compose files with:
-# - HTTPS/TLS certificates (Let's Encrypt)
-# - Actual domains (not .local)
-# - Cloudflare Tunnel for external access
-# - Production-grade logging and monitoring
+# Docker Compose - PRODUCTION CONFIGURATION
+# This is the production-ready configuration for Mac Mini deployment.
+# For local development with hot reload, create docker-compose.override.yaml
 
 services:
   traefik:
     image: traefik:v3.5
     restart: always
     command:
-      - "--api.insecure=true" # Dev only! Prod: secure dashboard
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
-      - "--log.level=DEBUG" # Dev: DEBUG; Prod: INFO or WARN
+      - "--entrypoints.websecure.address=:443"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+      # ACME/Let's Encrypt configuration (uncomment and configure for production)
+      # - "--certificatesresolvers.letsencrypt.acme.email=admin@yourdomain.com"
+      # - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
     ports:
-      - "80:80" # HTTP
-      - "8090:8080" # Traefik dashboard
+      - "80:80"
+      - "443:443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.nexus.local`)"
-      - "traefik.http.routers.traefik.service=api@internal"
-      - "traefik.http.routers.traefik.entrypoints=web"
+      - traefik_letsencrypt:/letsencrypt
+    # Traefik dashboard disabled in production for security
+    # Access via Tailscale or configure SSO if needed
 
   postgres:
     image: postgres:18-alpine
@@ -36,11 +35,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init-kratos-db.sh:/docker-entrypoint-initdb.d/init-kratos-db.sh
-    ports:
-      - "5432:5432" # Dev: exposed for local access; Prod: internal only
     env_file: .env
     environment:
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD} # Dev: from .env; Prod: from Vault
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
       interval: 10s
@@ -50,12 +47,10 @@ services:
   redis:
     image: redis:8-alpine
     restart: always
-    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_password}
-    ports:
-      - "6379:6379" # Dev: exposed for local access; Prod: internal only
+    command: redis-server --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
-    env_file: .env # Dev: from .env; Prod: from Vault
+    env_file: .env
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
       interval: 10s
@@ -65,8 +60,6 @@ services:
   vault:
     image: hashicorp/vault:1.21.0
     restart: always
-    ports:
-      - "8200:8200"
     volumes:
       - ./vault/config.hcl:/vault/config/config.hcl:ro
       - vault_data:/vault/data
@@ -110,8 +103,6 @@ services:
     image: temporalio/auto-setup:1.29.1
     hostname: temporal.service.local
     restart: always
-    ports:
-      - "8088:8088" # UI only, gRPC now internal with mTLS
     volumes:
       - temporal-secrets:/secrets:ro
     env_file: .env
@@ -167,27 +158,23 @@ services:
   data-api:
     build:
       context: ./backend
-      dockerfile: Dockerfile.data-api.dev
+      dockerfile: Dockerfile.data-api
     hostname: data-api.service.local
     restart: always
     expose:
       - "8081"
-    ports:
-      - "2345:2345" # Debugger
     env_file: .env
     environment:
       - SERVER_PORT=8081
       - POSTGRES_HOST=postgres
     volumes:
-      - ./backend:/app
       - data-api-secrets:/secrets:ro
-    command: ["air", "-c", ".air.data-api.toml"]
     labels:
       - "traefik.enable=true"
-      # Dev-mode direct access (bypassing Oathkeeper for debugging)
-      - "traefik.http.routers.data-api-direct.rule=Host(`data-api.nexus.local`)"
-      - "traefik.http.routers.data-api-direct.priority=50"
-      - "traefik.http.services.data-api-direct.loadbalancer.server.port=8081"
+      - "traefik.http.routers.data-api.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.data-api.entrypoints=websecure"
+      - "traefik.http.routers.data-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.data-api.loadbalancer.server.port=8081"
     depends_on:
       vault-agent-data-api:
         condition: service_started
@@ -221,17 +208,15 @@ services:
   worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile.worker.dev
+      dockerfile: Dockerfile.worker
     hostname: worker.service.local
     restart: always
     env_file: .env
     environment:
       - TEMPORAL_HOST=temporal:7233
-      - API_URL=http://data-api:8081/graphql # Worker reaches the API server
+      - API_URL=http://data-api:8081/graphql
     volumes:
-      - ./backend:/app
       - worker-secrets:/secrets:ro
-    command: ["air", "-c", ".air.worker.toml"]
     depends_on:
       vault-agent-worker:
         condition: service_started
@@ -267,7 +252,7 @@ services:
   internal-api:
     build:
       context: ./backend
-      dockerfile: Dockerfile.internal-api.dev
+      dockerfile: Dockerfile.internal-api
     hostname: internal-api.service.local
     restart: always
     expose:
@@ -289,15 +274,7 @@ services:
       - TEMPORAL_TASK_QUEUE=nexus-task-queue
       - AUDIT_ALLOWED_SUBJECTS=gateway
     volumes:
-      - ./backend:/app
       - internal-api-secrets:/secrets:ro
-    command: ["air", "-c", ".air.internal-api.toml"]
-    labels:
-      - "traefik.enable=true"
-      # Dev-mode direct access (for debugging internal endpoints)
-      - "traefik.http.routers.internal-api-direct.rule=Host(`internal-api.nexus.local`)"
-      - "traefik.http.routers.internal-api-direct.priority=50"
-      - "traefik.http.services.internal-api-direct.loadbalancer.server.port=8083"
     depends_on:
       vault-agent-internal-api:
         condition: service_started
@@ -332,7 +309,7 @@ services:
   gateway:
     build:
       context: ./backend
-      dockerfile: Dockerfile.gateway.dev
+      dockerfile: Dockerfile.gateway
     hostname: gateway.service.local
     restart: always
     expose:
@@ -342,21 +319,13 @@ services:
       - GRAPHQL_ENDPOINT=http://data-api:8081/graphql
       - POSTGRES_HOST=postgres
       - REDIS_HOST=redis
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis_password}
-      - OATHKEEPER_JWT_ISSUER=http://auth.nexus.local
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - OATHKEEPER_JWT_ISSUER=https://auth.${DOMAIN}
       - OATHKEEPER_JWT_AUDIENCE=gateway
       - OATHKEEPER_JWKS_FILE=/etc/oathkeeper/id_token.jwks.json
     volumes:
-      - ./backend:/app
-      - ./ory/dev/id_token.jwks.json:/etc/oathkeeper/id_token.jwks.json:ro
+      - ./ory/config/id_token.jwks.json:/etc/oathkeeper/id_token.jwks.json:ro
       - gateway-secrets:/secrets:ro
-    command: ["air", "-c", ".air.gateway.toml"]
-    labels:
-      - "traefik.enable=true"
-      # Dev-mode direct access (bypassing Oathkeeper for debugging)
-      - "traefik.http.routers.gateway-direct.rule=Host(`gateway.nexus.local`)"
-      - "traefik.http.routers.gateway-direct.priority=50"
-      - "traefik.http.services.gateway-direct.loadbalancer.server.port=8080"
     depends_on:
       vault-agent-gateway:
         condition: service_started
@@ -370,20 +339,17 @@ services:
   ui:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
     restart: always
     expose:
-      - "3000"
+      - "80"
     env_file: .env
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     labels:
       - "traefik.enable=true"
-      # Dev-mode direct access (bypassing Oathkeeper for debugging)
-      - "traefik.http.routers.ui-direct.rule=Host(`ui.nexus.local`)"
-      - "traefik.http.routers.ui-direct.priority=50"
-      - "traefik.http.services.ui-direct.loadbalancer.server.port=3000"
+      - "traefik.http.routers.ui.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.ui.entrypoints=websecure"
+      - "traefik.http.routers.ui.tls.certresolver=letsencrypt"
+      - "traefik.http.services.ui.loadbalancer.server.port=80"
     depends_on:
       - gateway
 
@@ -417,7 +383,7 @@ services:
       - DSN=${DSN}
     command: -c /etc/confi./ory/kratos.yml migrate sql -e --yes
     volumes:
-      - ./ory/dev:/etc/config/kratos:ro
+      - ./ory/config:/etc/config/kratos:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -427,8 +393,8 @@ services:
     hostname: kratos.service.local
     restart: always
     expose:
-      - "4433" # Public API
-      - "4434" # Admin API
+      - "4433"
+      - "4434"
     env_file: .env
     environment:
       - DSN=${DSN}
@@ -438,17 +404,17 @@ services:
       - SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - SELFSERVICE_FLOWS_LOGIN_AFTER_OIDC_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE=${WEBHOOK_SECRET}
       - SELFSERVICE_FLOWS_REGISTRATION_AFTER_PASSWORD_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE=${WEBHOOK_SECRET}
-    command: serve -c /etc/confi./ory/kratos.yml --dev --watch-courier # --dev flag for development only!
+    command: serve -c /etc/confi./ory/kratos.yml
     volumes:
-      - ./ory/dev:/etc/config/kratos:ro
+      - ./ory/config:/etc/config/kratos:ro
       - kratos-secrets:/secrets:ro
     labels:
       - "traefik.enable=true"
-      # Route for Kratos API endpoints (self-service flows)
-      - "traefik.http.routers.kratos-public.rule=Host(`auth.nexus.local`) && (PathPrefix(`/self-service`) || PathPrefix(`/schemas`) || PathPrefix(`/.well-known`))"
+      - "traefik.http.routers.kratos-public.rule=Host(`auth.${DOMAIN}`) && (PathPrefix(`/self-service`) || PathPrefix(`/schemas`) || PathPrefix(`/.well-known`))"
+      - "traefik.http.routers.kratos-public.entrypoints=websecure"
+      - "traefik.http.routers.kratos-public.tls.certresolver=letsencrypt"
       - "traefik.http.routers.kratos-public.priority=100"
       - "traefik.http.services.kratos-public.loadbalancer.server.port=4433"
-      # Stricter rate limiting for auth endpoints: 60 requests per minute per IP
       - "traefik.http.middlewares.kratos-ratelimit.ratelimit.average=60"
       - "traefik.http.middlewares.kratos-ratelimit.ratelimit.period=1m"
       - "traefik.http.middlewares.kratos-ratelimit.ratelimit.burst=20"
@@ -467,7 +433,7 @@ services:
     env_file: .env
     environment:
       - KRATOS_PUBLIC_URL=http://kratos:4433
-      - KRATOS_BROWSER_URL=http://auth.nexus.local
+      - KRATOS_BROWSER_URL=https://auth.${DOMAIN}
       - SECURITY_MODE=cookie
       - PORT=3000
       - COOKIE_SECRET=${COOKIE_SECRET}
@@ -475,11 +441,10 @@ services:
       - CSRF_COOKIE_SECRET=${CSRF_COOKIE_SECRET}
     labels:
       - "traefik.enable=true"
-      # Route for UI pages (lower priority than API)
-      # Provides: login, registration, settings, recovery, verification, account dashboard
-      - "traefik.http.routers.kratos-ui.rule=Host(`auth.nexus.local`)"
+      - "traefik.http.routers.kratos-ui.rule=Host(`auth.${DOMAIN}`)"
+      - "traefik.http.routers.kratos-ui.entrypoints=websecure"
+      - "traefik.http.routers.kratos-ui.tls.certresolver=letsencrypt"
       - "traefik.http.routers.kratos-ui.priority=1"
-      - "traefik.http.routers.kratos-ui.entrypoints=web"
       - "traefik.http.services.kratos-ui.loadbalancer.server.port=3000"
       # Rate limiting for UI: 300 requests per minute per IP
       - "traefik.http.middlewares.kratos-ui-ratelimit.ratelimit.average=300"
@@ -497,7 +462,7 @@ services:
       - DSN=${KETO_DSN}
     command: migrate up -c /etc/config/keto/keto.yml --yes
     volumes:
-      - ./ory/dev:/etc/config/keto:ro
+      - ./ory/config:/etc/config/keto:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -506,23 +471,14 @@ services:
     image: oryd/keto:v0.14.0
     restart: always
     expose:
-      - "4466" # Read API
-      - "4467" # Write API
+      - "4466"
+      - "4467"
     env_file: .env
     environment:
       - DSN=${KETO_DSN}
     command: serve -c /etc/config/keto/keto.yml
     volumes:
-      - ./ory/dev:/etc/config/keto:ro
-    labels:
-      - "traefik.enable=true"
-      # Dev-mode direct access for debugging
-      - "traefik.http.routers.keto-read.rule=Host(`keto-read.nexus.local`)"
-      - "traefik.http.routers.keto-read.priority=50"
-      - "traefik.http.services.keto-read.loadbalancer.server.port=4466"
-      - "traefik.http.routers.keto-write.rule=Host(`keto-write.nexus.local`)"
-      - "traefik.http.routers.keto-write.priority=50"
-      - "traefik.http.services.keto-write.loadbalancer.server.port=4467"
+      - ./ory/config:/etc/config/keto:ro
     depends_on:
       keto-migrate:
         condition: service_completed_successfully
@@ -554,20 +510,20 @@ services:
     hostname: oathkeeper.service.local
     restart: always
     expose:
-      - "4455" # Proxy port
-      - "4456" # API port
+      - "4455"
+      - "4456"
+    env_file: .env
     command: serve -c /etc/config/oathkeeper/oathkeeper.yml
     volumes:
-      - ./ory/dev:/etc/config/oathkeeper:ro
+      - ./ory/config:/etc/config/oathkeeper:ro
       - oathkeeper-secrets:/secrets:ro
     labels:
       - "traefik.enable=true"
-      # Route all protected domains through Oathkeeper
-      - "traefik.http.routers.oathkeeper.rule=Host(`nexus.local`) || Host(`api.nexus.local`) || Host(`graphql.nexus.local`) || Host(`traefik.nexus.local`)"
-      - "traefik.http.routers.oathkeeper.entrypoints=web"
+      - "traefik.http.routers.oathkeeper.rule=Host(`app.${DOMAIN}`) || Host(`graphql.${DOMAIN}`)"
+      - "traefik.http.routers.oathkeeper.entrypoints=websecure"
+      - "traefik.http.routers.oathkeeper.tls.certresolver=letsencrypt"
       - "traefik.http.routers.oathkeeper.priority=50"
       - "traefik.http.services.oathkeeper.loadbalancer.server.port=4455"
-      # Rate limiting: 1000 requests per minute per IP
       - "traefik.http.middlewares.oathkeeper-ratelimit.ratelimit.average=1000"
       - "traefik.http.middlewares.oathkeeper-ratelimit.ratelimit.period=1m"
       - "traefik.http.middlewares.oathkeeper-ratelimit.ratelimit.burst=100"
@@ -602,6 +558,7 @@ volumes:
   postgres_data:
   redis_data:
   vault_data:
+  traefik_letsencrypt:
 
   # tmpfs volumes for mTLS certificates (in-memory, not persisted)
   gateway-secrets:
