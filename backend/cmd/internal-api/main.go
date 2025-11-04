@@ -54,7 +54,10 @@ func run() error {
 		}
 	}()
 
-	roleHandler, auditHandler, kratosWebhookHandler := initServices(graphqlEndpoint, allowedRolesEnv, kratosAdminURL, temporalClient, taskQueue, auditSubjects)
+	roleHandler, auditHandler, kratosWebhookHandler, err := initServices(graphqlEndpoint, allowedRolesEnv, kratosAdminURL, temporalClient, taskQueue, auditSubjects)
+	if err != nil {
+		return err
+	}
 
 	mux := http.NewServeMux()
 	configureMux(mux, roleHandler, auditHandler, kratosWebhookHandler)
@@ -124,17 +127,21 @@ func configureMux(mux *http.ServeMux, roleHandler *handlers.AdminHandler, auditH
 	}
 }
 
-func initServices(_ string, allowedRolesEnv, kratosAdminURL string, temporalClient temporalclient.Client, taskQueue, auditSubjects string) (*handlers.AdminHandler, *handlers.AuditHandler, *handlers.KratosWebhookHandler) {
+func initServices(_ string, allowedRolesEnv, kratosAdminURL string, temporalClient temporalclient.Client, taskQueue, auditSubjects string) (*handlers.AdminHandler, *handlers.AuditHandler, *handlers.KratosWebhookHandler, error) {
 	webhookSecret := getEnv("KRATOS_WEBHOOK_SECRET", "")
 	if webhookSecret == "" {
 		log.Println("Warning: KRATOS_WEBHOOK_SECRET not set, webhook validation disabled")
 	}
 
-	roleHandler := handlers.NewAdminHandler(kratosAdminURL, parseCSV(allowedRolesEnv))
+	roleHandler, err := handlers.NewAdminHandler(kratosAdminURL, parseCSV(allowedRolesEnv))
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create admin handler: %w", err)
+	}
+
 	auditHandler := handlers.NewAuditHandler(temporalClient, taskQueue, parseCSV(auditSubjects))
 	kratosWebhookHandler := handlers.NewKratosWebhookHandler(temporalClient, taskQueue, webhookSecret)
 
-	return roleHandler, auditHandler, kratosWebhookHandler
+	return roleHandler, auditHandler, kratosWebhookHandler, nil
 }
 
 func adminRoleHandler(roleHandler *handlers.AdminHandler) http.HandlerFunc {

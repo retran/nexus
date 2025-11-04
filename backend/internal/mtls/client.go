@@ -73,3 +73,33 @@ func NewHTTPClient() (*http.Client, error) {
 		Transport: transport,
 	}, nil
 }
+
+// NewTLSHTTPClient creates a new HTTP client configured for TLS (server cert validation only).
+// It trusts the Vault CA but does not present a client certificate.
+// Useful for connecting to services that use TLS but don't require client authentication.
+func NewTLSHTTPClient() (*http.Client, error) {
+	caPath := defaultCAPath
+	// #nosec G304 -- caPath is controlled and comes from container environment
+	caCert, err := os.ReadFile(caPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate from %s: %w", caPath, err)
+	}
+
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to parse CA certificate")
+	}
+
+	tlsConfig := &tls.Config{
+		RootCAs:    caCertPool,
+		MinVersion: tls.VersionTLS13,
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+
+	return &http.Client{
+		Transport: transport,
+	}, nil
+}
