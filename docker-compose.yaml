@@ -560,45 +560,12 @@ volumes:
   vault_data:
   traefik_letsencrypt:
 
-  # tmpfs volumes for mTLS certificates (in-memory, not persisted)
+  # Persistent volumes for mTLS certificates (survive container restarts)
+  # Vault agent will regenerate certificates if needed
   gateway-secrets:
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-
   data-api-secrets:
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-
   internal-api-secrets:
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-
   worker-secrets:
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-
   oathkeeper-secrets:
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-
   kratos-secrets:
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-
   temporal-secrets:
-    driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
