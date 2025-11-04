@@ -163,7 +163,7 @@ VAULT_TOKEN="${root_token}" \
   VAULT_ADDR="${VAULT_ADDR_IN_CONTAINER}" \
   "${SCRIPT_DIR}/init-pki.sh"
 
-services=(data-api gateway worker internal-api oathkeeper kratos)
+services=(data-api gateway worker internal-api oathkeeper kratos temporal)
 
 for service in "${services[@]}"; do
   role_name="app-${service}"

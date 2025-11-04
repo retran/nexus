@@ -53,7 +53,7 @@ apply_policy() {
 tmpdir=$(mktemp -d)
 trap 'rm -rf "${tmpdir}"' EXIT
 
-services=(data-api gateway worker internal-api oathkeeper kratos)
+services=(data-api gateway worker internal-api oathkeeper kratos temporal)
 
 echo "[INFO] Writing service policies..."
 for service in "${services[@]}"; do

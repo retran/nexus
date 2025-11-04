@@ -119,6 +119,16 @@ vault_exec vault write pki_int/roles/worker-role \
   key_type="rsa" \
   key_bits=2048
 
+# Temporal role (Temporal server)
+echo "[INFO] Creating PKI role for temporal..."
+vault_exec vault write pki_int/roles/temporal-role \
+  allowed_domains="temporal.service.local" \
+  allow_bare_domains=true \
+  allow_subdomains=false \
+  max_ttl="1h" \
+  key_type="rsa" \
+  key_bits=2048
+
 # Kratos role (identity server)
 echo "[INFO] Creating PKI role for kratos..."
 vault_exec vault write pki_int/roles/kratos-role \
