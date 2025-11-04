@@ -522,7 +522,7 @@ services:
     labels:
       - "traefik.enable=true"
       # Route all protected domains through Oathkeeper
-      - "traefik.http.routers.oathkeeper.rule=Host(`nexus.local`) || Host(`api.nexus.local`) || Host(`graphql.nexus.local`)"
+      - "traefik.http.routers.oathkeeper.rule=Host(`nexus.local`) || Host(`api.nexus.local`) || Host(`graphql.nexus.local`) || Host(`traefik.nexus.local`)"
       - "traefik.http.routers.oathkeeper.entrypoints=web"
       - "traefik.http.routers.oathkeeper.priority=50"
       - "traefik.http.services.oathkeeper.loadbalancer.server.port=4455"

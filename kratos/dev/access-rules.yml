@@ -134,3 +134,32 @@
     handler: allow
   mutators:
     - handler: noop # Pass through all headers from Kratos
+
+# Traefik dashboard - requires admin role
+- id: "protected:traefik-dashboard"
+  upstream:
+    preserve_host: false
+    url: "http://traefik:8080"
+  match:
+    url: "http://traefik.nexus.local/<**>"
+    methods:
+      - GET
+      - POST
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: "http://gateway:8080/api/internal/authorize"
+      forward_response_headers_to_upstream:
+        - X-User
+        - X-User-Email
+        - X-User-Role
+      headers:
+        Authorization: 'Bearer {{ print .MatchContext.Header.Get "Authorization" }}'
+  mutators:
+    - handler: noop
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
