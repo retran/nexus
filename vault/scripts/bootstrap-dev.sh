@@ -159,6 +159,10 @@ VAULT_TOKEN="${root_token}" \
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN}" \
   "${SCRIPT_DIR}/init-transit.sh"
 
+VAULT_TOKEN="${root_token}" \
+  VAULT_ADDR="${VAULT_ADDR_IN_CONTAINER}" \
+  "${SCRIPT_DIR}/init-pki.sh"
+
 services=(data-api gateway worker)
 
 for service in "${services[@]}"; do
