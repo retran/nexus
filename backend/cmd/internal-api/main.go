@@ -115,11 +115,11 @@ func configureMux(mux *http.ServeMux, roleHandler *handlers.AdminHandler, auditH
 		mux.Handle("POST /internal/audit/events", mTLSAuthMiddleware("gateway.service.local", http.HandlerFunc(auditHandler.HandleAuditEvent)))
 	}
 
-	// Kratos webhooks (authenticated via webhook secret for now - will switch to mTLS in Commit 37)
+	// Kratos webhooks (proxied via Oathkeeper with mTLS, CN = oathkeeper.service.local)
 	if kratosWebhookHandler != nil {
-		mux.HandleFunc("POST /webhooks/kratos/registration", kratosWebhookHandler.HandleRegistration)
-		mux.HandleFunc("POST /webhooks/kratos/login", kratosWebhookHandler.HandleLogin)
-		mux.HandleFunc("POST /webhooks/kratos/logout", kratosWebhookHandler.HandleLogout)
+		mux.Handle("POST /webhooks/kratos/registration", mTLSAuthMiddleware("oathkeeper.service.local", http.HandlerFunc(kratosWebhookHandler.HandleRegistration)))
+		mux.Handle("POST /webhooks/kratos/login", mTLSAuthMiddleware("oathkeeper.service.local", http.HandlerFunc(kratosWebhookHandler.HandleLogin)))
+		mux.Handle("POST /webhooks/kratos/logout", mTLSAuthMiddleware("oathkeeper.service.local", http.HandlerFunc(kratosWebhookHandler.HandleLogout)))
 	}
 }
 

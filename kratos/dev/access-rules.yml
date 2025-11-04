@@ -23,7 +23,7 @@
 - id: "protected:api:admin"
   upstream:
     preserve_host: false
-    url: "http://gateway:8080"
+    url: "https://gateway.service.local:8080"
     strip_path: /.ory/kratos/public
   match:
     url: "http://<{api,127.0.0.1,localhost}{,:4455}>/api/admin/<**>"
@@ -56,7 +56,7 @@
 - id: "protected:api"
   upstream:
     preserve_host: false
-    url: "http://gateway:8080"
+    url: "https://gateway.service.local:8080"
     strip_path: /.ory/kratos/public
   match:
     url: "http://<{api,127.0.0.1,localhost}{,:4455}>/api/<**>"
@@ -118,3 +118,19 @@
     - handler: redirect
       config:
         to: http://auth.nexus.local/login
+
+# Kratos webhook proxy - routes webhooks via Oathkeeper with mTLS to internal-api
+- id: "webhook:kratos"
+  upstream:
+    preserve_host: false
+    url: "https://internal-api.service.local:8083"
+  match:
+    url: "http://<{oathkeeper,127.0.0.1,localhost}{,:4455}>/api/v1/internal/webhooks/kratos/<**>"
+    methods:
+      - POST
+  authenticators:
+    - handler: noop # Kratos already authenticated with X-Webhook-Secret
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop # Pass through all headers from Kratos

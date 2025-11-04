@@ -116,27 +116,27 @@ selfservice:
         hooks:
           - hook: web_hook
             config:
-              url: http://internal-api:8083/webhooks/kratos/login
+              url: http://oathkeeper:4455/api/v1/internal/webhooks/kratos/login
               method: POST
               body: file:///etc/config/kratos/webhook.jsonnet
               auth:
                 type: api_key
                 config:
                   name: X-Webhook-Secret
-                  value: to-be-configured
+                  value: file:///secrets/webhook.key
                   in: header
         oidc:
           hooks:
             - hook: web_hook
               config:
-                url: http://internal-api:8083/webhooks/kratos/login
+                url: http://oathkeeper:4455/api/v1/internal/webhooks/kratos/login
                 method: POST
                 body: file:///etc/config/kratos/webhook.jsonnet
                 auth:
                   type: api_key
                   config:
                     name: X-Webhook-Secret
-                    value: to-be-configured
+                    value: file:///secrets/webhook.key
                     in: header
 
     registration:
@@ -147,14 +147,14 @@ selfservice:
           hooks:
             - hook: web_hook
               config:
-                url: http://internal-api:8083/webhooks/kratos/registration
+                url: http://oathkeeper:4455/api/v1/internal/webhooks/kratos/registration
                 method: POST
                 body: file:///etc/config/kratos/webhook.jsonnet
                 auth:
                   type: api_key
                   config:
                     name: X-Webhook-Secret
-                    value: to-be-configured
+                    value: file:///secrets/webhook.key
                     in: header
 
 log:
