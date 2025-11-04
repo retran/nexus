@@ -90,9 +90,9 @@ vault_exec vault write pki_int/roles/gateway-role \
   key_bits=2048
 
 # Data API role (GraphQL API)
-echo "[INFO] Creating PKI role for data-api..."
-vault_exec vault write pki_int/roles/data-api-role \
-  allowed_domains="data-api.service.local" \
+echo "[INFO] Creating PKI role for data..."
+vault_exec vault write pki_int/roles/data-role \
+  allowed_domains="data.service.local" \
   allow_bare_domains=true \
   allow_subdomains=false \
   max_ttl="1h" \
@@ -100,9 +100,9 @@ vault_exec vault write pki_int/roles/data-api-role \
   key_bits=2048
 
 # Internal API role (gRPC internal services)
-echo "[INFO] Creating PKI role for internal-api..."
-vault_exec vault write pki_int/roles/internal-api-role \
-  allowed_domains="internal-api.service.local" \
+echo "[INFO] Creating PKI role for system..."
+vault_exec vault write pki_int/roles/system-role \
+  allowed_domains="system.service.local" \
   allow_bare_domains=true \
   allow_subdomains=false \
   max_ttl="1h" \

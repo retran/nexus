@@ -36,7 +36,7 @@ multi-layered, distributed platform built on enterprise-grade open-source tools.
   `nexus.retran.me`
 - **Development**: Create `docker-compose.override.yaml` locally for hot reload
 - **Domain**: `nexus.retran.me` (main), `auth.nexus.retran.me` (Kratos),
-  `api.nexus.retran.me` (data-api)
+  `api.nexus.retran.me` (data service)
 
 ### Starting the Stack
 

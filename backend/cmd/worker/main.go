@@ -15,8 +15,8 @@ import (
 	"go.temporal.io/sdk/worker"
 
 	"github.com/retran/nexus/backend/internal/activities"
-	gqlclient "github.com/retran/nexus/backend/internal/client/graphql"
-	"github.com/retran/nexus/backend/internal/mtls"
+	gqlclient "github.com/retran/nexus/backend/internal/client/data"
+	"github.com/retran/nexus/backend/internal/client/mtls"
 	"github.com/retran/nexus/backend/internal/workflows"
 )
 
@@ -52,7 +52,7 @@ func run() error {
 	defer c.Close()
 	log.Println("Connected to Temporal with mTLS")
 
-	apiURL := getEnv("API_URL", "https://data-api.service.local:8081/graphql")
+	apiURL := getEnv("API_URL", "https://data.service.local:8081/graphql")
 	gqlClient, err := gqlclient.NewMTLSClient(apiURL)
 	if err != nil {
 		return fmt.Errorf("failed to create GraphQL client with mTLS: %w", err)

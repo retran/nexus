@@ -133,18 +133,18 @@ services:
       kratos:
         condition: service_started
 
-  # Vault Agent sidecar for data-api
-  vault-agent-data-api:
+  # Vault Agent sidecar for data
+  vault-agent-data:
     image: hashicorp/vault:1.21.0
     restart: always
     command: ["agent", "-config=/config/template.hcl"]
     env_file: .env
     environment:
-      - PKI_ROLE=data-api-role
-      - COMMON_NAME=data-api.service.local
+      - PKI_ROLE=data-role
+      - COMMON_NAME=data.service.local
     volumes:
       - ./vault/agent:/config:ro
-      - data-api-secrets:/secrets
+      - data-secrets:/secrets
     entrypoint: >
       sh -c "
       echo \"$$DATA_API_ROLE_ID\" > /vault/role-id &&
@@ -155,11 +155,11 @@ services:
       vault:
         condition: service_started
 
-  data-api:
+  data:
     build:
       context: ./backend
-      dockerfile: Dockerfile.data-api
-    hostname: data-api.service.local
+      dockerfile: docker/Dockerfile.data
+    hostname: data.service.local
     restart: always
     expose:
       - "8081"
@@ -168,15 +168,15 @@ services:
       - SERVER_PORT=8081
       - POSTGRES_HOST=postgres
     volumes:
-      - data-api-secrets:/secrets:ro
+      - data-secrets:/secrets:ro
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.data-api.rule=Host(`api.${DOMAIN}`)"
-      - "traefik.http.routers.data-api.entrypoints=websecure"
-      - "traefik.http.routers.data-api.tls.certresolver=letsencrypt"
-      - "traefik.http.services.data-api.loadbalancer.server.port=8081"
+      - "traefik.http.routers.data.rule=Host(`api.${DOMAIN}`)"
+      - "traefik.http.routers.data.entrypoints=websecure"
+      - "traefik.http.routers.data.tls.certresolver=letsencrypt"
+      - "traefik.http.services.data.loadbalancer.server.port=8081"
     depends_on:
-      vault-agent-data-api:
+      vault-agent-data:
         condition: service_started
       postgres:
         condition: service_healthy
@@ -208,13 +208,13 @@ services:
   worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile.worker
+      dockerfile: docker/Dockerfile.worker
     hostname: worker.service.local
     restart: always
     env_file: .env
     environment:
       - TEMPORAL_HOST=temporal:7233
-      - API_URL=http://data-api:8081/graphql
+      - API_URL=http://data:8081/graphql
     volumes:
       - worker-secrets:/secrets:ro
     depends_on:
@@ -224,21 +224,21 @@ services:
         condition: service_healthy
       temporal:
         condition: service_started
-      data-api:
+      data:
         condition: service_started
 
-  # Vault Agent sidecar for internal-api
-  vault-agent-internal-api:
+  # Vault Agent sidecar for system
+  vault-agent-system:
     image: hashicorp/vault:1.21.0
     restart: always
     command: ["agent", "-config=/config/template.hcl"]
     env_file: .env
     environment:
-      - PKI_ROLE=internal-api-role
-      - COMMON_NAME=internal-api.service.local
+      - PKI_ROLE=system-role
+      - COMMON_NAME=system.service.local
     volumes:
       - ./vault/agent:/config:ro
-      - internal-api-secrets:/secrets
+      - system-secrets:/secrets
     entrypoint: >
       sh -c "
       echo \"$$INTERNAL_API_ROLE_ID\" > /vault/role-id &&
@@ -249,24 +249,24 @@ services:
       vault:
         condition: service_started
 
-  internal-api:
+  system:
     build:
       context: ./backend
-      dockerfile: Dockerfile.internal-api
-    hostname: internal-api.service.local
+      dockerfile: docker/Dockerfile.system
+    hostname: system.service.local
     restart: always
     expose:
       - "8083"
     env_file: .env
     environment:
       - PORT=8083
-      - GRAPHQL_ENDPOINT=http://data-api:8081/graphql
+      - GRAPHQL_ENDPOINT=http://data:8081/graphql
       - KRATOS_WEBHOOK_SECRET=${WEBHOOK_SECRET}
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=${VAULT_ROOT_TOKEN}
       - VAULT_SIGNING_KEY=service-jwt-key
       - VAULT_TRANSIT_MOUNT_PATH=transit
-      - JWT_ALLOWED_AUDIENCES=internal-api
+      - JWT_ALLOWED_AUDIENCES=system
       - KRATOS_ADMIN_URL=https://kratos.service.local:4434
       - INTERNAL_ALLOWED_ROLES=none,member,admin
       - TEMPORAL_HOST=temporal:7233
@@ -274,11 +274,11 @@ services:
       - TEMPORAL_TASK_QUEUE=nexus-task-queue
       - AUDIT_ALLOWED_SUBJECTS=gateway
     volumes:
-      - internal-api-secrets:/secrets:ro
+      - system-secrets:/secrets:ro
     depends_on:
-      vault-agent-internal-api:
+      vault-agent-system:
         condition: service_started
-      data-api:
+      data:
         condition: service_started
       temporal:
         condition: service_started
@@ -309,14 +309,14 @@ services:
   gateway:
     build:
       context: ./backend
-      dockerfile: Dockerfile.gateway
+      dockerfile: docker/Dockerfile.gateway
     hostname: gateway.service.local
     restart: always
     expose:
       - "8080"
     env_file: .env
     environment:
-      - GRAPHQL_ENDPOINT=http://data-api:8081/graphql
+      - GRAPHQL_ENDPOINT=http://data:8081/graphql
       - POSTGRES_HOST=postgres
       - REDIS_HOST=redis
       - REDIS_PASSWORD=${REDIS_PASSWORD}
@@ -329,7 +329,7 @@ services:
     depends_on:
       vault-agent-gateway:
         condition: service_started
-      data-api:
+      data:
         condition: service_started
       postgres:
         condition: service_healthy
@@ -539,7 +539,7 @@ services:
         condition: service_started
       ui:
         condition: service_started
-      data-api:
+      data:
         condition: service_started
 
   atlas:
@@ -563,8 +563,8 @@ volumes:
   # Persistent volumes for mTLS certificates (survive container restarts)
   # Vault agent will regenerate certificates if needed
   gateway-secrets:
-  data-api-secrets:
-  internal-api-secrets:
+  data-secrets:
+  system-secrets:
   worker-secrets:
   oathkeeper-secrets:
   kratos-secrets:

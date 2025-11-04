@@ -82,7 +82,7 @@
 - id: "protected:graphql"
   upstream:
     preserve_host: false
-    url: "http://data-api:8081"
+    url: "http://data:8081"
   match:
     url: "http://<{graphql,127.0.0.1,localhost}{,:4455}>/graphql<**>"
     methods:
@@ -120,11 +120,11 @@
       config:
         to: https://auth.${DOMAIN}/login
 
-# Kratos webhook proxy - routes webhooks via Oathkeeper with mTLS to internal-api
+# Kratos webhook proxy - routes webhooks via Oathkeeper with mTLS to system API
 - id: "webhook:kratos"
   upstream:
     preserve_host: false
-    url: "https://internal-api.service.local:8083"
+    url: "https://system.service.local:8083"
   match:
     url: "http://<{oathkeeper,127.0.0.1,localhost}{,:4455}>/api/v1/internal/webhooks/kratos/<**>"
     methods:

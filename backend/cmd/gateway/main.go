@@ -14,11 +14,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/retran/nexus/backend/internal/api/rest"
+	"github.com/retran/nexus/backend/internal/api/gateway"
 )
 
 func main() {
-	cfg := rest.Config{
+	cfg := gateway.Config{
 		Port:                  8080,
 		Host:                  "0.0.0.0",
 		ReadTimeout:           10 * time.Second,
@@ -42,9 +42,9 @@ func main() {
 		VaultKVMountPath:      getEnv("VAULT_KV_MOUNT_PATH", "kv"),
 		VaultTransitMountPath: getEnv("VAULT_TRANSIT_MOUNT_PATH", "transit"),
 		VaultSigningKey:       getEnv("VAULT_SIGNING_KEY", "service-jwt-key"),
-		ServiceJWTAudience:    parseCSVEnv("SERVICE_JWT_AUDIENCE", "data-api"),
-		InternalAPIURL:        getEnv("INTERNAL_API_URL", "http://internal-api:8083"),
-		InternalAPIAudience:   parseCSVEnv("INTERNAL_API_AUDIENCE", "internal-api"),
+		ServiceJWTAudience:    parseCSVEnv("SERVICE_JWT_AUDIENCE", "data"),
+		InternalAPIURL:        getEnv("INTERNAL_API_URL", "http://system:8083"),
+		InternalAPIAudience:   parseCSVEnv("INTERNAL_API_AUDIENCE", "system"),
 		KratosAdminURL:        getEnv("KRATOS_ADMIN_URL", "http://kratos:4434"),
 		ServiceJWTSubject:     getEnv("SERVICE_JWT_SUBJECT", "gateway"),
 		ServiceJWTIssuer:      getEnv("SERVICE_JWT_ISSUER", "nexus"),
@@ -56,7 +56,7 @@ func main() {
 		// Authorization now handled by Keto directly via Oathkeeper
 	}
 
-	server, err := rest.New(&cfg)
+	server, err := gateway.New(&cfg)
 	if err != nil {
 		log.Fatalf("Failed to create server: %v", err)
 	}

@@ -1,0 +1,27 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+schema:
+  - graphql/data.graphql
+
+exec:
+  filename: internal/api/data/exec.go
+  package: data
+
+model:
+  filename: internal/api/data/model.go
+  package: data
+
+resolver:
+  layout: follow-schema
+  dir: internal/api/data
+  package: data
+  filename_template: "{name}.resolvers.go"
+
+autobind:
+  - "github.com/retran/nexus/backend/internal/repository/postgres"
+
+models:
+  AuditEventType:
+    model:
+      - github.com/retran/nexus/backend/internal/repository/postgres.AuditEventType

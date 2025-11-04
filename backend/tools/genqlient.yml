@@ -1,0 +1,19 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+schema: ../graphql/data.graphql
+
+generated: ../internal/client/data/generated.go
+
+package: data
+
+operations:
+  - ../graphql/queries/*.graphql
+
+optional: pointer
+
+bindings:
+  UUID:
+    type: github.com/google/uuid.UUID
+  Time:
+    type: time.Time

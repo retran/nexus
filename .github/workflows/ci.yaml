@@ -348,13 +348,13 @@ jobs:
             echo "file=./frontend/Dockerfile.dev" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.service }}" = "api" ]; then
             echo "context=./backend" >> $GITHUB_OUTPUT
-            echo "file=./backend/Dockerfile.data-api.dev" >> $GITHUB_OUTPUT
+            echo "file=./backend/docker/Dockerfile.data.dev" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.service }}" = "gateway" ]; then
             echo "context=./backend" >> $GITHUB_OUTPUT
-            echo "file=./backend/Dockerfile.gateway.dev" >> $GITHUB_OUTPUT
+            echo "file=./backend/docker/Dockerfile.gateway.dev" >> $GITHUB_OUTPUT
           elif [ "${{ matrix.service }}" = "worker" ]; then
             echo "context=./backend" >> $GITHUB_OUTPUT
-            echo "file=./backend/Dockerfile.worker.dev" >> $GITHUB_OUTPUT
+            echo "file=./backend/docker/Dockerfile.worker.dev" >> $GITHUB_OUTPUT
           fi
 
       - name: Build Docker image

@@ -77,7 +77,7 @@ These ports are exposed for debugging but not typically accessed directly:
 
 - **Data API (GraphQL)**: `localhost:8081` - Direct database access API
 - **Temporal (gRPC)**: `localhost:7233`
-- **Delve Debugger**: `localhost:2345` (attached to data-api)
+- **Delve Debugger**: `localhost:2345` (attached to data service)
 
 ## License
 

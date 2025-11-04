@@ -3,7 +3,7 @@
 
 {{- /* Vault Agent template for Kratos webhook secret */ -}}
 {{- /* Renders the current webhook secret from KV store */ -}}
-{{- /* Used by Kratos to sign webhook requests to internal-api */ -}}
+{{- /* Used by Kratos to sign webhook requests to system API */ -}}
 
 {{- with secret "kv/data/shared/webhook" -}}
 {{ .Data.data.current }}

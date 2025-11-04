@@ -12,7 +12,7 @@ import (
 	"github.com/Khan/genqlient/graphql"
 	"github.com/google/uuid"
 
-	gqlclient "github.com/retran/nexus/backend/internal/client/graphql"
+	gqlclient "github.com/retran/nexus/backend/internal/client/data"
 	"github.com/retran/nexus/backend/internal/domain"
 )
 

@@ -207,7 +207,7 @@ ensure_vault_running
 echo "[INFO] Validating root token access..."
 vault_exec "${ROOT_TOKEN}" vault token lookup >/dev/null
 
-put_secret "services/data-api" \
+put_secret "services/data" \
   "postgres_host=${POSTGRES_HOST}" \
   "postgres_port=${POSTGRES_PORT}" \
   "postgres_db=${POSTGRES_DB}" \
