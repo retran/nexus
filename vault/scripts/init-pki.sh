@@ -63,7 +63,74 @@ vault_exec vault write pki_int/config/urls \
   crl_distribution_points="http://vault:8200/v1/pki_int/crl"
 
 echo "[SUCCESS] Vault PKI engine configured successfully!"
+
+# Create PKI roles for each service
+# Each role defines certificate parameters for a specific service
+echo ""
+echo "[INFO] Creating PKI roles for services..."
+
+# Oathkeeper role (authentication proxy)
+echo "[INFO] Creating PKI role for oathkeeper..."
+vault_exec vault write pki_int/roles/oathkeeper-role \
+  allowed_domains="oathkeeper.service.local" \
+  allow_bare_domains=true \
+  allow_subdomains=false \
+  max_ttl="1h" \
+  key_type="rsa" \
+  key_bits=2048
+
+# Gateway role (BFF/API Gateway)
+echo "[INFO] Creating PKI role for gateway..."
+vault_exec vault write pki_int/roles/gateway-role \
+  allowed_domains="gateway.service.local" \
+  allow_bare_domains=true \
+  allow_subdomains=false \
+  max_ttl="1h" \
+  key_type="rsa" \
+  key_bits=2048
+
+# Data API role (GraphQL API)
+echo "[INFO] Creating PKI role for data-api..."
+vault_exec vault write pki_int/roles/data-api-role \
+  allowed_domains="data-api.service.local" \
+  allow_bare_domains=true \
+  allow_subdomains=false \
+  max_ttl="1h" \
+  key_type="rsa" \
+  key_bits=2048
+
+# Internal API role (gRPC internal services)
+echo "[INFO] Creating PKI role for internal-api..."
+vault_exec vault write pki_int/roles/internal-api-role \
+  allowed_domains="internal-api.service.local" \
+  allow_bare_domains=true \
+  allow_subdomains=false \
+  max_ttl="1h" \
+  key_type="rsa" \
+  key_bits=2048
+
+# Worker role (Temporal workers)
+echo "[INFO] Creating PKI role for worker..."
+vault_exec vault write pki_int/roles/worker-role \
+  allowed_domains="worker.service.local" \
+  allow_bare_domains=true \
+  allow_subdomains=false \
+  max_ttl="1h" \
+  key_type="rsa" \
+  key_bits=2048
+
+# Kratos role (identity server)
+echo "[INFO] Creating PKI role for kratos..."
+vault_exec vault write pki_int/roles/kratos-role \
+  allowed_domains="kratos.service.local" \
+  allow_bare_domains=true \
+  allow_subdomains=false \
+  max_ttl="1h" \
+  key_type="rsa" \
+  key_bits=2048
+
+echo "[SUCCESS] All PKI roles created successfully!"
 echo ""
 echo "Next steps:"
-echo "  - Run init-policies.sh to configure PKI roles and policies"
+echo "  - Run init-policies.sh to configure PKI policies"
 echo "  - Configure Vault Agent sidecars to fetch certificates"

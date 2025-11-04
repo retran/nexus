@@ -53,7 +53,7 @@ apply_policy() {
 tmpdir=$(mktemp -d)
 trap 'rm -rf "${tmpdir}"' EXIT
 
-services=(data-api gateway worker)
+services=(data-api gateway worker internal-api oathkeeper kratos)
 
 echo "[INFO] Writing service policies..."
 for service in "${services[@]}"; do
@@ -97,19 +97,17 @@ path "kv/metadata/shared/*" {
   capabilities = ["list"]
 }
 
-path "transit/sign/service-jwt-key" {
+# PKI Engine - Issue mTLS certificates for this service
+path "pki_int/issue/${service}-role" {
   capabilities = ["update"]
 }
 
-path "transit/verify/service-jwt-key" {
-  capabilities = ["update"]
-}
-
-path "transit/keys/service-jwt-key" {
+# PKI Engine - Read CA certificate for client validation
+path "pki_int/cert/ca" {
   capabilities = ["read"]
 }
 
-path "transit/keys/service-jwt-key/*" {
+path "pki_int/ca/pem" {
   capabilities = ["read"]
 }
 
