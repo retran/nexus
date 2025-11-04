@@ -23,7 +23,6 @@ import (
 	temporalclient "go.temporal.io/sdk/client"
 
 	"github.com/retran/nexus/backend/internal/internalapi/handlers"
-	internalmiddleware "github.com/retran/nexus/backend/internal/internalapi/middleware"
 )
 
 func main() {
@@ -76,10 +75,11 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 }
 
 func internalHealthHandler(w http.ResponseWriter, r *http.Request) {
-	tokenInfo := internalmiddleware.TokenInfoFromContext(r.Context())
+	// mTLS ensures the request comes from an authorized service (gateway.service.local)
 	response := "OK"
-	if tokenInfo != nil && tokenInfo.Subject != "" {
-		response = fmt.Sprintf("OK (%s)", tokenInfo.Subject)
+	if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+		cn := r.TLS.PeerCertificates[0].Subject.CommonName
+		response = fmt.Sprintf("OK (%s)", cn)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -138,11 +138,8 @@ func initServices(_ string, allowedRolesEnv, kratosAdminURL string, temporalClie
 
 func adminRoleHandler(roleHandler *handlers.AdminHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tokenInfo := internalmiddleware.TokenInfoFromContext(r.Context())
-		if tokenInfo == nil || !strings.EqualFold(tokenInfo.Role, "admin") {
-			http.Error(w, "Forbidden", http.StatusForbidden)
-			return
-		}
+		// Role validation is now handled by the gateway, which already verifies admin role
+		// before calling this endpoint. mTLS ensures the request comes from gateway.service.local.
 
 		identityID := strings.TrimSpace(r.PathValue("id"))
 		if identityID == "" {

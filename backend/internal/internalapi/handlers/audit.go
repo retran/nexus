@@ -14,7 +14,6 @@ import (
 	"go.temporal.io/sdk/client"
 
 	"github.com/retran/nexus/backend/internal/domain"
-	internalmiddleware "github.com/retran/nexus/backend/internal/internalapi/middleware"
 )
 
 // AuditHandler accepts audit events and forwards them to Temporal workflows.
@@ -50,12 +49,16 @@ func (h *AuditHandler) HandleAuditEvent(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	tokenInfo := internalmiddleware.TokenInfoFromContext(r.Context())
-	if tokenInfo == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	// Extract subject from mTLS client certificate CN
+	subject := ""
+	if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
+		subject = r.TLS.PeerCertificates[0].Subject.CommonName
+	}
+	if subject == "" {
+		http.Error(w, "Unauthorized: missing client certificate", http.StatusUnauthorized)
 		return
 	}
-	if !h.subjectAllowed(tokenInfo.Subject) {
+	if !h.subjectAllowed(subject) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
