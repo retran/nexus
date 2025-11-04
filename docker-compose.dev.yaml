@@ -315,6 +315,44 @@ services:
     depends_on:
       - kratos
 
+  keto-migrate:
+    image: oryd/keto:v0.14.0
+    restart: on-failure
+    env_file: .env
+    environment:
+      - DSN=${KETO_DSN}
+    command: migrate up -c /etc/config/keto/keto.yml --yes
+    volumes:
+      - ./kratos/dev:/etc/config/keto:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  keto:
+    image: oryd/keto:v0.14.0
+    restart: always
+    expose:
+      - "4466" # Read API
+      - "4467" # Write API
+    env_file: .env
+    environment:
+      - DSN=${KETO_DSN}
+    command: serve -c /etc/config/keto/keto.yml
+    volumes:
+      - ./kratos/dev:/etc/config/keto:ro
+    labels:
+      - "traefik.enable=true"
+      # Dev-mode direct access for debugging
+      - "traefik.http.routers.keto-read.rule=Host(`keto-read.nexus.local`)"
+      - "traefik.http.routers.keto-read.priority=50"
+      - "traefik.http.services.keto-read.loadbalancer.server.port=4466"
+      - "traefik.http.routers.keto-write.rule=Host(`keto-write.nexus.local`)"
+      - "traefik.http.routers.keto-write.priority=50"
+      - "traefik.http.services.keto-write.loadbalancer.server.port=4467"
+    depends_on:
+      keto-migrate:
+        condition: service_completed_successfully
+
   oathkeeper:
     image: oryd/oathkeeper:v0.40.9
     restart: always
@@ -338,6 +376,7 @@ services:
       - "traefik.http.routers.oathkeeper.middlewares=oathkeeper-ratelimit"
     depends_on:
       - kratos
+      - keto
       - gateway
       - ui
       - data-api
