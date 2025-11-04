@@ -13,7 +13,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/Khan/genqlient/graphql"
@@ -22,10 +21,8 @@ import (
 	"github.com/retran/nexus/backend/internal/api/rest/handlers"
 	"github.com/retran/nexus/backend/internal/api/rest/middleware"
 	"github.com/retran/nexus/backend/internal/api/rest/services"
-	"github.com/retran/nexus/backend/internal/auth"
 	gql "github.com/retran/nexus/backend/internal/client/graphql"
 	"github.com/retran/nexus/backend/internal/repository/postgres"
-	"github.com/retran/nexus/backend/internal/secrets"
 )
 
 // Config contains REST API Gateway server configuration.
@@ -87,17 +84,12 @@ func New(cfg *Config) (*Server, error) {
 		return nil, errors.New("config is nil")
 	}
 
-	tokenClient, err := newTokenClient(cfg)
+	gqlClient, err := createGraphQLClient(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	gqlClient, err := createGraphQLClient(cfg, tokenClient)
-	if err != nil {
-		return nil, err
-	}
-
-	internalAPIClient, err := createInternalAPIClient(cfg, tokenClient)
+	internalAPIClient, err := createInternalAPIClient()
 	if err != nil {
 		return nil, err
 	}
@@ -243,105 +235,38 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func newTokenClient(cfg *Config) (*auth.TokenClient, error) {
-	if strings.TrimSpace(cfg.VaultAddress) == "" {
-		return nil, errors.New("vault address is required")
-	}
-	if strings.TrimSpace(cfg.VaultRoleID) == "" {
-		return nil, errors.New("vault role id is required")
-	}
-	if strings.TrimSpace(cfg.VaultSecretID) == "" {
-		return nil, errors.New("vault secret id is required")
-	}
-	if strings.TrimSpace(cfg.VaultSigningKey) == "" {
-		return nil, errors.New("vault signing key is required")
-	}
-
-	secretsClient, err := secrets.NewClient(&secrets.Config{
-		Address:       cfg.VaultAddress,
-		RoleID:        cfg.VaultRoleID,
-		SecretID:      cfg.VaultSecretID,
-		AuthMountPath: cfg.VaultAuthMountPath,
-		KVMountPath:   cfg.VaultKVMountPath,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create vault secrets client: %w", err)
-	}
-
-	tokenClient, err := auth.NewTokenClient(&auth.TokenClientConfig{
-		SecretsClient:    secretsClient,
-		SigningKeyName:   cfg.VaultSigningKey,
-		TransitMountPath: cfg.VaultTransitMountPath,
-		Issuer:           cfg.ServiceJWTIssuer,
-		VersionCacheTTL:  time.Minute,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create service token client: %w", err)
-	}
-
-	return tokenClient, nil
-}
-
-func createGraphQLClient(cfg *Config, tokenClient *auth.TokenClient) (graphql.Client, error) {
-	subject := strings.TrimSpace(cfg.ServiceJWTSubject)
-	if subject == "" {
-		return nil, errors.New("service jwt subject is required")
-	}
-
-	audience := normalizeAudience(cfg.ServiceJWTAudience)
-	if len(audience) == 0 {
-		return nil, errors.New("service jwt audience is required")
-	}
-
+func createGraphQLClient(cfg *Config) (graphql.Client, error) {
 	tlsConfig, err := loadMTLSConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load mTLS config: %w", err)
 	}
 
-	baseTransport := &http.Transport{
+	transport := &http.Transport{
 		TLSClientConfig: tlsConfig,
 	}
 
-	tokenTransport := newServiceTokenTransport(baseTransport, tokenClient, subject, audience, cfg.ServiceJWTTTL)
 	httpClient := &http.Client{
-		Transport: tokenTransport,
+		Transport: transport,
 		Timeout:   10 * time.Second,
 	}
 
 	return gql.NewClientWithHTTPClient(cfg.GraphQLEndpoint, httpClient), nil
 }
 
-func createInternalAPIClient(cfg *Config, tokenClient *auth.TokenClient) (*http.Client, error) {
-	audience := normalizeAudience(cfg.InternalAPIAudience)
-	if len(audience) == 0 {
-		audience = []string{"internal-api"}
-	}
-
+func createInternalAPIClient() (*http.Client, error) {
 	tlsConfig, err := loadMTLSConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load mTLS config: %w", err)
 	}
 
-	baseTransport := &http.Transport{
+	transport := &http.Transport{
 		TLSClientConfig: tlsConfig,
 	}
 
-	subject := strings.TrimSpace(cfg.ServiceJWTSubject)
-	transport := newServiceTokenTransport(baseTransport, tokenClient, subject, audience, cfg.ServiceJWTTTL)
 	return &http.Client{
 		Transport: transport,
 		Timeout:   10 * time.Second,
 	}, nil
-}
-
-func normalizeAudience(values []string) []string {
-	out := make([]string, 0, len(values))
-	for _, v := range values {
-		if trimmed := strings.TrimSpace(v); trimmed != "" {
-			out = append(out, trimmed)
-		}
-	}
-	return out
 }
 
 // loadMTLSConfig loads TLS configuration for mutual TLS authentication.
