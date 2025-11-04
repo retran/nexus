@@ -10,13 +10,13 @@ dsn: postgres://kratos:kratos@postgres:5432/kratos_db?sslmode=disable&max_conns=
 
 serve:
   public:
-    base_url: http://auth.nexus.local # Dev: local domain; Prod: will use actual domain
+    base_url: https://auth.${DOMAIN} # Dev: local domain; Prod: will use actual domain
     cors:
       enabled: true
       allowed_origins:
-        - http://nexus.local
-        - http://api.nexus.local
-        - http://auth.nexus.local
+        - https://${DOMAIN}
+        - https://api.${DOMAIN}
+        - https://auth.${DOMAIN}
       allowed_methods:
         - POST
         - GET
@@ -40,10 +40,10 @@ serve:
         path: /secrets/cert.crt
 
 selfservice:
-  default_browser_return_url: http://nexus.local/
+  default_browser_return_url: https://${DOMAIN}/
   allowed_return_urls:
-    - http://nexus.local
-    - http://api.nexus.local
+    - https://${DOMAIN}
+    - https://api.${DOMAIN}
     - http://vault:8200
     - http://localhost:8200
     - http://localhost:8200/ui/vault/auth/oidc/oidc/callback
@@ -90,34 +90,34 @@ selfservice:
 
   flows:
     error:
-      ui_url: http://auth.nexus.local/error
+      ui_url: https://auth.${DOMAIN}/error
 
     settings:
-      ui_url: http://auth.nexus.local/settings
+      ui_url: https://auth.${DOMAIN}/settings
       privileged_session_max_age: 15m
       required_aal: highest_available
 
     recovery:
       enabled: true
-      ui_url: http://auth.nexus.local/recovery
+      ui_url: https://auth.${DOMAIN}/recovery
       use: code
 
     verification:
       enabled: true
-      ui_url: http://auth.nexus.local/verification
+      ui_url: https://auth.${DOMAIN}/verification
       use: code
       after:
-        default_browser_return_url: http://nexus.local/
+        default_browser_return_url: https://${DOMAIN}/
 
     logout:
       after:
-        default_browser_return_url: http://auth.nexus.local/login
+        default_browser_return_url: https://auth.${DOMAIN}/login
 
     login:
-      ui_url: http://auth.nexus.local/login
+      ui_url: https://auth.${DOMAIN}/login
       lifespan: 10m
       after:
-        default_browser_return_url: http://nexus.local/
+        default_browser_return_url: https://${DOMAIN}/
         hooks:
           - hook: web_hook
             config:
@@ -146,7 +146,7 @@ selfservice:
 
     registration:
       lifespan: 10m
-      ui_url: http://auth.nexus.local/registration
+      ui_url: https://auth.${DOMAIN}/registration
       after:
         password:
           hooks:

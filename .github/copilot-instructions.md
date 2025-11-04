@@ -32,28 +32,32 @@ multi-layered, distributed platform built on enterprise-grade open-source tools.
 
 ### Deployment Architecture
 
-- **Infrastructure Stack**: `docker-compose.infra.yaml` (PostgreSQL, Temporal,
-  Traefik, Home Assistant, monitoring)
-- **Application Stack**: `docker-compose.app.yaml` (ui, bff, api, worker
-  containers)
-- **Development**: `docker-compose.yaml` provides 100% production parity with
-  hot reload
+- **Production**: Single `docker-compose.yaml` for Mac Mini deployment at
+  `nexus.retran.me`
+- **Development**: Create `docker-compose.override.yaml` locally for hot reload
+- **Domain**: `nexus.retran.me` (main), `auth.nexus.retran.me` (Kratos),
+  `api.nexus.retran.me` (data-api)
 
 ### Starting the Stack
 
 ```bash
-# Start all services
-docker-compose -f docker-compose.yaml up
+# Start all services (production mode)
+docker-compose up
 
 # Run database migrations
-docker-compose -f docker-compose.yaml --profile tools run migrations
+docker-compose --profile tools run atlas
+
+# Development mode (requires docker-compose.override.yaml)
+docker-compose up  # automatically merges with override
 ```
 
-### Hot Reload Setup
+### Development Setup (Local Only)
 
-- **Backend**: Uses Air for Go hot reload (`.air.toml` configuration)
-- **Frontend**: Vite dev server with HMR
-- **Volumes**: Source code mounted for live editing
+Create `docker-compose.override.yaml` for local development:
+
+- **Backend**: Adds Air hot reload, source volume mounts, debug ports
+- **Frontend**: Adds Vite dev server with HMR
+- **Databases**: Exposes ports for local tools (5432, 6379, 8200)
 
 ## Frontend Architecture (Refine.dev)
 
@@ -160,8 +164,7 @@ cd frontend && yarn dev
 cd backend && air
 
 # Database operations
-docker-compose -f docker-compose.yaml --profile tools run migrations up
-docker-compose -f docker-compose.yaml --profile tools run migrations down
+docker-compose --profile tools run atlas
 
 # Build production images
 docker-compose build

@@ -15,8 +15,8 @@ serve:
     cors:
       enabled: true
       allowed_origins:
-        - http://nexus.local
-        - http://api.nexus.local
+        - https://${DOMAIN}
+        - https://api.${DOMAIN}
         - http://oathkeeper:4455
       allowed_methods:
         - POST
@@ -36,8 +36,8 @@ serve:
     cors:
       enabled: true
       allowed_origins:
-        - http://nexus.local
-        - http://api.nexus.local
+        - https://${DOMAIN}
+        - https://api.${DOMAIN}
         - http://oathkeeper:4455
       allowed_methods:
         - POST

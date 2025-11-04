@@ -15,9 +15,9 @@ serve:
     cors:
       enabled: true
       allowed_origins:
-        - http://nexus.local
-        - http://api.nexus.local
-        - http://graphql.nexus.local
+        - https://${DOMAIN}
+        - https://api.${DOMAIN}
+        - https://graphql.${DOMAIN}
       allowed_methods:
         - POST
         - GET
@@ -42,7 +42,7 @@ errors:
     redirect:
       enabled: true
       config:
-        to: http://auth.nexus.local/login
+        to: https://auth.${DOMAIN}/login
         when:
           - error:
               - unauthorized
@@ -109,7 +109,7 @@ mutators:
   id_token:
     enabled: true
     config:
-      issuer_url: http://auth.nexus.local
+      issuer_url: https://auth.${DOMAIN}
       jwks_url: file:///etc/config/oathkeeper/id_token.jwks.json
       claims: |
         {
