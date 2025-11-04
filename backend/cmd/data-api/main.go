@@ -7,6 +7,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"log"
 	"net/http"
@@ -84,17 +86,24 @@ func run() error {
 	})
 
 	port := getEnv("SERVER_PORT", "8081")
+
+	tlsConfig, err := loadMTLSConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load mTLS config: %w", err)
+	}
+
 	httpServer := &http.Server{
 		Addr:         ":" + port,
 		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
+		TLSConfig:    tlsConfig,
 	}
 
 	go func() {
-		log.Printf("GraphQL server starting on http://localhost:%s/graphql", port)
-		log.Printf("GraphQL Playground available at http://localhost:%s/", port)
-		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Printf("GraphQL server starting with mTLS on https://localhost:%s/graphql", port)
+		log.Printf("GraphQL Playground available at https://localhost:%s/", port)
+		if err := httpServer.ListenAndServeTLS("/secrets/tls.crt", "/secrets/tls.key"); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %v", err)
 		}
 	}()
@@ -200,4 +209,23 @@ func parseCSV(value string) []string {
 		}
 	}
 	return result
+}
+
+func loadMTLSConfig() (*tls.Config, error) {
+	// Load CA certificate for validating client certificates
+	caCert, err := os.ReadFile("/secrets/vault-ca.pem")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	}
+
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to parse CA certificate")
+	}
+
+	return &tls.Config{
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		ClientCAs:  caCertPool,
+		MinVersion: tls.VersionTLS13,
+	}, nil
 }

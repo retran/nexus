@@ -5,6 +5,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -19,6 +20,12 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatalf("Worker failed: %v", err)
+	}
+}
+
+func run() error {
 	temporalHost := getEnv("TEMPORAL_HOST", "localhost:7233")
 	namespace := getEnv("TEMPORAL_NAMESPACE", "default")
 	taskQueue := getEnv("TEMPORAL_TASK_QUEUE", "nexus-task-queue")
@@ -29,14 +36,17 @@ func main() {
 		Namespace: namespace,
 	})
 	if err != nil {
-		log.Fatalf("Failed to create Temporal client: %v", err)
+		return fmt.Errorf("failed to create Temporal client: %w", err)
 	}
 	defer c.Close()
 	log.Println("Connected to Temporal")
 
-	apiURL := getEnv("API_URL", "http://localhost:8081/graphql")
-	gqlClient := gqlclient.NewClient(apiURL)
-	log.Printf("Initialized GraphQL client for: %s", apiURL)
+	apiURL := getEnv("API_URL", "https://data-api.service.local:8081/graphql")
+	gqlClient, err := gqlclient.NewMTLSClient(apiURL)
+	if err != nil {
+		return fmt.Errorf("failed to create GraphQL client with mTLS: %w", err)
+	}
+	log.Printf("Initialized GraphQL client with mTLS for: %s", apiURL)
 
 	w := worker.New(c, taskQueue, worker.Options{})
 
@@ -67,6 +77,7 @@ func main() {
 	log.Println("Shutting down worker...")
 	w.Stop()
 	log.Println("Worker stopped")
+	return nil
 }
 
 func getEnv(key, fallback string) string {

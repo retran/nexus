@@ -147,7 +147,4 @@ issues:
   max-same-issues: 5
 
 output:
-  sort-order:
-    - linter
-    - file
   show-stats: true

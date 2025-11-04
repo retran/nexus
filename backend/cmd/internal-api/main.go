@@ -7,6 +7,8 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -63,7 +65,10 @@ func run() error {
 	mux := http.NewServeMux()
 	configureMux(mux, jwtMiddleware, roleHandler, auditHandler, kratosWebhookHandler)
 
-	server := newHTTPServer(port, mux)
+	server, err := newHTTPServer(port, mux)
+	if err != nil {
+		return fmt.Errorf("create HTTP server: %w", err)
+	}
 	log.Printf("Starting internal API on port %s", port)
 
 	return serve(server)
@@ -220,22 +225,29 @@ func newTemporalClient(host, namespace string) (temporalclient.Client, error) {
 	return cli, nil
 }
 
-func newHTTPServer(port string, handler http.Handler) *http.Server {
+func newHTTPServer(port string, handler http.Handler) (*http.Server, error) {
+	tlsConfig, err := loadMTLSConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load mTLS config: %w", err)
+	}
+
 	return &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),
 		Handler:      handler,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
-	}
+		TLSConfig:    tlsConfig,
+	}, nil
 }
 
 func serve(server *http.Server) error {
 	errCh := make(chan error, 1)
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			errCh <- fmt.Errorf("listen and serve: %w", err)
+		log.Printf("Internal API starting with mTLS on https://localhost%s", server.Addr)
+		if err := server.ListenAndServeTLS("/secrets/tls.crt", "/secrets/tls.key"); err != nil && err != http.ErrServerClosed {
+			errCh <- fmt.Errorf("listen and serve TLS: %w", err)
 		}
 	}()
 
@@ -258,4 +270,23 @@ func serve(server *http.Server) error {
 
 	log.Println("Internal API stopped")
 	return nil
+}
+
+func loadMTLSConfig() (*tls.Config, error) {
+	// Load CA certificate for validating client certificates
+	caCert, err := os.ReadFile("/secrets/vault-ca.pem")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+	}
+
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to parse CA certificate")
+	}
+
+	return &tls.Config{
+		ClientAuth: tls.RequireAndVerifyClientCert,
+		ClientCAs:  caCertPool,
+		MinVersion: tls.VersionTLS13,
+	}, nil
 }
