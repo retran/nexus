@@ -62,124 +62,166 @@ vault/
   config.dev.hcl               # Development Vault config (current)
 ```
 
-## Implementation Plan
+## Implementation Plan - REFACTOR EXISTING ONLY
 
-### Phase 1: Production Docker Images (5 commits)
+### Phase 1: Rename & Restructure (3 commits)
 
-**Goal**: Create production-ready multi-stage Dockerfiles
+**Goal**: Rename current dev compose to main, prepare structure for prod/dev
+split
 
-1. **backend/Dockerfile (multi-stage for all services)**
-   - Stage 1: Build (golang:1.25-alpine)
-   - Stage 2: Runtime (alpine:latest)
-   - No Air, no volume mounts, static binaries
-   - Separate targets: gateway, internal-api, worker, data-api
+1. **Rename docker-compose.dev.yaml → docker-compose.yaml**
+   - This becomes the production compose file
+   - Rename volumes: `postgres_dev_data` → `postgres_data`, etc.
+   - Update Taskfile.yml references
+   - Update .gitignore to ignore `docker-compose.override.yaml`
+
+2. **Create docker-compose.override.yaml.example**
+   - Template for local development overrides
+   - Volume mounts for hot reload
+   - Port exposures (5432, 6379, 8200)
+   - Command overrides (air, vite)
+   - Reference to .dev Dockerfiles
+   - Developer copies to `docker-compose.override.yaml` (git-ignored)
+
+3. **Reorganize config directories**
+   - Rename `ory/dev/` → `ory/config/` (single config, parameterized via env)
+   - Rename `vault/config.hcl` → `vault/config.dev.hcl`
+   - Keep configs environment-agnostic via environment variables
+   - Update volume mounts in compose
+
+### Phase 2: Production-Ready Docker Images (4 commits)
+
+**Goal**: Create production multi-stage Dockerfiles, keep .dev variants
+
+1. **backend/Dockerfile (production multi-stage)**
+   - Stage 1: Build all services in single Dockerfile with targets
+   - Stage 2: Runtime with only binaries
+   - Targets: gateway, internal-api, worker, data-api
+   - Update compose to use `target:` for each service
 
 2. **frontend/Dockerfile (production)**
-   - Stage 1: Build (node:22-alpine, yarn build)
-   - Stage 2: Runtime (nginx:alpine)
-   - Static files only, no Vite dev server
+   - Stage 1: Build with yarn (node:22-alpine)
+   - Stage 2: Serve with nginx (nginx:alpine)
+   - Copy nginx.conf for SPA routing
 
-3. **Update docker-compose.yaml for prod images**
-   - Use production Dockerfiles
-   - Remove volume mounts for source code
-   - Keep config mounts (ory, vault agent)
+3. **Update docker-compose.yaml to use prod images**
+   - Change `dockerfile: Dockerfile.*.dev` → `dockerfile: Dockerfile`
+   - Remove `command: ["air", ...]` - use CMD from Dockerfile
+   - Remove source volume mounts (`./backend:/app`)
+   - Keep config mounts (`./ory/config`, vault agent templates)
 
-4. **Create docker-compose.override.yaml template**
-   - Volume mounts for dev
-   - Port exposures for dev
-   - Override with .dev Dockerfiles
-   - Air/HMR commands
+4. **Document dev override pattern**
+   - Add README.dev.md with setup instructions
+   - Override services to use .dev Dockerfiles
+   - Override commands to use air/vite
+   - Add back source volume mounts
 
-5. **Test both modes**
-   - `docker-compose up` = production
-   - `docker-compose -f docker-compose.yaml -f docker-compose.override.yaml up`
-     = dev
+### Phase 3: Environment & Security Hardening (4 commits)
 
-### Phase 2: Configuration Split (4 commits)
+**Goal**: Production-ready settings in main compose, dev overrides for local
 
-1. **Create ory/prod/ configs**
-   - kratos.yml: production URLs, secure cookies, real SMTP
-   - keto.yml: same as dev (stateless)
-   - oathkeeper.yml: production URLs
-   - access-rules.yml: same logic, different domains
-2. **Create vault/config.prod.hcl**
-   - TLS listener (not tcp with tls_disable)
-   - File storage with proper paths
-   - No dev mode, requires seal keys
-   - Cluster configuration for HA readiness
-3. **Environment file structure**
-   - .env.prod.example with placeholders
-   - Document secrets that must be in Vault
-   - Real domain examples
-   - ACME/Let's Encrypt settings
-4. **Update Taskfile.yml**
-   - `task up:prod` vs `task up:dev`
-   - Separate compose file references
-   - Production checks (no debug, sealed vault, etc.)
+1. **Remove exposed ports from docker-compose.yaml**
+   - Change `ports: ["5432:5432"]` → `expose: [5432]`
+   - Only Traefik keeps port 80/443
+   - Document: devs add back in override for direct access
 
-### Phase 3: External Access & Security (3 commits)
+2. **Secure production defaults**
+   - Traefik: Remove `--api.insecure`, add ACME placeholder
+   - Traefik: Change log level DEBUG → INFO
+   - Kratos: Remove `--dev --watch-courier`
+   - Vault: Comment about dev mode (needs seal keys in prod)
 
-1. **Traefik ACME configuration**
-   - Add ACME resolver for Let's Encrypt
-   - Certificate storage volume
-   - HTTP-01 or DNS-01 challenge (DNS via Cloudflare API)
-   - Secure dashboard with SSO
-2. **Cloudflare Tunnel setup**
-   - Add cloudflared service
-   - Tunnel configuration
-   - Route specific hosts through tunnel
-   - Keep admin interfaces on Tailscale only
-3. **Remove debug/dev features from prod**
-   - No exposed ports except 80/443 to tunnel
-   - Log level INFO/WARN
-   - Disable Kratos --dev flag
-   - Disable Traefik --api.insecure
+3. **Create .env.prod.example**
+   - Real domain placeholders (nexus.yourdomain.com)
+   - ACME email for Let's Encrypt
+   - No default passwords (must be set)
+   - Reference to Vault for secret storage
+   - Clear separation from .env.dev.example
 
-### Phase 4: Persistence & Reliability (3 commits)
+4. **Update vault/config.hcl for production path**
+   - Keep current as config.dev.hcl
+   - Create config.hcl (symlink/copy decision via docs)
+   - Document seal key setup
+   - Document TLS setup (can come later)
 
-1. **Certificate persistence**
-   - Named volumes for Vault certs (not tmpfs)
-   - Graceful cert rotation
-   - Backup strategy for Vault storage
-2. **PostgreSQL backups**
-   - Add backup sidecar service
-   - Cron-based pg_dump
-   - Upload to Backblaze B2
-   - Retention policy
-3. **Monitoring stack**
-   - Prometheus service
-   - Grafana with SSO
-   - cAdvisor for container metrics
-   - node-exporter for host metrics
-   - Uptime Kuma for uptime checks
+### Phase 4: Certificate & Volume Persistence (2 commits)
 
-### Phase 5: Deployment Automation (2 commits)
+**Goal**: Make certificates persistent, prepare for production restarts
 
-1. **GitOps preparation**
-   - GitHub Actions workflow structure
-   - Self-hosted runner setup docs
-   - Image build and push
-   - Deployment trigger
-2. **Ansible playbooks (skeleton)**
-   - Host provisioning playbook
-   - Docker installation
-   - Service deployment
-   - Backup configuration
-   - Tailscale setup
+1. **Replace tmpfs with named volumes for certificates**
+   - Change all `*-secrets` volumes from tmpfs → named volumes
+   - Keeps certificates across container restarts
+   - Document: Vault agent will regenerate if missing
+   - Update volume cleanup docs (these are now persistent)
 
-## Success Criteria
+2. **Add Traefik certificate persistence**
+   - Add `traefik_acme` named volume for Let's Encrypt certs
+   - Mount to `/letsencrypt` in Traefik
+   - Add ACME configuration (commented out for dev)
+   - Document: Uncomment for production with real domain
 
-- [ ] `docker-compose up` runs production config on Mac Mini
-- [ ] Developer can use
-      `docker-compose -f docker-compose.yaml -f docker-compose.override.yaml up`
-      for dev
-- [ ] All secrets in Vault (no .env in production)
+### Phase 5: Documentation & Validation (2 commits)
+
+**Goal**: Complete documentation, validate both modes work
+
+1. **Update all documentation**
+   - README.md: Production setup instructions
+   - README.dev.md: Development setup (NEW)
+   - Taskfile.yml: Add `up:prod` and `up:dev` tasks
+   - .github/copilot-instructions.md: Update architecture section
+   - Document override pattern clearly
+
+2. **Test matrix validation**
+   - Test: `docker-compose up` (production mode, should work for Mac Mini)
+   - Test:
+     `docker-compose -f docker-compose.yaml -f docker-compose.override.yaml up`
+     (dev mode)
+   - Document environment differences
+   - Validate builds work without source mounts
+   - Checklist for production deployment
+
+## FUTURE PHASES (Not implementing now, keep in plan)
+
+### Phase 6: External Access (for later)
+
+- Cloudflare Tunnel setup
+- Tailscale mesh configuration
+- ACME DNS-01 challenge
+
+### Phase 7: Monitoring & Backups (for later)
+
+- PostgreSQL backup automation
+- Prometheus + Grafana
+- Uptime monitoring
+
+### Phase 8: Deployment Automation (for later)
+
+- GitHub Actions
+- Self-hosted runner
+- Ansible playbooks
+
+## Success Criteria (Immediate - Phases 1-5)
+
+- [ ] `docker-compose up` runs production-ready config (no dev tools, no exposed
+      ports)
+- [ ] Developer can use `docker-compose.override.yaml` for dev mode (hot reload,
+      ports)
+- [ ] Production Dockerfiles build working containers without source mounts
+- [ ] All certificates persist across restarts (no tmpfs)
+- [ ] Config files organized and documented (ory/config, vault/config.hcl)
+- [ ] Both .env.prod.example and .env.dev.example exist with clear differences
+- [ ] README.md covers production, README.dev.md covers development
+- [ ] Can run on Mac Mini with production settings
+
+## Success Criteria (Future - Phases 6-8)
+
+- [ ] All secrets managed in Vault (no .env in production)
 - [ ] HTTPS via Let's Encrypt working
 - [ ] Cloudflare Tunnel provides external access
 - [ ] Admin interfaces only accessible via Tailscale
 - [ ] Automated PostgreSQL backups to B2
-- [ ] Monitoring dashboards accessible
-- [ ] Can deploy updates via git push + GitHub Actions
+- [ ] Monitoring dashboards operational
+- [ ] Can deploy updates via GitHub Actions
 
 ## Non-Goals (For Later)
 
