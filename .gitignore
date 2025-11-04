@@ -31,7 +31,9 @@ postgres/*.log
 postgres_data/
 postgres_dev_data/
 postgres_prod_data/
+postgres/backups/
 portainer_data/
 uptime_kuma_data/
+vault/.dev/
 .task/
 .meowg1k/**

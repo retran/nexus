@@ -12,7 +12,7 @@ storage "file" {
 }
 
 ui            = true
-# OIDC auth for the Vault UI is configured via scripts/init-oidc.sh
+# Vault UI accessed via token authentication (dev: token=root)
 disable_mlock = true
 api_addr      = "http://vault:8200"
 cluster_addr  = "http://vault:8201"

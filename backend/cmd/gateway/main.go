@@ -19,39 +19,30 @@ import (
 
 func main() {
 	cfg := gateway.Config{
-		Port:                  8080,
-		Host:                  "0.0.0.0",
-		ReadTimeout:           10 * time.Second,
-		WriteTimeout:          10 * time.Second,
-		ShutdownTimeout:       30 * time.Second,
-		GraphQLEndpoint:       getEnv("GRAPHQL_ENDPOINT", "http://localhost:8081/graphql"),
-		AllowedOrigins:        getAllowedOrigins(),
-		DatabaseURL:           getDatabaseURL(),
-		RedisHost:             getEnv("REDIS_HOST", "localhost"),
-		RedisPort:             getEnvInt("REDIS_PORT", 6379),
-		RedisPassword:         getEnv("REDIS_PASSWORD", ""),
-		RedisDB:               getEnvInt("REDIS_DB", 0),
-		GoogleClientID:        getEnv("GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret:    getEnv("GOOGLE_CLIENT_SECRET", ""),
-		GoogleRedirectURL:     getEnv("GOOGLE_REDIRECT_URL", "http://api.nexus.local/api/auth/google/callback"),
-		FrontendURL:           getEnv("FRONTEND_URL", "http://nexus.local"),
-		VaultAddress:          getEnv("VAULT_ADDR", "http://vault:8200"),
-		VaultRoleID:           getEnv("VAULT_ROLE_ID", ""),
-		VaultSecretID:         getEnv("VAULT_SECRET_ID", ""),
-		VaultAuthMountPath:    getEnv("VAULT_AUTH_MOUNT_PATH", "approle"),
-		VaultKVMountPath:      getEnv("VAULT_KV_MOUNT_PATH", "kv"),
-		VaultTransitMountPath: getEnv("VAULT_TRANSIT_MOUNT_PATH", "transit"),
-		VaultSigningKey:       getEnv("VAULT_SIGNING_KEY", "service-jwt-key"),
-		ServiceJWTAudience:    parseCSVEnv("SERVICE_JWT_AUDIENCE", "data"),
-		InternalAPIURL:        getEnv("INTERNAL_API_URL", "http://system:8083"),
-		InternalAPIAudience:   parseCSVEnv("INTERNAL_API_AUDIENCE", "system"),
-		KratosAdminURL:        getEnv("KRATOS_ADMIN_URL", "http://kratos:4434"),
-		ServiceJWTSubject:     getEnv("SERVICE_JWT_SUBJECT", "gateway"),
-		ServiceJWTIssuer:      getEnv("SERVICE_JWT_ISSUER", "nexus"),
-		ServiceJWTTTL:         getEnvDuration("SERVICE_JWT_TTL", 5*time.Minute),
-		OathkeeperJWTIssuer:   getEnv("OATHKEEPER_JWT_ISSUER", "http://auth.nexus.local"),
-		OathkeeperJWTAudience: getEnv("OATHKEEPER_JWT_AUDIENCE", "gateway"),
-		OathkeeperJWKSFile:    getEnv("OATHKEEPER_JWKS_FILE", "/etc/oathkeeper/id_token.jwks.json"),
+		Port:                8080,
+		Host:                "0.0.0.0",
+		ReadTimeout:         10 * time.Second,
+		WriteTimeout:        10 * time.Second,
+		ShutdownTimeout:     30 * time.Second,
+		GraphQLEndpoint:     getEnv("GRAPHQL_ENDPOINT", "http://localhost:8081/graphql"),
+		AllowedOrigins:      getAllowedOrigins(),
+		DatabaseURL:         getDatabaseURL(),
+		RedisHost:           getEnv("REDIS_HOST", "localhost"),
+		RedisPort:           getEnvInt("REDIS_PORT", 6379),
+		RedisPassword:       getEnv("REDIS_PASSWORD", ""),
+		RedisDB:             getEnvInt("REDIS_DB", 0),
+		GoogleClientID:      getEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret:  getEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleRedirectURL:   getEnv("GOOGLE_REDIRECT_URL", "http://api.nexus.local/api/auth/google/callback"),
+		FrontendURL:         getEnv("FRONTEND_URL", "http://nexus.local"),
+		VaultAddress:        getEnv("VAULT_ADDR", "http://vault:8200"),
+		VaultRoleID:         getEnv("VAULT_ROLE_ID", ""),
+		VaultSecretID:       getEnv("VAULT_SECRET_ID", ""),
+		VaultAuthMountPath:  getEnv("VAULT_AUTH_MOUNT_PATH", "approle"),
+		VaultKVMountPath:    getEnv("VAULT_KV_MOUNT_PATH", "kv"),
+		InternalAPIURL:      getEnv("INTERNAL_API_URL", "http://system:8083"),
+		InternalAPIAudience: parseCSVEnv("INTERNAL_API_AUDIENCE", "system"),
+		KratosAdminURL:      getEnv("KRATOS_ADMIN_URL", "http://kratos:4434"),
 		// Rate limiting removed - now handled by Traefik at edge level
 		// Authorization now handled by Keto directly via Oathkeeper
 	}
@@ -147,14 +138,4 @@ func parseCSV(value string) []string {
 		}
 	}
 	return result
-}
-
-func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
-	if value := os.Getenv(key); value != "" {
-		if parsed, err := time.ParseDuration(value); err == nil {
-			return parsed
-		}
-		log.Printf("Invalid duration for %s: %q, using default %s", key, value, defaultValue)
-	}
-	return defaultValue
 }

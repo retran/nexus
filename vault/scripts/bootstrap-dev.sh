@@ -139,106 +139,16 @@ else
   echo "[INFO] KV secrets engine already enabled."
 fi
 
-echo "[INFO] Enabling AppRole auth method..."
-auth_json=$(vault_exec "${root_token}" vault auth list -format=json)
-if ! echo "${auth_json}" | jq -e 'has("approle/")' >/dev/null; then
-  vault_exec "${root_token}" vault auth enable approle >/dev/null
-else
-  echo "[INFO] AppRole auth method already enabled."
-fi
+# Note: Dev mode uses Vault ONLY as KV secrets storage
+# Production features NOT configured in dev:
+# - NO Transit engine (JWT signing not used in Nexus)
+# - NO PKI engine (mTLS only for production - see init-pki.sh)
+# - NO AppRole auth (services don't authenticate to Vault in dev)
+# - NO policies (not needed without AppRole - see init-policies.sh)
+# - NO OIDC (Vault UI accessed via token in dev)
+#
+# For production setup with PKI/AppRole/Policies, run manually or see bootstrap-prod.sh
 
-echo "[INFO] Applying Vault policies..."
-VAULT_TOKEN="${root_token}" \
-  VAULT_ADDR="${VAULT_ADDR_IN_CONTAINER}" \
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN}" \
-  "${SCRIPT_DIR}/init-policies.sh"
-
-echo "[INFO] Configuring Vault transit engine for JWT signing..."
-VAULT_TOKEN="${root_token}" \
-  VAULT_ADDR="${VAULT_ADDR_IN_CONTAINER}" \
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN}" \
-  "${SCRIPT_DIR}/init-transit.sh"
-
-VAULT_TOKEN="${root_token}" \
-  VAULT_ADDR="${VAULT_ADDR_IN_CONTAINER}" \
-  "${SCRIPT_DIR}/init-pki.sh"
-
-services=(data gateway worker system oathkeeper kratos temporal)
-
-for service in "${services[@]}"; do
-  role_name="app-${service}"
-  policy_name="${role_name}"
-
-  echo "[INFO] Configuring AppRole '${role_name}'..."
-  vault_exec "${root_token}" vault write "auth/approle/role/${role_name}" \
-    token_policies="${policy_name}" \
-    secret_id_ttl=0 \
-    token_ttl=1h \
-    token_max_ttl=4h \
-    secret_id_num_uses=0 \
-    >/dev/null
-
-  role_id_json=$(vault_exec "${root_token}" vault read -format=json "auth/approle/role/${role_name}/role-id")
-  role_id=$(echo "${role_id_json}" | jq -r '.data.role_id')
-
-  secret_id_json=$(vault_exec "${root_token}" vault write -format=json -f "auth/approle/role/${role_name}/secret-id")
-  secret_id=$(echo "${secret_id_json}" | jq -r '.data.secret_id')
-  secret_id_accessor=$(echo "${secret_id_json}" | jq -r '.data.secret_id_accessor')
-
-  output_file="${APPROLE_OUTPUT_DIR}/${service}.json"
-  cat > "${output_file}" <<EOF
-{
-  "role_name": "${role_name}",
-  "policy": "${policy_name}",
-  "role_id": "${role_id}",
-  "secret_id": "${secret_id}",
-  "secret_id_accessor": "${secret_id_accessor}"
-}
-EOF
-  chmod 600 "${output_file}"
-  echo "[INFO] AppRole credentials written to ${output_file}"
-done
-
-# Export AppRole credentials to .env for docker-compose
-echo ""
-echo "[INFO] Exporting AppRole credentials to .env file..."
-ENV_FILE_PATH="${REPO_ROOT}/.env"
-
-for service in "${services[@]}"; do
-  approle_file="${APPROLE_OUTPUT_DIR}/${service}.json"
-
-  if [ ! -f "${approle_file}" ]; then
-    echo "[WARN] AppRole file not found: ${approle_file}, skipping..."
-    continue
-  fi
-
-  role_id=$(jq -r '.role_id' "${approle_file}")
-  secret_id=$(jq -r '.secret_id' "${approle_file}")
-
-  # Convert service name to uppercase with underscores for env var
-  service_upper=$(echo "${service}" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
-
-  # Remove old entries if they exist
-  sed -i.bak "/^${service_upper}_ROLE_ID=/d" "${ENV_FILE_PATH}" 2>/dev/null || true
-  sed -i.bak "/^${service_upper}_SECRET_ID=/d" "${ENV_FILE_PATH}" 2>/dev/null || true
-
-  # Append new entries
-  echo "${service_upper}_ROLE_ID=${role_id}" >> "${ENV_FILE_PATH}"
-  echo "${service_upper}_SECRET_ID=${secret_id}" >> "${ENV_FILE_PATH}"
-
-  echo "[INFO] Exported ${service_upper}_ROLE_ID and ${service_upper}_SECRET_ID to .env"
-done
-
-# Clean up backup files
-rm -f "${ENV_FILE_PATH}.bak"
-
-echo "[SUCCESS] AppRole credentials exported to ${ENV_FILE_PATH}"
-
-echo "[INFO] Configuring OIDC auth for Vault UI..."
-VAULT_TOKEN="${root_token}" \
-  VAULT_ADDR="${VAULT_ADDR_IN_CONTAINER}" \
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN}" \
-  ENV_FILE="${ENV_FILE}" \
-  "${SCRIPT_DIR}/init-oidc.sh"
-
-echo "[SUCCESS] Vault bootstrap complete. Root token stored at ${root_token_file}"
+echo "[SUCCESS] Vault dev bootstrap complete"
+echo "[INFO] Root token stored at ${root_token_file}"
+echo "[INFO] Access Vault UI at http://vault.nexus.local (token: root)"

@@ -1,0 +1,202 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+version: "3"
+
+vars:
+  REDIS_VERSION: "8-alpine"
+  TEMPORAL_VERSION: "1.29.1"
+  # Colors
+  GREEN: \033[0;32m
+  YELLOW: \033[0;33m
+  BLUE: \033[0;34m
+  RED: \033[0;31m
+  NC: \033[0m
+
+tasks:
+  # === Redis ===
+
+  redis:up:
+    desc: "Start Redis in Docker"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Redis...\n"
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d redis
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Redis started\n"
+
+  redis:down:
+    desc: "Stop Redis"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Stopping Redis...\n"
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml stop redis
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Redis stopped\n"
+
+  redis:logs:
+    desc: "Show Redis logs (use CLI_ARGS for filtering)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}} redis
+
+  redis:cli:
+    desc: "Connect to Redis CLI"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Connecting to Redis CLI...\n"
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec redis redis-cli
+
+  redis:destroy:
+    desc: "Destroy Redis data and container (WARNING: irreversible)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    prompt: "This will DESTROY all Redis data. Continue?"
+    cmds:
+      - |
+        printf "{{.RED}}[WARN]{{.NC}} Destroying Redis...\n"
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down redis
+      - docker volume rm nexus_redis_data 2>/dev/null || true
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Redis destroyed\n"
+
+  # === Temporal ===
+
+  temporal:up:
+    desc: "Start Temporal server in Docker"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Temporal...\n"
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d temporal
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Temporal started\n"
+
+  temporal:down:
+    desc: "Stop Temporal server"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Stopping Temporal...\n"
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml stop temporal
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Temporal stopped\n"
+
+  temporal:logs:
+    desc: "Show Temporal logs (use CLI_ARGS for filtering)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}} temporal
+
+  temporal:destroy:
+    desc: "Destroy Temporal data and container (WARNING: irreversible)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    prompt: "This will DESTROY all Temporal workflows and history. Continue?"
+    cmds:
+      - |
+        printf "{{.RED}}[WARN]{{.NC}} Destroying Temporal...\n"
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down temporal
+      - docker volume rm nexus_temporal_data 2>/dev/null || true
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Temporal destroyed\n"
+
+  # === Traefik ===
+
+  traefik:up:
+    desc: "Start Traefik proxy"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Traefik...\n"
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d traefik
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Traefik started\n"
+
+  traefik:down:
+    desc: "Stop Traefik proxy"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Stopping Traefik...\n"
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml stop traefik
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Traefik stopped\n"
+
+  traefik:logs:
+    desc: "Show Traefik logs (use CLI_ARGS for filtering)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}} traefik
+
+  # === All Infrastructure ===
+
+  up:
+    desc: "Start all infrastructure services"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting all infrastructure services...\n"
+      - task: traefik:up
+      - task: redis:up
+      - task: temporal:up
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All infrastructure services started\n"
+
+  # === Bootstrap ===
+
+  bootstrap:dev:
+    desc: "Bootstrap infrastructure for development"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Bootstrapping infrastructure for development...\n"
+      - task: up
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Infrastructure bootstrap complete\n"
+
+  down:
+    desc: "Stop all infrastructure services"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Stopping all infrastructure services...\n"
+      - task: traefik:down
+      - task: redis:down
+      - task: temporal:down
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All infrastructure services stopped\n"
+
+  logs:
+    desc: "Show logs from all infrastructure services (use CLI_ARGS for filtering)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}} traefik redis temporal
+
+  destroy:
+    desc: "Destroy all infrastructure data and containers (WARNING: irreversible)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    prompt: "This will DESTROY all infrastructure data. Continue?"
+    cmds:
+      - |
+        printf "{{.RED}}[WARN]{{.NC}} Destroying all infrastructure...\n"
+      - task: redis:destroy
+      - task: temporal:destroy
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down traefik
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All infrastructure destroyed\n"

@@ -25,7 +25,8 @@
 
 ### Security Hardening
 
-- [ ] Generate production secrets (JWT_SECRET, KRATOS_COOKIE_SECRET, etc.)
+- [ ] Generate production secrets (KRATOS_COOKIE_SECRET,
+      OATHKEEPER_SHARED_SECRET, WEBHOOK_SECRET)
 - [ ] Configure Google OAuth with production credentials
 - [ ] Review and update all environment variables in .env
 - [ ] Set up firewall rules (only Traefik ports exposed)

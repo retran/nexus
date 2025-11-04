@@ -1,0 +1,23 @@
+{
+  "schema_id": "default",
+  "traits": {
+    "email": "admin@nexus.local",
+    "name": {
+      "first": "System",
+      "last": "Administrator"
+    },
+    "role": "admin"
+  },
+  "credentials": {
+    "password": {
+      "config": {
+        "password": "admin123"
+      }
+    }
+  },
+  "state": "active",
+  "metadata_public": {
+    "created_by": "bootstrap",
+    "created_at": "2025-01-01T00:00:00Z"
+  }
+}

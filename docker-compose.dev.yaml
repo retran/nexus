@@ -1,0 +1,236 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Development Docker Compose overrides
+# Usage: docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up
+#
+# Development features:
+# - HTTP (no TLS)
+# - Vault dev mode (in-memory, token=root)
+# - Exposed ports for all services
+# - Hot reload (Air for backend, Vite for frontend)
+# - Admin tools: Adminer, Redis Commander, MailHog, Kratos UI, Temporal UI, Vault UI
+# - All protected by Oathkeeper SSO on *.nexus.local
+
+services:
+  traefik:
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8888:8080" # Dashboard (direct access without auth for debugging)
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  vault:
+    ports:
+      - "8200:8200"
+    environment:
+      - VAULT_DEV_ROOT_TOKEN_ID=root
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+    command:
+      - server
+      - -dev
+      - -dev-root-token-id=root
+    # Note: Vault UI access via vault.nexus.local is routed through Oathkeeper (see access-rules.yml)
+    # Direct access via localhost:8200 for debugging without auth
+
+  temporal:
+    ports:
+      - "7233:7233"
+
+  temporal-ui:
+    image: temporalio/ui:2.45.3
+    restart: always
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000
+    depends_on:
+      temporal:
+        condition: service_healthy
+    # Note: Temporal UI access via temporal.nexus.local is routed through Oathkeeper (see access-rules.yml protected:temporal-ui)
+
+  data:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile.data.dev
+    ports:
+      - "8081:8081" # Direct access for debugging (bypass Oathkeeper)
+      - "2345:2345" # Delve debug port
+    volumes:
+      - ./backend:/app
+      - /app/bin
+      - /app/tmp
+    environment:
+      - TLS_ENABLED=false
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
+      - AIR_PROXY_PORT=8081
+      - AIR_BUILD_DIR=/app/tmp
+    # Note: GraphQL access via graphql.nexus.local is routed through Oathkeeper (see access-rules.yml protected:graphql)
+
+  gateway:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile.gateway.dev
+    ports:
+      - "8080:8080" # Direct access for debugging (bypass Oathkeeper)
+      - "2346:2345" # Delve debug port
+    volumes:
+      - ./backend:/app
+      - /app/bin
+      - /app/tmp
+    environment:
+      - TLS_ENABLED=false
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
+      - AIR_PROXY_PORT=8080
+      - AIR_BUILD_DIR=/app/tmp
+    # Note: API Gateway access via api.nexus.local is routed through Oathkeeper (see access-rules.yml protected:api)
+
+  system:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile.system.dev
+    ports:
+      - "8082:8082"
+      - "2347:2345" # Delve debug port
+    volumes:
+      - ./backend:/app
+      - /app/bin
+      - /app/tmp
+    environment:
+      - TLS_ENABLED=false
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
+      - AIR_PROXY_PORT=8082
+      - AIR_BUILD_DIR=/app/tmp
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile.worker.dev
+    ports:
+      - "2348:2345" # Delve debug port
+    volumes:
+      - ./backend:/app
+      - /app/bin
+      - /app/tmp
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
+      - AIR_BUILD_DIR=/app/tmp
+
+  ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "5173:5173" # Direct access for Vite HMR (bypass Oathkeeper)
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://api.nexus.local
+      - VITE_AUTH_URL=http://auth.nexus.local
+    # Note: UI access via nexus.local is routed through Oathkeeper (see access-rules.yml protected:ui)
+
+  kratos:
+    ports:
+      - "4433:4433" # Direct access for debugging
+      - "4434:4434" # Admin API
+    volumes:
+      - ./ory/config:/etc/config/kratos:ro
+    command: serve -c /etc/config/kratos/kratos.yml --watch-courier --dev
+    environment:
+      - SERVE_PUBLIC_CORS_ENABLED=true
+      - SERVE_PUBLIC_CORS_ALLOWED_ORIGINS=http://nexus.local
+      - DSN=postgres://kratos:kratos@postgres:5432/kratos?sslmode=disable
+    # Note: Kratos access via auth.nexus.local is routed through Oathkeeper (see access-rules.yml public:auth)
+
+  kratos-ui:
+    image: oryd/kratos-selfservice-ui-node:v1.3.1
+    restart: always
+    environment:
+      - KRATOS_PUBLIC_URL=http://auth.nexus.local
+      - KRATOS_BROWSER_URL=http://auth.nexus.local
+      - PORT=4455
+      - SECURITY_MODE=cookie
+    depends_on:
+      kratos:
+        condition: service_healthy
+    # Note: This UI is served at auth.nexus.local via Kratos upstream (not separately routed)
+
+  keto:
+    ports:
+      - "4466:4466"
+      - "4467:4467"
+    volumes:
+      - ./ory/config:/etc/config/keto:ro
+    command: serve --config /etc/config/keto/keto.yml --dev
+    environment:
+      - DSN=postgres://keto:keto@postgres:5432/keto?sslmode=disable
+
+  oathkeeper:
+    ports:
+      - "4455:4455" # Proxy port (bypass Traefik for direct testing)
+      - "4456:4456" # Admin API
+    volumes:
+      - ./ory/config:/etc/config/oathkeeper:ro
+    command: serve --config /etc/config/oathkeeper/oathkeeper.yml
+    environment:
+      - LOG_LEVEL=debug
+    labels:
+      - "traefik.enable=true"
+      # Route ALL *.nexus.local traffic through Oathkeeper
+      - "traefik.http.routers.oathkeeper.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.nexus.local`)"
+      - "traefik.http.routers.oathkeeper.entrypoints=web"
+      - "traefik.http.routers.oathkeeper.priority=1"
+      - "traefik.http.services.oathkeeper.loadbalancer.server.port=4455"
+
+  # Admin Tools (all authentication disabled - handled by Oathkeeper)
+  adminer:
+    image: adminer:4.8.4
+    restart: always
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+      - ADMINER_DESIGN=pepa-linha-dark
+      - ADMINER_PLUGINS=login-servers
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Note: Adminer access via adminer.nexus.local is routed through Oathkeeper (see access-rules.yml protected:adminer)
+    # Authentication is handled by Oathkeeper → Kratos → Keto (admin role check)
+
+  redis-commander:
+    image: ghcr.io/joeferner/redis-commander:latest
+    restart: always
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - HTTP_USER= # Disable built-in auth
+      - HTTP_PASSWORD= # Disable built-in auth
+    depends_on:
+      redis:
+        condition: service_healthy
+    # Note: Redis Commander access via redis.nexus.local is routed through Oathkeeper (see access-rules.yml protected:redis-ui)
+    # Authentication is handled by Oathkeeper → Kratos → Keto (admin role check)
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    restart: always
+    ports:
+      - "1025:1025" # SMTP port (for sending test emails)
+      - "8025:8025" # Direct HTTP access (bypass Oathkeeper for debugging)
+    environment:
+      - MH_AUTH_FILE= # Disable built-in auth
+    # Note: MailHog web UI access via mail.nexus.local is routed through Oathkeeper (see access-rules.yml protected:mailhog)
+    # Authentication is handled by Oathkeeper → Kratos → Keto (admin role check)

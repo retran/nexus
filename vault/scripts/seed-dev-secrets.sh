@@ -179,96 +179,24 @@ seed_shared_secret() {
 ensure_vault_running
 import_env
 
-require_var "POSTGRES_USER"
-require_var "POSTGRES_PASSWORD"
-require_var "POSTGRES_DB"
-require_var "REDIS_PASSWORD"
-require_var "KRATOS_COOKIE_SECRET"
-require_var "KRATOS_CIPHER_SECRET"
-require_var "JWT_SECRET"
-require_var "COOKIE_SECRET"
-require_var "CSRF_COOKIE_SECRET"
 require_var "WEBHOOK_SECRET"
-
-POSTGRES_HOST=${POSTGRES_HOST:-postgres}
-POSTGRES_PORT=${POSTGRES_PORT:-5432}
-POSTGRES_SSLMODE=${POSTGRES_SSLMODE:-disable}
-TEMPORAL_NAMESPACE=${TEMPORAL_NAMESPACE:-default}
-TEMPORAL_TASK_QUEUE=${TEMPORAL_TASK_QUEUE:-nexus-task-queue}
-
-OATHKEEPER_SHARED_SECRET=${OATHKEEPER_SHARED_SECRET:-}
-if [ -z "${OATHKEEPER_SHARED_SECRET}" ]; then
-  OATHKEEPER_SHARED_SECRET=$(openssl rand -hex 32)
-  echo "[WARN] OATHKEEPER_SHARED_SECRET not set; generated random secret."
-fi
+require_var "OATHKEEPER_SHARED_SECRET"
 
 ensure_vault_running
 
 echo "[INFO] Validating root token access..."
 vault_exec "${ROOT_TOKEN}" vault token lookup >/dev/null
 
-put_secret "services/data" \
-  "postgres_host=${POSTGRES_HOST}" \
-  "postgres_port=${POSTGRES_PORT}" \
-  "postgres_db=${POSTGRES_DB}" \
-  "postgres_user=${POSTGRES_USER}" \
-  "postgres_password=${POSTGRES_PASSWORD}" \
-  "postgres_sslmode=${POSTGRES_SSLMODE}"
+# Note: In dev mode, services read configuration from environment variables,
+# NOT from Vault. Vault is used ONLY for shared secrets that need rotation.
+#
+# Shared secrets stored in Vault (used across multiple services):
+# - shared/webhook: Kratos → Gateway/System webhook authentication
+# - shared/oathkeeper: Oathkeeper → downstream services authentication
 
-put_secret "services/gateway" \
-  "postgres_host=${POSTGRES_HOST}" \
-  "postgres_port=${POSTGRES_PORT}" \
-  "postgres_db=${POSTGRES_DB}" \
-  "postgres_user=${POSTGRES_USER}" \
-  "postgres_password=${POSTGRES_PASSWORD}" \
-  "redis_host=${REDIS_HOST:-redis}" \
-  "redis_port=${REDIS_PORT:-6379}" \
-  "redis_password=${REDIS_PASSWORD}" \
-  "jwt_secret=${JWT_SECRET}" \
-  "google_client_id=${GOOGLE_CLIENT_ID:-}" \
-  "google_client_secret=${GOOGLE_CLIENT_SECRET:-}" \
-  "frontend_url=${FRONTEND_URL:-http://nexus.local}"
+echo "[INFO] Seeding shared secrets..."
 
-put_secret "services/worker" \
-  "postgres_host=${POSTGRES_HOST}" \
-  "postgres_port=${POSTGRES_PORT}" \
-  "postgres_db=${POSTGRES_DB}" \
-  "postgres_user=${POSTGRES_USER}" \
-  "postgres_password=${POSTGRES_PASSWORD}" \
-  "temporal_host=${TEMPORAL_HOST:-temporal:7233}" \
-  "temporal_namespace=${TEMPORAL_NAMESPACE}" \
-  "temporal_task_queue=${TEMPORAL_TASK_QUEUE}" \
-  "jwt_secret=${JWT_SECRET}"
-
-put_secret "services/kratos" \
-  "cookie_secret=${KRATOS_COOKIE_SECRET}" \
-  "cipher_secret=${KRATOS_CIPHER_SECRET}" \
-  "public_url=${KRATOS_PUBLIC_URL:-http://auth.nexus.local}" \
-  "admin_url=${KRATOS_ADMIN_URL:-http://kratos:4434}" \
-  "webhook_secret=${WEBHOOK_SECRET:-}" \
-  "google_client_id=${GOOGLE_CLIENT_ID:-}" \
-  "google_client_secret=${GOOGLE_CLIENT_SECRET:-}" \
-  "apple_client_id=${APPLE_CLIENT_ID:-}" \
-  "apple_client_secret=${APPLE_CLIENT_SECRET:-}" \
-  "apple_team_id=${APPLE_TEAM_ID:-}" \
-  "apple_key_id=${APPLE_KEY_ID:-}"
-
-put_secret "services/frontend" \
-  "api_url=${VITE_API_URL:-http://api.nexus.local}" \
-  "auth_url=${VITE_AUTH_URL:-http://auth.nexus.local}" \
-  "cookie_secret=${COOKIE_SECRET}" \
-  "csrf_cookie_name=${CSRF_COOKIE_NAME:-__HOST-nexus_csrf}" \
-  "csrf_cookie_secret=${CSRF_COOKIE_SECRET}"
-
-put_secret "services/postgres" \
-  "user=${POSTGRES_USER}" \
-  "password=${POSTGRES_PASSWORD}" \
-  "database=${POSTGRES_DB}"
-
-put_secret "services/redis" \
-  "password=${REDIS_PASSWORD}"
-
-seed_shared_secret "shared/webhook" "${WEBHOOK_SECRET:-}"
+seed_shared_secret "shared/webhook" "${WEBHOOK_SECRET}"
 seed_shared_secret "shared/oathkeeper" "${OATHKEEPER_SHARED_SECRET}"
 
 echo "[SUCCESS] Vault dev secrets seeded from ${ENV_FILE}"

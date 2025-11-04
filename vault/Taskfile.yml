@@ -1,0 +1,359 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+version: "3"
+
+vars:
+  VAULT_VERSION: "1.21.0"
+  VAULT_ADDR: "http://localhost:8200"
+  VAULT_TOKEN: "root"
+  # Colors
+  GREEN: \033[0;32m
+  YELLOW: \033[0;33m
+  BLUE: \033[0;34m
+  RED: \033[0;31m
+  NC: \033[0m
+
+tasks:
+  # === Development Setup ===
+
+  dev:init:
+    desc: "Initialize Vault in dev mode (auto-unsealed, token=root)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Vault dev mode is auto-initialized with token=root\n"
+        printf "{{.GREEN}}[OK]{{.NC}} Run: export VAULT_ADDR=http://localhost:8200 VAULT_TOKEN=root\n"
+
+  dev:status:
+    desc: "Check Vault status"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking Vault status...\n"
+      - |
+        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+          vault status
+
+  # === PKI (TLS Certificates) ===
+
+  pki:init:
+    desc: "Initialize PKI for internal mTLS"
+    silent: true
+    dir: "{{.ROOT_DIR}}/vault"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Initializing PKI for internal mTLS...\n"
+      - ./scripts/init-pki.sh
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} PKI initialized\n"
+
+  pki:issue:
+    desc: "Issue certificate (usage: task vault:pki:issue SERVICE=data)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Issuing certificate for {{.SERVICE}}.nexus.local...\n"
+      - |
+        docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml exec vault \
+          vault write pki_int/issue/nexus-internal \
+          common_name={{.SERVICE}}.nexus.local \
+          ttl=720h
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Certificate issued\n"
+    requires:
+      vars:
+        - SERVICE
+
+  pki:list:
+    desc: "List issued certificates"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Listing issued certificates...\n"
+      - |
+        docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml exec vault \
+          vault list pki_int/certs
+
+  pki:revoke:
+    desc: "Revoke certificate (usage: task vault:pki:revoke SERIAL=<serial>)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Revoking certificate {{.SERIAL}}...\n"
+      - |
+        docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml exec vault \
+          vault write pki_int/revoke serial_number={{.SERIAL}}
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Certificate revoked\n"
+    requires:
+      vars:
+        - SERIAL
+
+  # === Secrets Management ===
+
+  secrets:put:
+    desc: "Store secret (usage: task vault:secrets:put PATH=app/db KEY=password VALUE=secret)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Storing secret at secret/{{.PATH}}...\n"
+      - |
+        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+          vault kv put secret/{{.PATH}} {{.KEY}}={{.VALUE}}
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Secret stored\n"
+    requires:
+      vars:
+        - PATH
+        - KEY
+        - VALUE
+
+  secrets:get:
+    desc: "Get secret (usage: task vault:secrets:get PATH=app/db)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Retrieving secret from secret/{{.PATH}}...\n"
+      - |
+        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+          vault kv get secret/{{.PATH}}
+    requires:
+      vars:
+        - PATH
+
+  secrets:delete:
+    desc: "Delete secret (usage: task vault:secrets:delete PATH=app/db)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    prompt: "This will delete the secret. Continue?"
+    cmds:
+      - |
+        printf "{{.RED}}[WARN]{{.NC}} Deleting secret at secret/{{.PATH}}...\n"
+      - |
+        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+          vault kv delete secret/{{.PATH}}
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Secret deleted\n"
+    requires:
+      vars:
+        - PATH
+
+  secrets:list:
+    desc: "List secrets at path (usage: task vault:secrets:list PATH=app/)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Listing secrets at secret/{{.PATH}}...\n"
+      - |
+        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+          vault kv list secret/{{.PATH}}
+    requires:
+      vars:
+        - PATH
+
+  # === Shared Secrets (for services) ===
+
+  secrets:seed:
+    desc: "Seed shared secrets from .env (dev only)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/vault"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Seeding shared secrets from .env...\n"
+      - ./scripts/seed-dev-secrets.sh
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Shared secrets seeded\n"
+
+  secrets:rotate:
+    desc: "Rotate all shared secrets (webhook, oathkeeper)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/vault"
+    prompt: "This will rotate all shared secrets. Continue?"
+    cmds:
+      - |
+        printf "{{.YELLOW}}[WARN]{{.NC}} Rotating shared secrets...\n"
+      - ./scripts/rotate-shared-secrets.sh
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Secrets rotated\n"
+
+  secrets:verify:
+    desc: "Verify shared secrets are configured"
+    silent: true
+    dir: "{{.ROOT_DIR}}/vault"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Verifying shared secrets...\n"
+      - ./scripts/verify-shared-secrets.sh
+
+  # === Policies ===
+
+  policies:init:
+    desc: "Initialize all Vault policies"
+    silent: true
+    dir: "{{.ROOT_DIR}}/vault"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Initializing Vault policies...\n"
+      - ./scripts/init-policies.sh
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Policies initialized\n"
+
+  policies:list:
+    desc: "List all policies"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Listing Vault policies...\n"
+      - |
+        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+          vault policy list
+
+  policies:read:
+    desc: "Read policy (usage: task vault:policies:read POLICY=data-service)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Reading policy {{.POLICY}}...\n"
+      - |
+        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+          vault policy read {{.POLICY}}
+    requires:
+      vars:
+        - POLICY
+
+  # === Development Bootstrap ===
+
+  bootstrap:dev:
+    desc: "Bootstrap Vault for development (all initializations)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/vault"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Bootstrapping Vault for development...\n"
+      - ./scripts/bootstrap-dev.sh
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Vault bootstrap complete\n"
+
+  # === Production Bootstrap ===
+
+  bootstrap:prod:
+    desc: "Bootstrap Vault for production (manual unseal required)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/vault"
+    prompt: "This will initialize production Vault. Continue?"
+    cmds:
+      - |
+        printf "{{.YELLOW}}[WARN]{{.NC}} Production bootstrap requires manual steps:\n"
+        printf "  1. Initialize Vault: vault operator init (save keys!)\n"
+        printf "  2. Unseal Vault with recovery keys\n"
+        printf "  3. Run: task vault:pki:init (mTLS certificates)\n"
+        printf "  4. Run: task vault:policies:init (AppRole policies)\n"
+        printf "  5. Create AppRoles for each service\n"
+        printf "  6. Store recovery keys in secure location (Backblaze B2)\n"
+        printf "\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Note: OIDC and Transit engines NOT used in Nexus\n"
+
+  # === Logs ===
+
+  logs:
+    desc: "View Vault logs (use CLI_ARGS for filtering)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}} vault
+
+  # === Agent Management ===
+
+  agent:status:
+    desc: "Check status of all Vault Agents"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking Vault Agents status...\n"
+      - |
+        for service in temporal data gateway system worker kratos oathkeeper; do
+          printf "{{.BLUE}}=== ${service}-vault-agent ===\n{{.NC}}"
+          docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml ps ${service}-vault-agent
+        done
+
+  agent:logs:
+    desc: "View Vault Agent logs (usage: task vault:agent:logs SERVICE=data)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml logs -f {{.SERVICE}}-vault-agent
+    requires:
+      vars:
+        - SERVICE
+
+  # === Backup ===
+
+  backup:
+    desc: "Create Vault backup (snapshots)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Creating Vault backup...\n"
+      - |
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml exec vault \
+          vault operator raft snapshot save /vault/backups/snapshot-${TIMESTAMP}.snap
+        printf "{{.GREEN}}[OK]{{.NC}} Backup created: snapshot-${TIMESTAMP}.snap\n"
+
+  backup:list:
+    desc: "List Vault backups"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Listing Vault backups...\n"
+      - docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml exec vault ls /vault/backups/
+
+  backup:restore:
+    desc: "Restore from backup (usage: task vault:backup:restore FILE=snapshot-20250101-120000.snap)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    prompt: "This will restore Vault from backup. Continue?"
+    cmds:
+      - |
+        printf "{{.YELLOW}}[WARN]{{.NC}} Restoring Vault from backup {{.FILE}}...\n"
+      - |
+        docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml exec vault \
+          vault operator raft snapshot restore /vault/backups/{{.FILE}}
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Vault restored from backup\n"
+    requires:
+      vars:
+        - FILE
+
+  # === Destroy ===
+
+  destroy:
+    desc: "Destroy all Vault data and containers (WARNING: irreversible)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    prompt: "This will DESTROY all Vault containers, volumes, secrets, and keys. Continue?"
+    cmds:
+      - |
+        printf "{{.RED}}[WARN]{{.NC}} Destroying Vault...\n"
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down vault
+      - docker volume rm nexus_vault_data 2>/dev/null || true
+      - docker volume rm nexus_vault_logs 2>/dev/null || true
+      - rm -rf vault/backups/* 2>/dev/null || true
+      - |
+        printf "{{.RED}}[WARN]{{.NC}} All secrets, keys, and certificates are permanently lost!\n"
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Vault destroyed\n"

@@ -27,39 +27,30 @@ import (
 
 // Config contains REST API Gateway server configuration.
 type Config struct {
-	VaultSecretID         string
-	VaultRoleID           string
-	GoogleClientID        string
-	GraphQLEndpoint       string
-	DatabaseURL           string
-	RedisHost             string
-	GoogleRedirectURL     string
-	Host                  string
-	RedisPassword         string
-	FrontendURL           string
-	ServiceJWTIssuer      string
-	ServiceJWTSubject     string
-	GoogleClientSecret    string
-	VaultSigningKey       string
-	InternalAPIURL        string
-	KratosAdminURL        string
-	OathkeeperJWTIssuer   string
-	OathkeeperJWTAudience string
-	OathkeeperJWKSFile    string
-	InternalAPIAudience   []string
-	VaultAuthMountPath    string
-	VaultTransitMountPath string
-	VaultKVMountPath      string
-	VaultAddress          string
-	ServiceJWTAudience    []string
-	AllowedOrigins        []string
-	ShutdownTimeout       time.Duration
-	WriteTimeout          time.Duration
-	ReadTimeout           time.Duration
-	Port                  int
-	RedisDB               int
-	RedisPort             int
-	ServiceJWTTTL         time.Duration
+	VaultSecretID       string
+	VaultRoleID         string
+	GoogleClientID      string
+	GraphQLEndpoint     string
+	DatabaseURL         string
+	RedisHost           string
+	GoogleRedirectURL   string
+	Host                string
+	RedisPassword       string
+	FrontendURL         string
+	GoogleClientSecret  string
+	InternalAPIURL      string
+	KratosAdminURL      string
+	InternalAPIAudience []string
+	VaultAuthMountPath  string
+	VaultKVMountPath    string
+	VaultAddress        string
+	AllowedOrigins      []string
+	ShutdownTimeout     time.Duration
+	WriteTimeout        time.Duration
+	ReadTimeout         time.Duration
+	Port                int
+	RedisDB             int
+	RedisPort           int
 }
 
 // Server represents the REST API Gateway HTTP server.

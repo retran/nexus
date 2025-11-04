@@ -1,0 +1,269 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Production Docker Compose overrides
+# Usage: docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml up
+#
+# Production features:
+# - HTTPS with Let's Encrypt
+# - mTLS between services via Vault PKI
+# - Vault Agents for certificate management
+# - Closed ports (only Traefik exposed)
+
+services:
+  traefik:
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=me@retran.me"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - traefik_letsencrypt:/letsencrypt
+
+  vault:
+    volumes:
+      - ./vault/config.hcl:/vault/config/config.hcl:ro
+      - vault_data:/vault/data
+    environment:
+      - VAULT_API_ADDR=http://0.0.0.0:8200
+    command:
+      - server
+      - -config=/vault/config/config.hcl
+
+  # Vault Agents for mTLS certificate provisioning
+  vault-agent-temporal:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - COMMON_NAME=temporal.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - temporal-secrets:/secrets
+    depends_on:
+      vault:
+        condition: service_healthy
+
+  vault-agent-data:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - COMMON_NAME=data.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - data-secrets:/secrets
+    depends_on:
+      vault:
+        condition: service_healthy
+
+  vault-agent-gateway:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - COMMON_NAME=gateway.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - gateway-secrets:/secrets
+    depends_on:
+      vault:
+        condition: service_healthy
+
+  vault-agent-system:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - COMMON_NAME=system.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - system-secrets:/secrets
+    depends_on:
+      vault:
+        condition: service_healthy
+
+  vault-agent-worker:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - COMMON_NAME=worker.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - worker-secrets:/secrets
+    depends_on:
+      vault:
+        condition: service_healthy
+
+  vault-agent-kratos:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - COMMON_NAME=kratos.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - kratos-secrets:/secrets
+    depends_on:
+      vault:
+        condition: service_healthy
+
+  vault-agent-oathkeeper:
+    image: hashicorp/vault:1.21.0
+    restart: always
+    command: ["agent", "-config=/config/template.hcl"]
+    env_file: .env
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - COMMON_NAME=oathkeeper.service.local
+    volumes:
+      - ./vault/agent:/config:ro
+      - oathkeeper-secrets:/secrets
+    depends_on:
+      vault:
+        condition: service_healthy
+
+  temporal:
+    hostname: temporal.service.local
+    volumes:
+      - temporal-secrets:/secrets:ro
+    environment:
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/production.yaml
+      - TEMPORAL_TLS_REQUIRE_CLIENT_AUTH=true
+      - TEMPORAL_TLS_SERVER_CERT=/secrets/vault-cert.pem
+      - TEMPORAL_TLS_SERVER_KEY=/secrets/vault-key.pem
+      - TEMPORAL_TLS_CLIENT_CA_DATA=/secrets/vault-ca.pem
+    depends_on:
+      vault-agent-temporal:
+        condition: service_started
+
+  data:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile.data
+    volumes:
+      - data-secrets:/secrets:ro
+    environment:
+      - TLS_ENABLED=true
+      - VAULT_ADDR=http://vault:8200
+    depends_on:
+      vault-agent-data:
+        condition: service_started
+    # Note: GraphQL is INTERNAL ONLY - not exposed via Traefik
+    # Only accessible by gateway service via internal Docker network
+
+  gateway:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile.gateway
+    volumes:
+      - gateway-secrets:/secrets:ro
+    environment:
+      - TLS_ENABLED=true
+      - VAULT_ADDR=http://vault:8200
+    depends_on:
+      vault-agent-gateway:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gateway.rule=Host(`api.nexus.retran.me`)"
+      - "traefik.http.routers.gateway.entrypoints=websecure"
+      - "traefik.http.routers.gateway.tls.certresolver=letsencrypt"
+      - "traefik.http.services.gateway.loadbalancer.server.port=8080"
+
+  system:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile.system
+    volumes:
+      - system-secrets:/secrets:ro
+    environment:
+      - TLS_ENABLED=true
+      - VAULT_ADDR=http://vault:8200
+    depends_on:
+      vault-agent-system:
+        condition: service_started
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile.worker
+    volumes:
+      - worker-secrets:/secrets:ro
+    environment:
+      - VAULT_ADDR=http://vault:8200
+    depends_on:
+      vault-agent-worker:
+        condition: service_started
+
+  ui:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ui.rule=Host(`nexus.retran.me`)"
+      - "traefik.http.routers.ui.entrypoints=websecure"
+      - "traefik.http.routers.ui.tls.certresolver=letsencrypt"
+      - "traefik.http.services.ui.loadbalancer.server.port=80"
+
+  kratos:
+    volumes:
+      - ./ory/config:/etc/config/kratos:ro
+      - kratos-secrets:/secrets:ro
+    command: serve -c /etc/config/kratos/kratos.yml --watch-courier
+    depends_on:
+      vault-agent-kratos:
+        condition: service_started
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kratos.rule=Host(`auth.nexus.retran.me`)"
+      - "traefik.http.routers.kratos.entrypoints=websecure"
+      - "traefik.http.routers.kratos.tls.certresolver=letsencrypt"
+      - "traefik.http.services.kratos.loadbalancer.server.port=4433"
+
+  oathkeeper:
+    volumes:
+      - ./ory/config:/etc/config/oathkeeper:ro
+      - oathkeeper-secrets:/secrets:ro
+    command: serve --config /etc/config/oathkeeper/oathkeeper.yml
+    depends_on:
+      vault-agent-oathkeeper:
+        condition: service_started
+
+  keto:
+    volumes:
+      - ./ory/config:/etc/config/keto:ro
+    command: serve --config /etc/config/keto/keto.yml
+
+volumes:
+  vault_data:
+  traefik_letsencrypt:
+  temporal-secrets:
+  data-secrets:
+  gateway-secrets:
+  system-secrets:
+  worker-secrets:
+  kratos-secrets:
+  oathkeeper-secrets:

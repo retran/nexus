@@ -1,12 +1,12 @@
 # Copyright 2025 Andrew Vasilyev
 # SPDX-License-Identifier: Apache-2.0
 
-# Ory Keto Configuration - DEVELOPMENT ENVIRONMENT
-# Production configuration will be in separate file with proper secrets management
+# Ory Keto Configuration - SHARED (Dev + Prod)
+# Environment-specific values configured via env vars in docker-compose files
 
 version: v0.14.0
 
-dsn: postgres://admin:SUPER_SECRET_PASSWORD@postgres:5432/keto_db?sslmode=disable&max_conns=20&max_idle_conns=4
+dsn: ${DSN}
 
 serve:
   read:
@@ -56,5 +56,5 @@ namespaces:
   location: file:///etc/config/keto/namespaces.ts
 
 log:
-  level: debug
-  format: json
+  level: ${LOG_LEVEL:-info}
+  format: ${LOG_FORMAT:-json}

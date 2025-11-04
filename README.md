@@ -48,28 +48,60 @@ echo "WEBHOOK_SECRET=$(openssl rand -hex 32)" >> .env
 
 ### Starting the Stack
 
+**Development mode** (local development with hot reload):
+
 ```bash
-# Start all services
-docker-compose -f docker-compose.dev.yaml up -d
+# Start all services with dev overrides
+docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d
 
 # Check status
-docker-compose -f docker-compose.dev.yaml ps
+docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml ps
+
+# View logs
+docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f
+
+# Stop all services
+docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down
+```
+
+**Production mode** (Mac Mini deployment):
+
+```bash
+# Start all services with prod overrides (HTTPS, mTLS)
+docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml up -d
 ```
 
 ### Service URLs
 
-Once the stack is running, access the services at:
+**Main Services** (Development):
 
-| Service               | URL                          | Description                                        |
-| --------------------- | ---------------------------- | -------------------------------------------------- |
-| **Frontend UI**       | <http://nexus.local>         | Main application interface                         |
-| **REST API (BFF)**    | <http://api.nexus.local>     | Backend-for-Frontend gateway                       |
-| **GraphQL API**       | <http://graphql.nexus.local> | GraphQL API endpoint                               |
-| **Auth UI**           | <http://auth.nexus.local>    | Ory Kratos self-service UI                         |
-| **Traefik Dashboard** | <http://traefik.nexus.local> | Reverse proxy dashboard                            |
-| **Temporal UI**       | <http://localhost:8088>      | Workflow orchestration UI                          |
-| **PostgreSQL**        | `localhost:5432`             | Database (user: `admin`, db: `nexus`, `kratos_db`) |
-| **Redis**             | `localhost:6379`             | Cache (password in `.env`)                         |
+| Service            | URL                          | Description                  |
+| ------------------ | ---------------------------- | ---------------------------- |
+| **Frontend UI**    | <http://nexus.local>         | Main application interface   |
+| **REST API (BFF)** | <http://api.nexus.local>     | Backend-for-Frontend gateway |
+| **GraphQL API**    | <http://graphql.nexus.local> | GraphQL API endpoint         |
+| **Auth UI**        | <http://auth.nexus.local>    | Ory Kratos self-service UI   |
+| **Login UI**       | <http://login.nexus.local>   | Kratos self-service login UI |
+
+**Admin Tools** (Development only, requires admin role):
+
+| Service               | URL                           | Description               |
+| --------------------- | ----------------------------- | ------------------------- |
+| **Traefik Dashboard** | <http://traefik.nexus.local>  | Reverse proxy dashboard   |
+| **Temporal UI**       | <http://temporal.nexus.local> | Workflow orchestration UI |
+| **Vault UI**          | <http://vault.nexus.local>    | HashiCorp Vault UI        |
+| **Adminer**           | <http://adminer.nexus.local>  | PostgreSQL database admin |
+| **Redis Commander**   | <http://redis.nexus.local>    | Redis cache browser       |
+| **MailHog**           | <http://mail.nexus.local>     | Email testing UI          |
+
+**Production URLs** (nexus.retran.me):
+
+- All services use `nexus.retran.me`, `api.nexus.retran.me`,
+  `graphql.nexus.retran.me`, `auth.nexus.retran.me`
+- HTTPS with Let's Encrypt certificates
+- Admin tools not exposed in production | **PostgreSQL** | `localhost:5432` |
+  Database (user: `admin`, db: `nexus`, `kratos_db`) | | **Redis** |
+  `localhost:6379` | Cache (password in `.env`) |
 
 ### Internal Service Ports
 
