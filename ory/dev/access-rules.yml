@@ -36,15 +36,16 @@
   authenticators:
     - handler: cookie_session
   authorizer:
-    handler: remote_json
+    handler: remote
     config:
-      remote: "http://gateway:8080/api/internal/authorize"
-      forward_response_headers_to_upstream:
-        - X-User
-        - X-User-Email
-        - X-User-Role
-      headers:
-        Authorization: 'Bearer {{ print .MatchContext.Header.Get "Authorization" }}'
+      remote: "http://keto:4466/relation-tuples/check"
+      payload: |
+        {
+          "namespace": "Role",
+          "object": "admin",
+          "relation": "members",
+          "subject_id": "{{ print .Subject }}"
+        }
   mutators:
     - handler: id_token
     - handler: header
@@ -148,15 +149,16 @@
   authenticators:
     - handler: cookie_session
   authorizer:
-    handler: remote_json
+    handler: remote
     config:
-      remote: "http://gateway:8080/api/internal/authorize"
-      forward_response_headers_to_upstream:
-        - X-User
-        - X-User-Email
-        - X-User-Role
-      headers:
-        Authorization: 'Bearer {{ print .MatchContext.Header.Get "Authorization" }}'
+      remote: "http://keto:4466/relation-tuples/check"
+      payload: |
+        {
+          "namespace": "Role",
+          "object": "admin",
+          "relation": "members",
+          "subject_id": "{{ print .Subject }}"
+        }
   mutators:
     - handler: noop
   errors:

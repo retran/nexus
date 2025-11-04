@@ -52,8 +52,8 @@ func main() {
 		OathkeeperJWTIssuer:   getEnv("OATHKEEPER_JWT_ISSUER", "http://auth.nexus.local"),
 		OathkeeperJWTAudience: getEnv("OATHKEEPER_JWT_AUDIENCE", "gateway"),
 		OathkeeperJWKSFile:    getEnv("OATHKEEPER_JWKS_FILE", "/etc/oathkeeper/id_token.jwks.json"),
-		AdminRoles:            parseCSVEnv("ADMIN_ROLES", "admin"),
 		// Rate limiting removed - now handled by Traefik at edge level
+		// Authorization now handled by Keto directly via Oathkeeper
 	}
 
 	server, err := rest.New(&cfg)

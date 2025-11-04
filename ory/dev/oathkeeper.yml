@@ -87,6 +87,13 @@ authorizers:
   deny:
     enabled: true
 
+  remote:
+    enabled: true
+    config:
+      remote: http://keto:4466/relation-tuples/check
+      headers:
+        Content-Type: application/json
+
 mutators:
   noop:
     enabled: true

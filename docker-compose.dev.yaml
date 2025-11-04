@@ -307,7 +307,7 @@ services:
       - OATHKEEPER_JWKS_FILE=/etc/oathkeeper/id_token.jwks.json
     volumes:
       - ./backend:/app
-      - ./kratos/dev/id_token.jwks.json:/etc/oathkeeper/id_token.jwks.json:ro
+      - ./ory/dev/id_token.jwks.json:/etc/oathkeeper/id_token.jwks.json:ro
       - gateway-secrets:/secrets:ro
     command: ["air", "-c", ".air.gateway.toml"]
     labels:
@@ -374,9 +374,9 @@ services:
     env_file: .env
     environment:
       - DSN=${DSN}
-    command: -c /etc/config/kratos/kratos.yml migrate sql -e --yes
+    command: -c /etc/confi./ory/kratos.yml migrate sql -e --yes
     volumes:
-      - ./kratos/dev:/etc/config/kratos:ro
+      - ./ory/dev:/etc/config/kratos:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -397,9 +397,9 @@ services:
       - SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - SELFSERVICE_FLOWS_LOGIN_AFTER_OIDC_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE=${WEBHOOK_SECRET}
       - SELFSERVICE_FLOWS_REGISTRATION_AFTER_PASSWORD_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE=${WEBHOOK_SECRET}
-    command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier # --dev flag for development only!
+    command: serve -c /etc/confi./ory/kratos.yml --dev --watch-courier # --dev flag for development only!
     volumes:
-      - ./kratos/dev:/etc/config/kratos:ro
+      - ./ory/dev:/etc/config/kratos:ro
       - kratos-secrets:/secrets:ro
     labels:
       - "traefik.enable=true"
@@ -456,7 +456,7 @@ services:
       - DSN=${KETO_DSN}
     command: migrate up -c /etc/config/keto/keto.yml --yes
     volumes:
-      - ./kratos/dev:/etc/config/keto:ro
+      - ./ory/dev:/etc/config/keto:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -472,7 +472,7 @@ services:
       - DSN=${KETO_DSN}
     command: serve -c /etc/config/keto/keto.yml
     volumes:
-      - ./kratos/dev:/etc/config/keto:ro
+      - ./ory/dev:/etc/config/keto:ro
     labels:
       - "traefik.enable=true"
       # Dev-mode direct access for debugging
@@ -517,7 +517,7 @@ services:
       - "4456" # API port
     command: serve -c /etc/config/oathkeeper/oathkeeper.yml
     volumes:
-      - ./kratos/dev:/etc/config/oathkeeper:ro
+      - ./ory/dev:/etc/config/oathkeeper:ro
       - oathkeeper-secrets:/secrets:ro
     labels:
       - "traefik.enable=true"

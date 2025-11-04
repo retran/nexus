@@ -81,7 +81,7 @@ Review Oathkeeper remote_json authorizer.
 
 Files:
 
-kratos/dev/access-rules.yml
+ory/dev/access-rules.yml
 
 docker-compose.dev.yaml
 
@@ -119,7 +119,7 @@ Kratos Admin API documentation for OIDC client management (/admin/clients).
 
 Files:
 
-kratos/scripts/bootstrap_oidc_clients.sh (NEW)
+ory/scripts/bootstrap_oidc_clients.sh (NEW)
 
 Taskfile.yml
 
@@ -298,7 +298,7 @@ Ory Kratos serve.admin.tls configuration.
 
 Files:
 
-kratos/dev/kratos.yml
+ory/dev/kratos.yml
 
 docker-compose.dev.yaml
 
