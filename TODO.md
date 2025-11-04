@@ -64,103 +64,88 @@ vault/
 
 ## Implementation Plan - REFACTOR EXISTING ONLY
 
-### Phase 1: Rename & Restructure (3 commits)
+### Phase 1: Rename & Restructure ✅ COMPLETED
 
 **Goal**: Rename current dev compose to main, prepare structure for prod/dev
 split
 
-1. **Rename docker-compose.dev.yaml → docker-compose.yaml**
+1. ✅ **Rename docker-compose.dev.yaml → docker-compose.yaml**
    - This becomes the production compose file
    - Rename volumes: `postgres_dev_data` → `postgres_data`, etc.
    - Update Taskfile.yml references
    - Update .gitignore to ignore `docker-compose.override.yaml`
 
-2. **Create docker-compose.override.yaml.example**
-   - Template for local development overrides
-   - Volume mounts for hot reload
-   - Port exposures (5432, 6379, 8200)
-   - Command overrides (air, vite)
-   - Reference to .dev Dockerfiles
-   - Developer copies to `docker-compose.override.yaml` (git-ignored)
+2. ✅ **Convert docker-compose.yaml to production defaults**
+   - Remove all exposed ports (postgres, redis, vault, temporal)
+   - Update Traefik to production config (HTTPS, Let's Encrypt ready)
+   - Remove Air/Vite hot reload commands and source mounts
+   - Update all Traefik labels to use ${DOMAIN} variable
+   - Remove Kratos --dev flags
 
-3. **Reorganize config directories**
+3. ✅ **Reorganize config directories**
    - Rename `ory/dev/` → `ory/config/` (single config, parameterized via env)
-   - Rename `vault/config.hcl` → `vault/config.dev.hcl`
-   - Keep configs environment-agnostic via environment variables
-   - Update volume mounts in compose
+   - Update all configs to use ${DOMAIN} with HTTPS
+   - Update .env to production domain (nexus.retran.me)
+   - Rename VITE\_\* env vars to generic API_URL/AUTH_URL
 
-### Phase 2: Production-Ready Docker Images (4 commits)
+### Phase 2: Production-Ready Docker Images ✅ COMPLETED
 
 **Goal**: Create production multi-stage Dockerfiles, keep .dev variants
 
-1. **backend/Dockerfile (production multi-stage)**
-   - Stage 1: Build all services in single Dockerfile with targets
-   - Stage 2: Runtime with only binaries
-   - Targets: gateway, internal-api, worker, data-api
-   - Update compose to use `target:` for each service
+1. ✅ **backend/Dockerfile.\* (production multi-stage builds)**
+   - Dockerfile.data-api: Go binary in scratch image
+   - Dockerfile.gateway: Go binary in scratch image
+   - Dockerfile.internal-api: Go binary in scratch image
+   - Dockerfile.worker: Go binary in scratch image
+   - Multi-stage builds with CGO_ENABLED=0
+   - Run as non-root user (65534)
 
-2. **frontend/Dockerfile (production)**
-   - Stage 1: Build with yarn (node:22-alpine)
-   - Stage 2: Serve with nginx (nginx:alpine)
-   - Copy nginx.conf for SPA routing
+2. ✅ **frontend/Dockerfile (production)**
+   - Stage 1: Build with yarn (node:current-alpine)
+   - Stage 2: Serve with nginx:1.27-alpine
+   - Copy nginx.conf for SPA routing with security headers
 
-3. **Update docker-compose.yaml to use prod images**
-   - Change `dockerfile: Dockerfile.*.dev` → `dockerfile: Dockerfile`
-   - Remove `command: ["air", ...]` - use CMD from Dockerfile
+3. ✅ **Update docker-compose.yaml to use prod images**
+   - Change `dockerfile: Dockerfile.*.dev` → `dockerfile: Dockerfile.*`
+   - Remove `command: ["air", ...]` - binaries run directly
    - Remove source volume mounts (`./backend:/app`)
    - Keep config mounts (`./ory/config`, vault agent templates)
 
-4. **Document dev override pattern**
-   - Add README.dev.md with setup instructions
-   - Override services to use .dev Dockerfiles
-   - Override commands to use air/vite
-   - Add back source volume mounts
+### Phase 3: Environment & Security Hardening ✅ COMPLETED
 
-### Phase 3: Environment & Security Hardening (4 commits)
+**Goal**: Production-ready settings in main compose
 
-**Goal**: Production-ready settings in main compose, dev overrides for local
+1. ✅ **Remove exposed ports from docker-compose.yaml**
+   - Removed all ports except Traefik 80/443
+   - PostgreSQL, Redis, Vault, Temporal are internal-only
 
-1. **Remove exposed ports from docker-compose.yaml**
-   - Change `ports: ["5432:5432"]` → `expose: [5432]`
-   - Only Traefik keeps port 80/443
-   - Document: devs add back in override for direct access
+2. ✅ **Secure production defaults**
+   - Traefik: Removed `--api.insecure`, changed to INFO logging
+   - Traefik: Added ACME/Let's Encrypt configuration (commented)
+   - Kratos: Removed `--dev --watch-courier` flags
+   - Vault: Updated config.hcl with production warnings
 
-2. **Secure production defaults**
-   - Traefik: Remove `--api.insecure`, add ACME placeholder
-   - Traefik: Change log level DEBUG → INFO
-   - Kratos: Remove `--dev --watch-courier`
-   - Vault: Comment about dev mode (needs seal keys in prod)
+3. ✅ **Create .env.example**
+   - Created from current .env as template
+   - Added security warnings for VAULT_ROOT_TOKEN
+   - Updated .gitignore to allow .env.example
 
-3. **Create .env.prod.example**
-   - Real domain placeholders (nexus.yourdomain.com)
-   - ACME email for Let's Encrypt
-   - No default passwords (must be set)
-   - Reference to Vault for secret storage
-   - Clear separation from .env.dev.example
-
-4. **Update vault/config.hcl for production path**
-   - Keep current as config.dev.hcl
-   - Create config.hcl (symlink/copy decision via docs)
-   - Document seal key setup
-   - Document TLS setup (can come later)
-
-### Phase 4: Certificate & Volume Persistence (2 commits)
+### Phase 4: Certificate & Volume Persistence ✅ COMPLETED
 
 **Goal**: Make certificates persistent, prepare for production restarts
 
-1. **Replace tmpfs with named volumes for certificates**
-   - Change all `*-secrets` volumes from tmpfs → named volumes
-   - Keeps certificates across container restarts
-   - Document: Vault agent will regenerate if missing
-   - Update volume cleanup docs (these are now persistent)
+1. ✅ **Replace tmpfs with named volumes for certificates**
+   - Changed all `*-secrets` volumes from tmpfs → regular named volumes
+   - Certificates now persist across container restarts
+   - Vault agent will regenerate if volumes are deleted
+   - Reduces restart time (no cert regeneration needed)
 
-2. **Add Traefik certificate persistence**
-   - Add `traefik_acme` named volume for Let's Encrypt certs
-   - Mount to `/letsencrypt` in Traefik
-   - Add ACME configuration (commented out for dev)
-   - Document: Uncomment for production with real domain
+2. ✅ **Add Traefik certificate persistence**
+   - Added `traefik_letsencrypt` named volume for Let's Encrypt certs
+   - Mounted to `/letsencrypt` in Traefik
+   - ACME configuration ready (commented, needs LETSENCRYPT_EMAIL env var)
 
-### Phase 5: Documentation & Validation (2 commits)
+### Phase 5: Documentation & Validation ⏳ IN PROGRESS
 
 **Goal**: Complete documentation, validate both modes work
 
