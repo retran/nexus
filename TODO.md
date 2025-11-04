@@ -63,36 +63,48 @@ Keto требует собственных миграций, как и Kratos.
 
 ---
 
-#### Commit 29 (НОВЫЙ): Cоздать и загрузить политики Keto
+#### ✅ Commit 29: Настроить Keto OPL namespaces и relationships
+
+**Status**: ✅ COMPLETED (2025-11-04)
 
 **Research**:
 
-Изучить синтаксис Ory Keto Policies
-<https://www.ory.sh/docs/keto/concepts/policies>.
+Изучить синтаксис Ory Permission Language (OPL) v0.14.0:
+<https://www.ory.sh/docs/keto/reference/ory-permission-language>.
 
-Изучить ory create policy CLI.
+**Files**:
 
-Files:
+- `kratos/dev/namespaces.ts` (новый) - OPL конфигурация
+- `kratos/dev/keto.yml` (обновлен) - указать на namespaces.ts
+- `kratos/dev/seed-keto-tuples.sh` (новый) - скрипт для создания тестовых
+  relationship tuples
 
-kratos/dev/policies/admin.json (новый)
+**Changes**:
 
-Taskfile.yml (обновлен)
+- **`namespaces.ts`**: Создать OPL конфигурацию с TypeScript синтаксисом:
+  - `class User implements Namespace {}`
+  - `class Role implements Namespace` с relation `members: User[]`
+  - `class Resource implements Namespace` с relations `viewers`, `editors`,
+    `admins`
+  - `permits` с методами `view`, `edit`, `delete` используя `includes()` и
+    `transitive()`
+- **`seed-keto-tuples.sh`**: Скрипт для создания тестовых relationship tuples:
+  - Создать admin роль с test-admin-user-id
+  - Создать test-document-1 с admin доступом через Role
+  - Создать test-document-2 с viewer доступом для test-viewer-user-id
+  - Выполнить permission checks для проверки
 
-vault/Taskfile.yml (добавить keto:seed)
+**Test**: ✅ Keto успешно парсит OPL конфигурацию, permission checks работают
+корректно:
 
-Changes:
+- Admin может delete документ ✅
+- Viewer может view документ ✅
+- Viewer НЕ может delete документ ✅
 
-admin.json: Создать базовую политику (Ory ACP):
+**Commit**:
+`feat(iam): step-29 - configure Keto OPL namespaces and relationships`
 
-JSON
-
-{ "id": "policy-admin-access", "subjects": ["<role:admin>"], "actions":
-["create", "read", "update", "delete"], "resources": ["api:admin:<.*>"],
-"effect": "allow" } Taskfile.yml: Добавить task keto:seed.
-
-Скрипт keto:seed должен вызывать docker-compose exec keto ory create policy ....
-
-Test: task keto:seed успешно загружает политику.
+---
 
 #### Commit 31 (НОВЫЙ): Настроить Vault PKI Engine
 
