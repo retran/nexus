@@ -5,24 +5,10 @@ version: "3"
 
 vars:
   GREEN: \033[0;32m
-  RED: \033[0;31m
   YELLOW: \033[0;33m
   BLUE: \033[0;34m
+  RED: \033[0;31m
   NC: \033[0m
-
-includes:
-  backend:
-    taskfile: backend/Taskfile.yml
-    dir: backend
-  frontend:
-    taskfile: frontend/Taskfile.yml
-    dir: frontend
-  postgres:
-    taskfile: postgres/Taskfile.yml
-    dir: postgres
-  vault:
-    taskfile: vault/Taskfile.yml
-    dir: vault
 
 silent: true
 
@@ -32,156 +18,20 @@ tasks:
     cmds:
       - task --list-all
 
-  # SETUP & INSTALLATION
-  setup:
-    desc: "First-time setup: install dependencies, initialize environment"
-    cmds:
-      - task: env:init
-      - task: deps
-      - task: tools:check
-      - printf "{{.GREEN}}[OK]{{.NC}} Setup complete! Run 'task up' to start services.\n"
-
-  deps:
-    desc: "Install all project dependencies"
-    cmds:
-      - task: backend:deps
-      - task: frontend:deps
-      - task: postgres:deps
-      - printf "{{.GREEN}}[OK]{{.NC}} All dependencies installed\n"
-
-  env:init:
-    desc: "Initialize .env file from development template"
-    cmds:
-      - |
-        if [ ! -f .env ]; then
-          if [ -f .env.dev.example ]; then
-            cp .env.dev.example .env
-            printf "{{.GREEN}}[OK]{{.NC}} .env file created from .env.dev.example\n"
-            printf "{{.YELLOW}}[NOTE]{{.NC}} Don't forget to update secret values in .env\n"
-          else
-            echo "POSTGRES_USER=admin
-        POSTGRES_PASSWORD=SUPER_SECRET_PASSWORD
-        POSTGRES_DB=nexus_db" > .env
-            printf "{{.GREEN}}[OK]{{.NC}} .env file created with defaults\n"
-          fi
-        else
-          printf "{{.YELLOW}}[INFO]{{.NC}} .env file already exists\n"
-        fi
-
-  # TOOLS MANAGEMENT
-  tools:install:
-    desc: "Install required host tools (golangci-lint, sqlfluff, pre-commit, etc.)"
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Installing development tools...\n"
-
-        # golangci-lint
-        if ! command -v golangci-lint >/dev/null 2>&1; then
-          printf "Installing golangci-lint...\n"
-          brew install golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
-        fi
-
-        # sqlfluff (Python)
-        if ! command -v sqlfluff >/dev/null 2>&1; then
-          printf "Installing sqlfluff...\n"
-          pip install sqlfluff || pip3 install sqlfluff
-        fi
-
-        # pre-commit
-        if ! command -v pre-commit >/dev/null 2>&1; then
-          printf "Installing pre-commit...\n"
-          brew install pre-commit || pip install pre-commit
-        fi
-
-        # gitleaks
-        if ! command -v gitleaks >/dev/null 2>&1; then
-          printf "Installing gitleaks...\n"
-          brew install gitleaks
-        fi
-
-        printf "{{.GREEN}}[OK]{{.NC}} All tools installed\n"
-
-  tools:check:
-    desc: "Check if all required tools are installed"
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Checking required tools...\n"
-        MISSING=""
-
-        command -v go >/dev/null 2>&1 || MISSING="$MISSING go"
-        command -v node >/dev/null 2>&1 || MISSING="$MISSING node"
-        command -v yarn >/dev/null 2>&1 || MISSING="$MISSING yarn"
-        command -v docker >/dev/null 2>&1 || MISSING="$MISSING docker"
-        command -v docker-compose >/dev/null 2>&1 || MISSING="$MISSING docker-compose"
-
-        if [ -n "$MISSING" ]; then
-          printf "{{.RED}}[ERROR]{{.NC}} Missing required tools:$MISSING\n"
-          printf "{{.YELLOW}}[INFO]{{.NC}} Run 'task tools:install' to install optional tools\n"
-          exit 1
-        fi
-
-        printf "{{.GREEN}}[OK]{{.NC}} All required tools are installed\n"
-        printf "{{.YELLOW}}[INFO]{{.NC}} Run 'task tools:install' to install optional development tools\n"
-
-  # DEVELOPMENT ENVIRONMENT
+  # PRODUCTION DEPLOYMENT
   up:
-    desc: "Start all services"
+    desc: "Start all services in production mode"
     cmds:
-      - docker-compose up -d
-      - printf "{{.GREEN}}[OK]{{.NC}} All services are starting...\n"
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Waiting for PostgreSQL to be ready...\n"
-        sleep 3
-        until docker-compose exec -T postgres pg_isready -U ${POSTGRES_USER:-admin} >/dev/null 2>&1; do
-          printf "{{.YELLOW}}[WAIT]{{.NC}} PostgreSQL is not ready yet...\n"
-          sleep 2
-        done
-        printf "{{.GREEN}}[OK]{{.NC}} PostgreSQL is ready\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Checking if migrations are needed...\n"
-        if docker-compose exec -T postgres psql -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-nexus_db} -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'" | grep -q '^0$'; then
-          printf "{{.YELLOW}}[INFO]{{.NC}} Database is empty, applying migrations...\n"
-          task postgres:migrate:apply
-        else
-          printf "{{.GREEN}}[OK]{{.NC}} Database already initialized\n"
-        fi
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Nexus services...\n"
+        docker-compose up -d
+        printf "{{.GREEN}}[OK]{{.NC}} All services started\n"
 
   down:
     desc: "Stop all services"
     cmds:
       - docker-compose down
-      - printf "{{.GREEN}}[OK]{{.NC}} All services stopped.\n"
-
-  down:clean:
-    desc: "Stop all services and remove volumes (clean slate)"
-    cmds:
-      - |
-        printf "{{.YELLOW}}[WARNING]{{.NC}} This will remove all containers, networks, and volumes for this project.\n"
-        printf "{{.YELLOW}}[WARNING]{{.NC}} All data will be lost!\n"
-        read -p "Are you sure? (yes/no): " CONFIRM
-        if [ "$CONFIRM" != "yes" ]; then
-          printf "{{.RED}}[CANCELLED]{{.NC}} Operation cancelled.\n"
-          exit 1
-        fi
-      - docker-compose down -v --remove-orphans
-      - printf "{{.GREEN}}[OK]{{.NC}} All services stopped and volumes removed.\n"
-
-  prune:
-    desc: "Remove all stopped containers, unused networks, dangling images, and build cache"
-    cmds:
-      - |
-        printf "{{.YELLOW}}[WARNING]{{.NC}} This will remove:\n"
-        printf "  - All stopped containers\n"
-        printf "  - All networks not used by at least one container\n"
-        printf "  - All dangling images\n"
-        printf "  - All dangling build cache\n"
-        read -p "Continue? (yes/no): " CONFIRM
-        if [ "$CONFIRM" != "yes" ]; then
-          printf "{{.RED}}[CANCELLED]{{.NC}} Operation cancelled.\n"
-          exit 1
-        fi
-      - docker system prune -f
-      - printf "{{.GREEN}}[OK]{{.NC}} Docker cleanup complete.\n"
+      - printf "{{.GREEN}}[OK]{{.NC}} All services stopped\n"
 
   restart:
     desc: "Restart all services"
@@ -195,138 +45,132 @@ tasks:
       - docker-compose ps
 
   logs:
-    desc: "View logs from all services (use -- <service> for specific one)"
+    desc: "View logs from all services (use -- <service> for specific service)"
     cmds:
       - docker-compose logs -f {{.CLI_ARGS}}
 
-  # AGGREGATED CODE QUALITY & CHECKS
-  format:
-    desc: "Format all code (Go, JS/TS, SQL, HCL)"
-    cmds:
-      - task: frontend:format
-      - task: backend:format
-      - task: postgres:schema:fmt
-      - task: postgres:lint:fix
-
-  format:check:
-    desc: "Check all code formatting"
-    cmds:
-      - task: frontend:format:check
-      - task: backend:format:check
-      - task: postgres:lint:sql
-
-  lint:
-    desc: "Run all linters"
-    cmds:
-      - task: frontend:lint
-      - task: backend:lint
-      - task: postgres:lint:schema
-      - task: postgres:lint:sql
-
-  lint:fix:
-    desc: "Run all linters and auto-fix issues"
-    cmds:
-      - task: frontend:lint:fix
-      - task: backend:lint:fix
-      - task: postgres:schema:fmt
-      - task: postgres:lint:fix
-
-  test:
-    desc: "Run all tests"
-    cmds:
-      - task: backend:test
-      - task: frontend:test
-
-  test:coverage:
-    desc: "Run all tests and generate coverage reports"
-    cmds:
-      - task: backend:test:coverage
-      - task: frontend:test:coverage
-
-  check:
-    desc: "Run all checks (same as pre-commit hooks)"
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Running pre-commit checks...\n"
-        if ! command -v pre-commit >/dev/null 2>&1; then
-          printf "{{.RED}}[ERROR]{{.NC}} pre-commit is not installed\n"
-          printf "{{.YELLOW}}[INFO]{{.NC}} Install with: brew install pre-commit\n"
-          exit 1
-        fi
-        pre-commit run --all-files
-        printf "{{.GREEN}}[OK]{{.NC}} All checks passed!\n"
-
   # BUILD
   build:
-    desc: "Build all services (data-api, gateway, worker, ui)"
-    cmds:
-      - task: backend:build
-      - task: frontend:build
-      - printf "{{.GREEN}}[OK]{{.NC}} All services built\n"
-
-  # SECURITY
-  security:
-    desc: "Run all security checks (gitleaks, gosec, govulncheck, yarn audit)"
+    desc: "Build all Docker images"
     cmds:
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Running gitleaks...\n"
-        if command -v gitleaks >/dev/null 2>&1; then
-          gitleaks detect --source . --verbose || printf "{{.YELLOW}}[WARN]{{.NC}} Gitleaks found issues\n"
-        else
-          printf "{{.YELLOW}}[WARN]{{.NC}} gitleaks not installed, skipping\n"
-        fi
-      - task: backend:security
-      - task: frontend:security
-      - printf "{{.GREEN}}[OK]{{.NC}} Security checks complete\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Building production images...\n"
+        docker-compose build
+        printf "{{.GREEN}}[OK]{{.NC}} All images built\n"
 
-  secrets:rotate:
-    desc: "Rotate shared Vault secrets with grace-period handling"
-    cmds:
-      - task: vault:rotate-shared-secrets
-
-  secrets:verify:
-    desc: "Verify required shared secrets exist in Vault"
-    cmds:
-      - task: vault:verify-shared-secrets
-
-  secrets:seed:
-    desc: "Seed development secrets into Vault from .env"
-    cmds:
-      - task: vault:seed-dev-secrets
-
-  sso:init:
-    desc: "Configure Vault OIDC via Kratos"
-    cmds:
-      - task: vault:init-oidc
-
-  sso:clients:
-    desc: "Bootstrap OIDC clients in Kratos for SSO integrations (Temporal, Grafana)"
+  build:clean:
+    desc: "Build all images from scratch (no cache)"
     cmds:
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Bootstrapping OIDC clients in Kratos...\n"
-        if [ -f .env ]; then
-          set -a
-          source .env
-          set +a
-        fi
-        export KRATOS_ADMIN_URL="${KRATOS_ADMIN_URL:-http://localhost:4434}"
-        ./ory/scripts/bootstrap_oidc_clients.sh
+        printf "{{.BLUE}}[INFO]{{.NC}} Building images without cache...\n"
+        docker-compose build --no-cache
+        printf "{{.GREEN}}[OK]{{.NC}} All images built\n"
 
-  # UTILITIES
-  repo:format:
-    desc: "Format repository root files (YAML, Markdown)"
+  # DATABASE
+  db:migrate:
+    desc: "Run database migrations using Atlas"
     cmds:
       - |
-        if command -v prettier >/dev/null 2>&1; then
-          prettier --write "*.{yaml,yml,md}"
-          printf "{{.GREEN}}[OK]{{.NC}} Root files formatted\n"
-        else
-          printf "{{.YELLOW}}[WARN]{{.NC}} prettier not installed, skipping\n"
-        fi
+        printf "{{.BLUE}}[INFO]{{.NC}} Running database migrations...\n"
+        docker-compose --profile tools run --rm atlas
+        printf "{{.GREEN}}[OK]{{.NC}} Migrations complete\n"
 
-  clean:
-    desc: "Clean all build artifacts and caches"
+  # VAULT OPERATIONS
+  vault:init:
+    desc: "Initialize Vault (first-time setup)"
     cmds:
-      - task: backend:clean
-      - task: frontend:clean
-      - printf "{{.GREEN}}[OK]{{.NC}} All artifacts cleaned\n"
+      - |
+        printf "{{.YELLOW}}[WARNING]{{.NC}} This will initialize Vault and generate root token\n"
+        printf "{{.YELLOW}}[WARNING]{{.NC}} Save the unseal keys and root token in a secure location!\n"
+        read -p "Continue? (yes/no): " CONFIRM
+        if [ "$CONFIRM" != "yes" ]; then
+          printf "{{.BLUE}}[INFO]{{.NC}} Operation cancelled\n"
+          exit 0
+        fi
+        docker-compose exec vault vault operator init
+
+  vault:unseal:
+    desc: "Unseal Vault (required after restart)"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Unsealing Vault...\n"
+        printf "{{.YELLOW}}[NOTE]{{.NC}} You will need to enter 3 unseal keys\n"
+        docker-compose exec vault vault operator unseal
+        docker-compose exec vault vault operator unseal
+        docker-compose exec vault vault operator unseal
+        printf "{{.GREEN}}[OK]{{.NC}} Vault unsealed\n"
+
+  vault:status:
+    desc: "Check Vault status"
+    cmds:
+      - docker-compose exec vault vault status
+
+  # BACKUP & RESTORE
+  backup:db:
+    desc: "Backup PostgreSQL database"
+    cmds:
+      - |
+        mkdir -p ./backups
+        BACKUP_FILE="backup-$(date +%Y%m%d-%H%M%S).sql.gz"
+        printf "{{.BLUE}}[INFO]{{.NC}} Creating database backup: $BACKUP_FILE\n"
+        docker-compose exec -T postgres pg_dumpall -U ${POSTGRES_USER:-admin} | gzip > "./backups/$BACKUP_FILE"
+        printf "{{.GREEN}}[OK]{{.NC}} Backup saved to ./backups/$BACKUP_FILE\n"
+
+  restore:db:
+    desc: "Restore PostgreSQL database from backup (use -- <backup-file>)"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          printf "{{.RED}}[ERROR]{{.NC}} Please specify backup file: task restore:db -- backup-20250101-120000.sql.gz\n"
+          exit 1
+        fi
+        printf "{{.YELLOW}}[WARNING]{{.NC}} This will overwrite the current database!\n"
+        read -p "Continue? (yes/no): " CONFIRM
+        if [ "$CONFIRM" != "yes" ]; then
+          printf "{{.BLUE}}[INFO]{{.NC}} Operation cancelled\n"
+          exit 0
+        fi
+        printf "{{.BLUE}}[INFO]{{.NC}} Restoring database from {{.CLI_ARGS}}...\n"
+        gunzip < "./backups/{{.CLI_ARGS}}" | docker-compose exec -T postgres psql -U ${POSTGRES_USER:-admin}
+        printf "{{.GREEN}}[OK]{{.NC}} Database restored\n"
+
+  # MAINTENANCE
+  prune:
+    desc: "Remove unused Docker resources"
+    cmds:
+      - |
+        printf "{{.YELLOW}}[WARNING]{{.NC}} This will remove unused containers, networks, and images\n"
+        read -p "Continue? (yes/no): " CONFIRM
+        if [ "$CONFIRM" != "yes" ]; then
+          printf "{{.BLUE}}[INFO]{{.NC}} Operation cancelled\n"
+          exit 0
+        fi
+        docker system prune -f
+        printf "{{.GREEN}}[OK]{{.NC}} Docker cleanup complete\n"
+
+  update:
+    desc: "Update all images to latest versions"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Pulling latest images...\n"
+        docker-compose pull
+        printf "{{.GREEN}}[OK]{{.NC}} All images updated\n"
+        printf "{{.YELLOW}}[NOTE]{{.NC}} Run 'task restart' to apply updates\n"
+
+  # HEALTH CHECKS
+  health:
+    desc: "Check health of all services"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking service health...\n\n"
+        docker-compose ps
+
+  # SSL/TLS
+  ssl:renew:
+    desc: "Force renewal of Let's Encrypt certificates"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Restarting Traefik to renew certificates...\n"
+        docker-compose restart traefik
+        printf "{{.GREEN}}[OK]{{.NC}} Certificate renewal triggered\n"
+        printf "{{.YELLOW}}[NOTE]{{.NC}} Check logs: task logs -- traefik\n"
