@@ -170,6 +170,40 @@ Keto требует собственных миграций, как и Kratos.
 
 ---
 
+#### ✅ Commit 32 (COMPLETED): Создание PKI ролей и политик
+
+**Status**: ✅ Завершено (hash: `00aa74b`)
+
+**Files**:
+
+- `vault/scripts/init-pki.sh` (обновлен)
+- `vault/scripts/init-policies.sh` (обновлен)
+
+**Результат**:
+
+- ✅ Создано 6 PKI ролей для всех сервисов:
+  - `oathkeeper-role`, `gateway-role`, `data-api-role`
+  - `internal-api-role`, `worker-role`, `kratos-role`
+  - Все роли: `allow_bare_domains=true`, TTL=1h, RSA 2048-bit
+- ✅ Обновлены политики для всех сервисов (6 сервисов):
+  - Удалены права `transit/sign/*`, `transit/verify/*` (JWT убран)
+  - Добавлены права `pki_int/issue/{service}-role` (выдача сертификатов)
+  - Добавлены права `pki_int/cert/ca` и `pki_int/ca/pem` (чтение CA)
+- ✅ Протестирована выдача сертификатов:
+  - `gateway.service.local`: сертификат выдан с TTL=1h
+  - `data-api.service.local`: сертификат выдан с CN=data-api.service.local
+
+**Test Command**:
+
+```bash
+bash vault/scripts/bootstrap-dev.sh 2>&1 | grep "Creating PKI role"
+docker-compose -f docker-compose.dev.yaml exec vault \
+  vault write pki_int/issue/gateway-role \
+  common_name="gateway.service.local" ttl="30m"
+```
+
+---
+
 #### ✅ Commit 31 (COMPLETED): Настройка PKI Engine
 
 **Status**: ✅ Завершено (hash: `0915637`)
