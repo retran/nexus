@@ -125,21 +125,21 @@ tasks:
 
   # DEVELOPMENT ENVIRONMENT
   up:
-    desc: "Start all services in development mode"
+    desc: "Start all services"
     cmds:
-      - docker-compose -f docker-compose.dev.yaml up -d
+      - docker-compose up -d
       - printf "{{.GREEN}}[OK]{{.NC}} All services are starting...\n"
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Waiting for PostgreSQL to be ready...\n"
         sleep 3
-        until docker-compose -f docker-compose.dev.yaml exec -T postgres pg_isready -U ${POSTGRES_USER:-admin} >/dev/null 2>&1; do
+        until docker-compose exec -T postgres pg_isready -U ${POSTGRES_USER:-admin} >/dev/null 2>&1; do
           printf "{{.YELLOW}}[WAIT]{{.NC}} PostgreSQL is not ready yet...\n"
           sleep 2
         done
         printf "{{.GREEN}}[OK]{{.NC}} PostgreSQL is ready\n"
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Checking if migrations are needed...\n"
-        if docker-compose -f docker-compose.dev.yaml exec -T postgres psql -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-nexus_db} -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'" | grep -q '^0$'; then
+        if docker-compose exec -T postgres psql -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-nexus_db} -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'" | grep -q '^0$'; then
           printf "{{.YELLOW}}[INFO]{{.NC}} Database is empty, applying migrations...\n"
           task postgres:migrate:apply
         else
@@ -149,7 +149,7 @@ tasks:
   down:
     desc: "Stop all services"
     cmds:
-      - docker-compose -f docker-compose.dev.yaml down
+      - docker-compose down
       - printf "{{.GREEN}}[OK]{{.NC}} All services stopped.\n"
 
   down:clean:
@@ -163,7 +163,7 @@ tasks:
           printf "{{.RED}}[CANCELLED]{{.NC}} Operation cancelled.\n"
           exit 1
         fi
-      - docker-compose -f docker-compose.dev.yaml down -v --remove-orphans
+      - docker-compose down -v --remove-orphans
       - printf "{{.GREEN}}[OK]{{.NC}} All services stopped and volumes removed.\n"
 
   prune:
@@ -192,12 +192,12 @@ tasks:
   ps:
     desc: "List running services"
     cmds:
-      - docker-compose -f docker-compose.dev.yaml ps
+      - docker-compose ps
 
   logs:
     desc: "View logs from all services (use -- <service> for specific one)"
     cmds:
-      - docker-compose -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}}
+      - docker-compose logs -f {{.CLI_ARGS}}
 
   # AGGREGATED CODE QUALITY & CHECKS
   format:

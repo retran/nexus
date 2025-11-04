@@ -36,17 +36,17 @@ multi-layered, distributed platform built on enterprise-grade open-source tools.
   Traefik, Home Assistant, monitoring)
 - **Application Stack**: `docker-compose.app.yaml` (ui, bff, api, worker
   containers)
-- **Development**: `docker-compose.dev.yaml` provides 100% production parity
-  with hot reload
+- **Development**: `docker-compose.yaml` provides 100% production parity with
+  hot reload
 
 ### Starting the Stack
 
 ```bash
 # Start all services
-docker-compose -f docker-compose.dev.yaml up
+docker-compose -f docker-compose.yaml up
 
 # Run database migrations
-docker-compose -f docker-compose.dev.yaml --profile tools run migrations
+docker-compose -f docker-compose.yaml --profile tools run migrations
 ```
 
 ### Hot Reload Setup
@@ -160,8 +160,8 @@ cd frontend && yarn dev
 cd backend && air
 
 # Database operations
-docker-compose -f docker-compose.dev.yaml --profile tools run migrations up
-docker-compose -f docker-compose.dev.yaml --profile tools run migrations down
+docker-compose -f docker-compose.yaml --profile tools run migrations up
+docker-compose -f docker-compose.yaml --profile tools run migrations down
 
 # Build production images
 docker-compose build
