@@ -16,6 +16,7 @@ import (
 
 	"github.com/retran/nexus/backend/internal/activities"
 	gqlclient "github.com/retran/nexus/backend/internal/client/graphql"
+	"github.com/retran/nexus/backend/internal/mtls"
 	"github.com/retran/nexus/backend/internal/workflows"
 )
 
@@ -30,16 +31,26 @@ func run() error {
 	namespace := getEnv("TEMPORAL_NAMESPACE", "default")
 	taskQueue := getEnv("TEMPORAL_TASK_QUEUE", "nexus-task-queue")
 
-	log.Printf("Connecting to Temporal at %s...", temporalHost)
+	log.Printf("Connecting to Temporal at %s with mTLS...", temporalHost)
+
+	// Load mTLS configuration for Temporal client
+	tlsConfig, err := mtls.LoadClientTLSConfig("", "", "")
+	if err != nil {
+		return fmt.Errorf("failed to load mTLS config: %w", err)
+	}
+
 	c, err := client.Dial(client.Options{
 		HostPort:  temporalHost,
 		Namespace: namespace,
+		ConnectionOptions: client.ConnectionOptions{
+			TLS: tlsConfig,
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create Temporal client: %w", err)
 	}
 	defer c.Close()
-	log.Println("Connected to Temporal")
+	log.Println("Connected to Temporal with mTLS")
 
 	apiURL := getEnv("API_URL", "https://data-api.service.local:8081/graphql")
 	gqlClient, err := gqlclient.NewMTLSClient(apiURL)

@@ -23,6 +23,7 @@ import (
 	temporalclient "go.temporal.io/sdk/client"
 
 	"github.com/retran/nexus/backend/internal/internalapi/handlers"
+	"github.com/retran/nexus/backend/internal/mtls"
 )
 
 func main() {
@@ -172,10 +173,22 @@ func newTemporalClient(host, namespace string) (temporalclient.Client, error) {
 		return nil, errors.New("TEMPORAL_HOST is required")
 	}
 
-	opts := temporalclient.Options{HostPort: host, Namespace: strings.TrimSpace(namespace)}
+	// Load mTLS configuration for Temporal client
+	tlsConfig, err := mtls.LoadClientTLSConfig("", "", "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load mTLS config: %w", err)
+	}
+
+	opts := temporalclient.Options{
+		HostPort:  host,
+		Namespace: strings.TrimSpace(namespace),
+		ConnectionOptions: temporalclient.ConnectionOptions{
+			TLS: tlsConfig,
+		},
+	}
 	cli, err := temporalclient.Dial(opts)
 	if err != nil {
-		return nil, fmt.Errorf("connect to Temporal: %w", err)
+		return nil, fmt.Errorf("connect to Temporal with mTLS: %w", err)
 	}
 	return cli, nil
 }
