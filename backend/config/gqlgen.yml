@@ -2,19 +2,19 @@
 # SPDX-License-Identifier: Apache-2.0
 
 schema:
-  - internal/api/graphql/schema.graphql
+  - ../internal/api/graphql/schema.graphql
 
 exec:
-  filename: internal/api/graphql/generated.go
+  filename: ../internal/api/graphql/generated.go
   package: graphql
 
 model:
-  filename: internal/api/graphql/model/models.go
+  filename: ../internal/api/graphql/model/models.go
   package: model
 
 resolver:
   layout: follow-schema
-  dir: internal/api/graphql/resolvers
+  dir: ../internal/api/graphql/resolvers
   package: resolvers
 
 autobind:
