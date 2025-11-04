@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -23,10 +22,7 @@ import (
 
 	"github.com/retran/nexus/backend/internal/api/graphql"
 	"github.com/retran/nexus/backend/internal/api/graphql/resolvers"
-	"github.com/retran/nexus/backend/internal/auth"
-	internalmiddleware "github.com/retran/nexus/backend/internal/internalapi/middleware"
 	"github.com/retran/nexus/backend/internal/repository/postgres"
-	"github.com/retran/nexus/backend/internal/secrets"
 )
 
 func main() {
@@ -65,18 +61,13 @@ func run() error {
 		Queries: queries,
 	}
 
-	secretsClient, jwtMiddleware, accessErr := setupAccessControl(ctx)
-	if accessErr != nil {
-		return fmt.Errorf("configure access control: %w", accessErr)
-	}
-
 	srv := handler.NewDefaultServer(graphql.NewExecutableSchema(graphql.Config{
 		Resolvers: resolver,
 	}))
 
 	mux := http.NewServeMux()
-	mux.Handle("/graphql", protectHandler(secretsClient, jwtMiddleware, srv))
-	mux.Handle("/", protectHandler(secretsClient, jwtMiddleware, playground.Handler("GraphQL Playground", "/graphql")))
+	mux.Handle("/graphql", mTLSAuthMiddleware(srv))
+	mux.Handle("/", mTLSAuthMiddleware(playground.Handler("GraphQL Playground", "/graphql")))
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -132,85 +123,6 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-func setupAccessControl(ctx context.Context) (*secrets.Client, *internalmiddleware.JWTMiddleware, error) {
-	vaultAddr := getEnv("VAULT_ADDR", "http://vault:8200")
-	roleID := strings.TrimSpace(getEnv("VAULT_ROLE_ID", ""))
-	secretID := strings.TrimSpace(getEnv("VAULT_SECRET_ID", ""))
-	authMount := getEnv("VAULT_AUTH_MOUNT_PATH", "approle")
-	kvMount := getEnv("VAULT_KV_MOUNT_PATH", "kv")
-	transitMount := getEnv("VAULT_TRANSIT_MOUNT_PATH", "transit")
-	signingKey := strings.TrimSpace(getEnv("VAULT_SIGNING_KEY", "service-jwt-key"))
-	allowedAud := parseCSV(getEnv("JWT_ALLOWED_AUDIENCES", "data-api"))
-	if len(allowedAud) == 0 {
-		allowedAud = []string{"data-api"}
-	}
-
-	if roleID == "" {
-		return nil, nil, fmt.Errorf("VAULT_ROLE_ID is required")
-	}
-	if secretID == "" {
-		return nil, nil, fmt.Errorf("VAULT_SECRET_ID is required")
-	}
-	if signingKey == "" {
-		return nil, nil, fmt.Errorf("VAULT_SIGNING_KEY is required")
-	}
-
-	secretsClient, err := secrets.NewClient(&secrets.Config{
-		Address:       vaultAddr,
-		RoleID:        roleID,
-		SecretID:      secretID,
-		AuthMountPath: authMount,
-		KVMountPath:   kvMount,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("create Vault secrets client: %w", err)
-	}
-
-	vaultClient, err := secretsClient.APIClient(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("authenticate with Vault: %w", err)
-	}
-
-	verifier, err := auth.NewJWTVerifier(&auth.JWTVerifierConfig{
-		VaultClient:      vaultClient,
-		KeyName:          signingKey,
-		TransitMountPath: transitMount,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("initialise JWT verifier: %w", err)
-	}
-
-	return secretsClient, internalmiddleware.NewJWTMiddleware(verifier, allowedAud), nil
-}
-
-func protectHandler(secretsClient *secrets.Client, jwtMiddleware *internalmiddleware.JWTMiddleware, next http.Handler) http.Handler {
-	protected := jwtMiddleware.Require(next)
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, err := secretsClient.APIClient(r.Context()); err != nil {
-			log.Printf("failed to renew Vault token: %v", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-
-		protected.ServeHTTP(w, r)
-	})
-}
-
-func parseCSV(value string) []string {
-	if strings.TrimSpace(value) == "" {
-		return nil
-	}
-
-	parts := strings.Split(value, ",")
-	result := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if trimmed := strings.TrimSpace(part); trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-	return result
-}
-
 func loadMTLSConfig() (*tls.Config, error) {
 	// Load CA certificate for validating client certificates
 	caCert, err := os.ReadFile("/secrets/vault-ca.pem")
@@ -228,4 +140,24 @@ func loadMTLSConfig() (*tls.Config, error) {
 		ClientCAs:  caCertPool,
 		MinVersion: tls.VersionTLS13,
 	}, nil
+}
+
+func mTLSAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check mTLS client certificate CN
+		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+			http.Error(w, "Forbidden: missing client certificate", http.StatusForbidden)
+			return
+		}
+
+		cn := r.TLS.PeerCertificates[0].Subject.CommonName
+		// Allow gateway.service.local or worker.service.local
+		if cn != "gateway.service.local" && cn != "worker.service.local" {
+			log.Printf("Forbidden: invalid client CN: %s", cn)
+			http.Error(w, "Forbidden: invalid client certificate", http.StatusForbidden)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

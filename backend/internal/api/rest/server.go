@@ -125,21 +125,8 @@ func New(cfg *Config) (*Server, error) {
 	db := postgres.New(pool)
 
 	// Create JWT verifier for Oathkeeper tokens
-	jwksVerifier, err := auth.NewJWKSVerifier(cfg.OathkeeperJWKSFile)
-	if err != nil {
-		return nil, fmt.Errorf("create JWKS verifier: %w", err)
-	}
-
-	// Create auth middleware
-	authMiddleware, err := middleware.NewAuthMiddleware(middleware.Config{
-		Verifier: jwksVerifier,
-		Issuer:   cfg.OathkeeperJWTIssuer,
-		Subject:  "", // Oathkeeper doesn't set a specific subject
-		Audience: []string{cfg.OathkeeperJWTAudience},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create auth middleware: %w", err)
-	}
+	// Create auth middleware (mTLS-based, no JWT verification needed)
+	authMiddleware := middleware.NewAuthMiddleware()
 
 	return &Server{
 		config:         *cfg,

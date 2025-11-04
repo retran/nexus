@@ -20,10 +20,8 @@ import (
 	"syscall"
 	"time"
 
-	vaultapi "github.com/hashicorp/vault/api"
 	temporalclient "go.temporal.io/sdk/client"
 
-	"github.com/retran/nexus/backend/internal/auth"
 	"github.com/retran/nexus/backend/internal/internalapi/handlers"
 	internalmiddleware "github.com/retran/nexus/backend/internal/internalapi/middleware"
 )
@@ -37,7 +35,6 @@ func main() {
 func run() error {
 	port := getEnv("PORT", "8083")
 	graphqlEndpoint := getEnv("GRAPHQL_ENDPOINT", "http://localhost:8081/graphql")
-	audienceEnv := getEnv("JWT_ALLOWED_AUDIENCES", "internal-api")
 	allowedRolesEnv := getEnv("INTERNAL_ALLOWED_ROLES", "none,member,admin")
 	kratosAdminURL := getEnv("KRATOS_ADMIN_URL", "http://kratos:4434")
 	temporalHost := getEnv("TEMPORAL_HOST", "temporal:7233")
@@ -57,13 +54,10 @@ func run() error {
 		}
 	}()
 
-	jwtMiddleware, roleHandler, auditHandler, kratosWebhookHandler, err := initServices(graphqlEndpoint, audienceEnv, allowedRolesEnv, kratosAdminURL, temporalClient, taskQueue, auditSubjects)
-	if err != nil {
-		return err
-	}
+	roleHandler, auditHandler, kratosWebhookHandler := initServices(graphqlEndpoint, allowedRolesEnv, kratosAdminURL, temporalClient, taskQueue, auditSubjects)
 
 	mux := http.NewServeMux()
-	configureMux(mux, jwtMiddleware, roleHandler, auditHandler, kratosWebhookHandler)
+	configureMux(mux, roleHandler, auditHandler, kratosWebhookHandler)
 
 	server, err := newHTTPServer(port, mux)
 	if err != nil {
@@ -101,37 +95,6 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-func newJWTVerifierFromEnv() (*auth.JWTVerifier, error) {
-	vaultAddr := getEnv("VAULT_ADDR", "http://vault:8200")
-	vaultToken := os.Getenv("VAULT_TOKEN")
-	if vaultToken == "" {
-		return nil, fmt.Errorf("VAULT_TOKEN environment variable is required")
-	}
-
-	signingKey := getEnv("VAULT_SIGNING_KEY", "service-jwt-key")
-	transitPath := getEnv("VAULT_TRANSIT_MOUNT_PATH", "transit")
-
-	cfg := vaultapi.DefaultConfig()
-	cfg.Address = vaultAddr
-
-	client, err := vaultapi.NewClient(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("create Vault client: %w", err)
-	}
-	client.SetToken(vaultToken)
-
-	verifier, err := auth.NewJWTVerifier(&auth.JWTVerifierConfig{
-		VaultClient:      client,
-		KeyName:          signingKey,
-		TransitMountPath: transitPath,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create JWT verifier: %w", err)
-	}
-
-	return verifier, nil
-}
-
 func parseCSV(raw string) []string {
 	parts := strings.Split(raw, ",")
 	out := make([]string, 0, len(parts))
@@ -142,16 +105,17 @@ func parseCSV(raw string) []string {
 	}
 	return out
 }
-func configureMux(mux *http.ServeMux, jwtMiddleware *internalmiddleware.JWTMiddleware, roleHandler *handlers.AdminHandler, auditHandler *handlers.AuditHandler, kratosWebhookHandler *handlers.KratosWebhookHandler) {
+func configureMux(mux *http.ServeMux, roleHandler *handlers.AdminHandler, auditHandler *handlers.AuditHandler, kratosWebhookHandler *handlers.KratosWebhookHandler) {
 	mux.HandleFunc("GET /health", healthHandler)
 
-	mux.Handle("GET /internal/healthz", jwtMiddleware.Require(http.HandlerFunc(internalHealthHandler)))
-	mux.Handle("POST /admin/users/{id}/role", jwtMiddleware.Require(adminRoleHandler(roleHandler)))
+	// mTLS-protected endpoints (only gateway.service.local)
+	mux.Handle("GET /internal/healthz", mTLSAuthMiddleware("gateway.service.local", http.HandlerFunc(internalHealthHandler)))
+	mux.Handle("POST /admin/users/{id}/role", mTLSAuthMiddleware("gateway.service.local", adminRoleHandler(roleHandler)))
 	if auditHandler != nil {
-		mux.Handle("POST /internal/audit/events", jwtMiddleware.Require(http.HandlerFunc(auditHandler.HandleAuditEvent)))
+		mux.Handle("POST /internal/audit/events", mTLSAuthMiddleware("gateway.service.local", http.HandlerFunc(auditHandler.HandleAuditEvent)))
 	}
 
-	// Kratos webhooks (no JWT required, authenticated via webhook secret)
+	// Kratos webhooks (authenticated via webhook secret for now - will switch to mTLS in Commit 37)
 	if kratosWebhookHandler != nil {
 		mux.HandleFunc("POST /webhooks/kratos/registration", kratosWebhookHandler.HandleRegistration)
 		mux.HandleFunc("POST /webhooks/kratos/login", kratosWebhookHandler.HandleLogin)
@@ -159,23 +123,17 @@ func configureMux(mux *http.ServeMux, jwtMiddleware *internalmiddleware.JWTMiddl
 	}
 }
 
-func initServices(_ string, audienceEnv, allowedRolesEnv, kratosAdminURL string, temporalClient temporalclient.Client, taskQueue, auditSubjects string) (*internalmiddleware.JWTMiddleware, *handlers.AdminHandler, *handlers.AuditHandler, *handlers.KratosWebhookHandler, error) {
-	jwtVerifier, err := newJWTVerifierFromEnv()
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("initialise JWT verifier: %w", err)
-	}
-
+func initServices(_ string, allowedRolesEnv, kratosAdminURL string, temporalClient temporalclient.Client, taskQueue, auditSubjects string) (*handlers.AdminHandler, *handlers.AuditHandler, *handlers.KratosWebhookHandler) {
 	webhookSecret := getEnv("KRATOS_WEBHOOK_SECRET", "")
 	if webhookSecret == "" {
 		log.Println("Warning: KRATOS_WEBHOOK_SECRET not set, webhook validation disabled")
 	}
 
-	jwtMiddleware := internalmiddleware.NewJWTMiddleware(jwtVerifier, parseCSV(audienceEnv))
 	roleHandler := handlers.NewAdminHandler(kratosAdminURL, parseCSV(allowedRolesEnv))
 	auditHandler := handlers.NewAuditHandler(temporalClient, taskQueue, parseCSV(auditSubjects))
 	kratosWebhookHandler := handlers.NewKratosWebhookHandler(temporalClient, taskQueue, webhookSecret)
 
-	return jwtMiddleware, roleHandler, auditHandler, kratosWebhookHandler, nil
+	return roleHandler, auditHandler, kratosWebhookHandler
 }
 
 func adminRoleHandler(roleHandler *handlers.AdminHandler) http.HandlerFunc {
@@ -289,4 +247,23 @@ func loadMTLSConfig() (*tls.Config, error) {
 		ClientCAs:  caCertPool,
 		MinVersion: tls.VersionTLS13,
 	}, nil
+}
+
+func mTLSAuthMiddleware(expectedCN string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check mTLS client certificate CN
+		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+			http.Error(w, "Forbidden: missing client certificate", http.StatusForbidden)
+			return
+		}
+
+		cn := r.TLS.PeerCertificates[0].Subject.CommonName
+		if cn != expectedCN {
+			log.Printf("Forbidden: invalid client CN: %s (expected %s)", cn, expectedCN)
+			http.Error(w, "Forbidden: invalid client certificate", http.StatusForbidden)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }

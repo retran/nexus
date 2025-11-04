@@ -11,76 +11,31 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
-
-// TokenVerifier abstracts JWT verification for dependency injection and testing.
-type TokenVerifier interface {
-	Verify(ctx context.Context, tokenString string, claims jwt.Claims, opts ...jwt.ParserOption) (*jwt.Token, error)
-}
 
 type contextKey string
 
 const authInfoKey contextKey = "gateway-auth-info"
 
-// Config configures the authentication middleware.
-type Config struct {
-	Verifier TokenVerifier
-	Issuer   string
-	Subject  string
-	Audience []string
-}
-
 // AuthMiddleware validates requests that pass through Oathkeeper before reaching the gateway.
+// It uses mTLS client certificate CN validation instead of JWT.
 type AuthMiddleware struct {
-	verifier TokenVerifier
-
-	expectedIssuer  string
-	expectedSubject string
-	allowedAudience []string
+	// No configuration needed - we just check CN from TLS
 }
 
-// AuthInfo describes the authenticated user extracted from Oathkeeper headers and JWT claims.
+// AuthInfo describes the authenticated user extracted from Oathkeeper headers via mTLS.
 type AuthInfo struct {
-	Token     string
 	Email     string
 	Role      string
 	SessionID string
-	Issuer    string
-	Subject   string
 	FullName  string
-	Audience  []string
 	UserID    uuid.UUID
 }
 
-// NewAuthMiddleware builds a middleware instance that validates requests coming from Oathkeeper.
-func NewAuthMiddleware(cfg Config) (*AuthMiddleware, error) {
-	if cfg.Verifier == nil {
-		return nil, errors.New("auth middleware requires a verifier")
-	}
-
-	audience := make([]string, 0, len(cfg.Audience))
-	seen := make(map[string]struct{}, len(cfg.Audience))
-	for _, aud := range cfg.Audience {
-		normalized := strings.TrimSpace(aud)
-		if normalized == "" {
-			continue
-		}
-		key := strings.ToLower(normalized)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		audience = append(audience, normalized)
-	}
-
-	return &AuthMiddleware{
-		verifier:        cfg.Verifier,
-		expectedIssuer:  strings.TrimSpace(cfg.Issuer),
-		expectedSubject: strings.TrimSpace(cfg.Subject),
-		allowedAudience: audience,
-	}, nil
+// NewAuthMiddleware builds a middleware instance that validates requests coming from Oathkeeper via mTLS.
+func NewAuthMiddleware() *AuthMiddleware {
+	return &AuthMiddleware{}
 }
 
 // RequireAuth rejects requests that do not include a valid Bearer token issued by Oathkeeper.
@@ -96,7 +51,7 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 	})
 }
 
-// OptionalAuth attempts to authenticate requests but allows anonymous access when no token is provided.
+// OptionalAuth attempts to authenticate requests but allows anonymous access when no cert is provided.
 func (m *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		info, err := m.authenticateRequest(r)
@@ -105,35 +60,35 @@ func (m *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
-		if errors.Is(err, errMissingToken) {
+		if errors.Is(err, errMissingCert) {
 			next.ServeHTTP(w, r)
 			return
 		}
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		http.Error(w, "Forbidden", http.StatusForbidden)
 	})
 }
 
 var (
-	errMissingToken   = errors.New("missing bearer token")
+	errMissingCert    = errors.New("missing client certificate")
+	errInvalidCN      = errors.New("invalid client certificate CN")
 	errInvalidHeaders = errors.New("invalid oathkeeper headers")
 )
 
+const expectedCN = "oathkeeper.service.local"
+
 func (m *AuthMiddleware) authenticateRequest(r *http.Request) (*AuthInfo, error) {
-	token := extractBearerToken(r.Header.Get("Authorization"))
-	if token == "" {
-		return nil, errMissingToken
+	// Check mTLS client certificate CN
+	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
+		return nil, errMissingCert
 	}
 
-	claims := &oathkeeperClaims{}
-	if _, err := m.verifier.Verify(r.Context(), token, claims); err != nil {
-		return nil, fmt.Errorf("verify token: %w", err)
+	cn := r.TLS.PeerCertificates[0].Subject.CommonName
+	if cn != expectedCN {
+		return nil, fmt.Errorf("%w: got %q, expected %q", errInvalidCN, cn, expectedCN)
 	}
 
-	if err := m.validateClaims(claims); err != nil {
-		return nil, err
-	}
-
-	info, err := buildAuthInfo(r, token, claims)
+	// CN is valid - now read user info from Oathkeeper headers (Trusted Subsystem pattern)
+	info, err := buildAuthInfoFromHeaders(r)
 	if err != nil {
 		return nil, err
 	}
@@ -141,102 +96,41 @@ func (m *AuthMiddleware) authenticateRequest(r *http.Request) (*AuthInfo, error)
 	return info, nil
 }
 
-func (m *AuthMiddleware) validateClaims(claims *oathkeeperClaims) error {
-	if claims == nil {
-		return errors.New("missing claims")
-	}
-	if claims.Issuer != "" && m.expectedIssuer != "" && !strings.EqualFold(claims.Issuer, m.expectedIssuer) {
-		return fmt.Errorf("unexpected issuer %q", claims.Issuer)
-	}
-	if claims.Subject != "" && m.expectedSubject != "" && !strings.EqualFold(claims.Subject, m.expectedSubject) {
-		return fmt.Errorf("unexpected subject %q", claims.Subject)
-	}
-	if len(m.allowedAudience) > 0 && len(claims.Audience) > 0 && !audienceAllowed(m.allowedAudience, claims.Audience) {
-		return errors.New("unexpected audience")
-	}
-	return nil
-}
-
-func audienceAllowed(allowed []string, actual jwt.ClaimStrings) bool {
-	if len(allowed) == 0 {
-		return true
-	}
-
-	for _, want := range allowed {
-		for _, got := range actual {
-			if strings.EqualFold(strings.TrimSpace(got), want) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func buildAuthInfo(r *http.Request, token string, claims *oathkeeperClaims) (*AuthInfo, error) {
-	if claims == nil {
-		return nil, errors.New("claims are required")
-	}
-
-	session := claims.Session
-	identity := session.Identity
-	traits := identity.Traits
-
-	rawIdentityID := strings.TrimSpace(identity.ID)
-	if rawIdentityID == "" {
-		return nil, fmt.Errorf("%w: missing identity id", errInvalidHeaders)
-	}
-	userHeader, err := readAndValidateHeader(r, "X-User")
+func buildAuthInfoFromHeaders(r *http.Request) (*AuthInfo, error) {
+	// Read X-User-ID header
+	userIDHeader, err := readAndValidateHeader(r, "X-User-ID")
 	if err != nil {
 		return nil, err
 	}
-	if !strings.EqualFold(userHeader, rawIdentityID) {
-		return nil, fmt.Errorf("%w: identity mismatch", errInvalidHeaders)
-	}
-	identityID, err := uuid.Parse(rawIdentityID)
+	userID, err := uuid.Parse(userIDHeader)
 	if err != nil {
-		return nil, fmt.Errorf("%w: invalid identity id", errInvalidHeaders)
+		return nil, fmt.Errorf("%w: invalid user id", errInvalidHeaders)
 	}
 
-	emailClaim := strings.TrimSpace(traits.Email)
-	if emailClaim == "" {
-		return nil, fmt.Errorf("%w: missing email claim", errInvalidHeaders)
-	}
-	emailHeader, err := readAndValidateHeader(r, "X-User-Email")
+	// Read X-User-Email header
+	email, err := readAndValidateHeader(r, "X-User-Email")
 	if err != nil {
 		return nil, err
 	}
-	if !strings.EqualFold(emailHeader, emailClaim) {
-		return nil, fmt.Errorf("%w: email mismatch", errInvalidHeaders)
-	}
 
-	roleClaim := strings.ToLower(strings.TrimSpace(traits.Role))
-	if roleClaim == "" {
-		return nil, fmt.Errorf("%w: missing role claim", errInvalidHeaders)
-	}
-	roleHeader, err := readAndValidateHeader(r, "X-User-Role")
+	// Read X-User-Role header
+	role, err := readAndValidateHeader(r, "X-User-Role")
 	if err != nil {
 		return nil, err
 	}
-	if !strings.EqualFold(roleHeader, roleClaim) {
-		return nil, fmt.Errorf("%w: role mismatch", errInvalidHeaders)
-	}
+	role = strings.ToLower(strings.TrimSpace(role))
 
-	sessionID := strings.TrimSpace(session.ID)
-	if sessionID == "" {
-		return nil, fmt.Errorf("%w: missing session id", errInvalidHeaders)
-	}
+	// Read X-Session-ID header (optional for now)
+	sessionID := strings.TrimSpace(r.Header.Get("X-Session-ID"))
 
-	fullName := deriveFullName(traits.Name.First, traits.Name.Last)
+	// Read X-User-Name header (optional)
+	fullName := strings.TrimSpace(r.Header.Get("X-User-Name"))
 
 	return &AuthInfo{
-		Token:     token,
-		UserID:    identityID,
-		Email:     emailClaim,
-		Role:      roleClaim,
+		UserID:    userID,
+		Email:     email,
+		Role:      role,
 		SessionID: sessionID,
-		Issuer:    claims.Issuer,
-		Subject:   claims.Subject,
-		Audience:  claimStringsToSlice(claims.Audience),
 		FullName:  fullName,
 	}, nil
 }
@@ -252,46 +146,6 @@ func readAndValidateHeader(r *http.Request, header string) (string, error) {
 	return value, nil
 }
 
-func deriveFullName(first, last string) string {
-	first = strings.TrimSpace(first)
-	last = strings.TrimSpace(last)
-	switch {
-	case first == "" && last == "":
-		return ""
-	case first == "":
-		return last
-	case last == "":
-		return first
-	default:
-		return fmt.Sprintf("%s %s", first, last)
-	}
-}
-
-func extractBearerToken(header string) string {
-	if header == "" {
-		return ""
-	}
-	parts := strings.SplitN(header, " ", 2)
-	if len(parts) != 2 {
-		return ""
-	}
-	if !strings.EqualFold(parts[0], "Bearer") {
-		return ""
-	}
-	return strings.TrimSpace(parts[1])
-}
-
-func claimStringsToSlice(aud jwt.ClaimStrings) []string {
-	if len(aud) == 0 {
-		return nil
-	}
-	out := make([]string, 0, len(aud))
-	for _, v := range aud {
-		out = append(out, strings.TrimSpace(v))
-	}
-	return out
-}
-
 // AuthInfoFromContext retrieves the authenticated user from the request context.
 func AuthInfoFromContext(ctx context.Context) *AuthInfo {
 	if ctx == nil {
@@ -303,22 +157,4 @@ func AuthInfoFromContext(ctx context.Context) *AuthInfo {
 		}
 	}
 	return nil
-}
-
-type oathkeeperClaims struct {
-	jwt.RegisteredClaims
-	Session struct {
-		ID       string `json:"id"`
-		Identity struct {
-			ID     string `json:"id"`
-			Traits struct {
-				Email string `json:"email"`
-				Role  string `json:"role"`
-				Name  struct {
-					First string `json:"first"`
-					Last  string `json:"last"`
-				} `json:"name"`
-			} `json:"traits"`
-		} `json:"identity"`
-	} `json:"session"`
 }
