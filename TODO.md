@@ -170,6 +170,37 @@ Keto требует собственных миграций, как и Kratos.
 
 ---
 
+#### ✅ Commit 31 (COMPLETED): Настройка PKI Engine
+
+**Status**: ✅ Завершено (hash: `0915637`)
+
+**Files**:
+
+- `vault/scripts/init-pki.sh` (новый)
+- `vault/scripts/bootstrap-dev.sh` (обновлен)
+- `vault/scripts/init-transit.sh` (права доступа)
+
+**Результат**:
+
+- ✅ PKI Engine включен на пути `pki_int` с TTL 5 лет (dev mode)
+- ✅ Создан self-signed Intermediate CA: `CN=Nexus Dev Intermediate CA`
+- ✅ Настроены URL для CA и CRL: `http://vault:8200/v1/pki_int/ca`
+- ✅ Интегрировано в `bootstrap-dev.sh` workflow
+- ✅ Сертификат CA проверен:
+  - Serial: 1f:3d:c8:e3:fb:04:bf:cf:b4:1d:a7:b5:9a:54:82:50:e9:72:ff:4d
+  - Valid: 2025-11-04 до 2030-11-03 (5 лет)
+  - Algorithm: RSA 2048-bit, SHA256
+
+**Test Command**:
+
+```bash
+bash vault/scripts/bootstrap-dev.sh | grep "PKI"
+docker-compose -f docker-compose.dev.yaml exec vault \
+  vault read -field=certificate pki_int/cert/ca | openssl x509 -text -noout
+```
+
+---
+
 ### Фаза 2: 🚗 Внедрение Vault Agent Sidecar (для всех)
 
 #### Commit 33 (НОВЫЙ): Создать конфиг Vault Agent для mTLS
