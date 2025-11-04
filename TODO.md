@@ -284,6 +284,41 @@ docker-compose -f docker-compose.dev.yaml exec vault \
 
 ---
 
+#### ✅ Commit 33 (COMPLETED): Vault Agent Templates
+
+**Status**: ✅ Завершено (hash: `ab40f33`)
+
+**Files**:
+
+- `vault/agent/template.hcl` (новый)
+- `vault/agent/ca.tpl`, `cert.tpl`, `key.tpl` (новые)
+- `vault/agent/webhook.tpl` (новый)
+
+**Результат**:
+
+- ✅ Создан `template.hcl` с AppRole auto-auth конфигурацией
+- ✅ Шаблоны используют Consul Template синтаксис:
+  - `ca.tpl`: `secret "pki_int/cert/ca"` → vault-ca.pem
+  - `cert.tpl`: `pkiCert "pki_int/issue/{PKI_ROLE}"` → tls.crt (auto-rotation)
+  - `key.tpl`: `pkiCert` → tls.key (perms 0600)
+  - `webhook.tpl`: `secret "kv/data/shared/webhook"` → webhook-secret
+- ✅ Настроена автоматическая ротация при 90% TTL
+- ✅ Протестировано с gateway-role:
+  - Успешно выдан сертификат CN=gateway.service.local
+  - Созданы readiness-маркеры (.ca-ready, .cert-ready, .key-ready)
+
+**Test Command**:
+
+```bash
+docker run --rm --network nexus_default \
+  -v $(pwd)/vault/agent:/config:ro \
+  -v /tmp/test:/vault -v /tmp/test/secrets:/secrets \
+  -e PKI_ROLE=gateway-role -e COMMON_NAME=gateway.service.local \
+  hashicorp/vault:1.21.0 agent -config=/config/template.hcl
+```
+
+---
+
 #### Commit 34 (НОВЫЙ): Внедрить Sidecar-контейнеры
 
 **Files**:
