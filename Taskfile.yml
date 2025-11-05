@@ -9,6 +9,20 @@ vars:
   NC: \033[0m
 
 tasks:
+  # === Environment Setup ===
+
+  env:generate:
+    desc: "Generate .env file with secure random secrets"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Generating .env file...\n"
+      - ./scripts/generate-env.sh
+    preconditions:
+      - sh: test -f .env.example
+        msg: |
+          .env.example file not found
+
   # === Development Bootstrap ===
 
   bootstrap:dev:
@@ -18,39 +32,33 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Bootstrapping entire Nexus development environment...\n"
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 1/6: Infrastructure services (Redis, Temporal, Traefik)...\n"
+        if [ ! -f .env ]; then
+          printf "{{.YELLOW}}[WARN]{{.NC}} .env file not found, generating...\n"
+          ./scripts/generate-env.sh
+        fi
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 1/7: Infrastructure services (Redis, Temporal, Traefik)...\n"
       - task: infra:bootstrap:dev
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 2/6: PostgreSQL (migrations + seeds)...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 2/7: PostgreSQL (migrations + seeds)...\n"
       - task: postgres:bootstrap:dev
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 3/6: Vault (dev mode, shared secrets only)...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 3/7: Vault (dev mode, shared secrets only)...\n"
       - task: vault:bootstrap:dev
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 4/6: Ory stack (Kratos + Keto + seeds)...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 4/7: Ory stack (Kratos + Keto + seeds)...\n"
       - task: ory:bootstrap:dev
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 5/6: Backend dependencies...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 5/7: Backend dependencies...\n"
       - task: backend:deps:install
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 6/6: Frontend dependencies...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 6/7: Frontend dependencies...\n"
       - task: frontend:deps:install
       - |
-        printf "{{.GREEN}}[OK]{{.NC}} Nexus development environment ready!\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 7/7: Starting all application services...\n"
+      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d
       - |
-        printf "\n"
-        printf "{{.GREEN}}[SERVICES RUNNING]{{.NC}}\n"
-        printf "  Frontend:        http://localhost:3000\n"
-        printf "  Kratos Admin:    http://localhost:4434\n"
-        printf "  Kratos Public:   http://localhost:4433\n"
-        printf "  Keto:            http://localhost:4466\n"
-        printf "  Oathkeeper:      http://localhost:4455\n"
-        printf "  Vault:           http://localhost:8200 (token: root)\n"
-        printf "  Temporal UI:     http://localhost:8088\n"
-        printf "\n"
-        printf "{{.YELLOW}}[TIP]{{.NC}} View logs: task logs\n"
-        printf "{{.YELLOW}}[TIP]{{.NC}} Check status: task status\n"
-        printf "\n"
+        printf "{{.GREEN}}[OK]{{.NC}} Nexus development environment ready!\n"
 
   # === Development Servers ===
 
@@ -63,20 +71,6 @@ tasks:
       - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d
       - |
         printf "{{.GREEN}}[OK]{{.NC}} All services started\n"
-      - |
-        printf "\n"
-        printf "{{.GREEN}}[SERVICES RUNNING]{{.NC}}\n"
-        printf "  Frontend:        http://localhost:3000\n"
-        printf "  Kratos Admin:    http://localhost:4434\n"
-        printf "  Kratos Public:   http://localhost:4433\n"
-        printf "  Keto:            http://localhost:4466\n"
-        printf "  Oathkeeper:      http://localhost:4455\n"
-        printf "  Vault:           http://localhost:8200 (token: root)\n"
-        printf "  Temporal UI:     http://localhost:8088\n"
-        printf "\n"
-        printf "{{.YELLOW}}[TIP]{{.NC}} View logs: task logs\n"
-        printf "{{.YELLOW}}[TIP]{{.NC}} Check status: task status\n"
-        printf "\n"
 
   dev:stop:
     desc: "Stop all services"

@@ -17,7 +17,7 @@
 INSERT INTO audit_logs (
   user_id,
   event_type,
-  event_data,
+  metadata,
   ip_address,
   user_agent,
   created_at

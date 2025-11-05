@@ -10,13 +10,15 @@ dsn: ${DSN}
 
 serve:
   public:
-    base_url: https://auth.${DOMAIN} # Dev: local domain; Prod: will use actual domain
+    base_url: http://localhost:4433 # Dev: local access; Prod: will use actual domain via env
     cors:
       enabled: true
       allowed_origins:
-        - https://${DOMAIN}
-        - https://api.${DOMAIN}
-        - https://auth.${DOMAIN}
+        - http://localhost:3000
+        - http://localhost:8001
+        - http://localhost:8002
+        - http://localhost:8003
+        - http://localhost:4433
       allowed_methods:
         - POST
         - GET
@@ -32,18 +34,15 @@ serve:
         - Set-Cookie
       allow_credentials: true
   admin:
-    base_url: https://kratos.service.local:4434
-    tls:
-      key:
-        path: /secrets/cert.key
-      cert:
-        path: /secrets/cert.crt
+    base_url: http://localhost:4434 # Dev: no TLS for admin API
 
 selfservice:
-  default_browser_return_url: https://${DOMAIN}/
+  default_browser_return_url: http://localhost:3000/
   allowed_return_urls:
-    - https://${DOMAIN}
-    - https://api.${DOMAIN}
+    - http://localhost:3000
+    - http://localhost:8001
+    - http://localhost:8002
+    - http://localhost:8003
 
   methods:
     password:
@@ -87,34 +86,34 @@ selfservice:
 
   flows:
     error:
-      ui_url: https://auth.${DOMAIN}/error
+      ui_url: http://localhost:4433/error
 
     settings:
-      ui_url: https://auth.${DOMAIN}/settings
+      ui_url: http://localhost:4433/settings
       privileged_session_max_age: 15m
       required_aal: highest_available
 
     recovery:
       enabled: true
-      ui_url: https://auth.${DOMAIN}/recovery
+      ui_url: http://localhost:4433/recovery
       use: code
 
     verification:
       enabled: true
-      ui_url: https://auth.${DOMAIN}/verification
+      ui_url: http://localhost:4433/verification
       use: code
       after:
-        default_browser_return_url: https://${DOMAIN}/
+        default_browser_return_url: http://localhost:3000/
 
     logout:
       after:
-        default_browser_return_url: https://auth.${DOMAIN}/login
+        default_browser_return_url: http://localhost:4433/login
 
     login:
-      ui_url: https://auth.${DOMAIN}/login
+      ui_url: http://localhost:4433/login
       lifespan: 10m
       after:
-        default_browser_return_url: https://${DOMAIN}/
+        default_browser_return_url: http://localhost:3000/
         hooks:
           - hook: web_hook
             config:
@@ -143,7 +142,7 @@ selfservice:
 
     registration:
       lifespan: 10m
-      ui_url: https://auth.${DOMAIN}/registration
+      ui_url: http://localhost:4433/registration
       after:
         password:
           hooks:
@@ -160,9 +159,9 @@ selfservice:
                     in: header
 
 log:
-  level: ${LOG_LEVEL:-info}
-  format: ${LOG_FORMAT:-json}
-  leak_sensitive_values: ${LOG_LEAK_SENSITIVE:-false}
+  level: debug
+  format: text
+  leak_sensitive_values: true
 
 ciphers:
   algorithm: xchacha20-poly1305
@@ -180,4 +179,4 @@ identity:
 
 courier:
   smtp:
-    connection_uri: ${SMTP_CONNECTION_URI}
+    connection_uri: smtps://test:test@mailhog:1025/?skip_ssl_verify=true

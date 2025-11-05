@@ -27,6 +27,16 @@ services:
       timeout: 5s
       retries: 5
 
+  atlas:
+    image: arigaio/atlas:latest
+    volumes:
+      - ./postgres:/work
+    working_dir: /work
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   redis:
     image: redis:8-alpine
     restart: always
@@ -46,7 +56,14 @@ services:
     cap_add:
       - IPC_LOCK
     healthcheck:
-      test: ["CMD", "vault", "status"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "--quiet",
+          "http://127.0.0.1:8200/v1/sys/health?standbyok=true",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,7 +73,7 @@ services:
     restart: always
     env_file: .env
     environment:
-      - DB=postgresql
+      - DB=postgres12
       - DB_PORT=5432
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PWD=${POSTGRES_PASSWORD}
@@ -64,6 +81,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   data:
     restart: always
@@ -125,9 +148,19 @@ services:
     depends_on:
       kratos-migrate:
         condition: service_completed_successfully
+    healthcheck:
+      test:
+        ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4433/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   keto-migrate:
     image: oryd/keto:v0.14.0
+    env_file: .env
+    environment:
+      - DSN=${KETO_DSN}
     command: migrate up -y
     depends_on:
       postgres:
@@ -136,6 +169,9 @@ services:
   keto:
     image: oryd/keto:v0.14.0
     restart: always
+    env_file: .env
+    environment:
+      - DSN=${KETO_DSN}
     command: serve
     depends_on:
       keto-migrate:

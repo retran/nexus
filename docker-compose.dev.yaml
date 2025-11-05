@@ -49,7 +49,7 @@ services:
       - "7233:7233"
 
   temporal-ui:
-    image: temporalio/ui:2.45.3
+    image: temporalio/ui:latest
     restart: always
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
@@ -154,7 +154,6 @@ services:
     environment:
       - SERVE_PUBLIC_CORS_ENABLED=true
       - SERVE_PUBLIC_CORS_ALLOWED_ORIGINS=http://nexus.local
-      - DSN=postgres://kratos:kratos@postgres:5432/kratos?sslmode=disable
     # Note: Kratos access via auth.nexus.local is routed through Oathkeeper (see access-rules.yml public:auth)
 
   kratos-ui:
@@ -170,15 +169,18 @@ services:
         condition: service_healthy
     # Note: This UI is served at auth.nexus.local via Kratos upstream (not separately routed)
 
+  keto-migrate:
+    volumes:
+      - ./ory/config:/etc/config/keto:ro
+    command: migrate up --config /etc/config/keto/keto.yml -y
+
   keto:
     ports:
       - "4466:4466"
       - "4467:4467"
     volumes:
       - ./ory/config:/etc/config/keto:ro
-    command: serve --config /etc/config/keto/keto.yml --dev
-    environment:
-      - DSN=postgres://keto:keto@postgres:5432/keto?sslmode=disable
+    command: serve --config /etc/config/keto/keto.yml
 
   oathkeeper:
     ports:
@@ -199,7 +201,7 @@ services:
 
   # Admin Tools (all authentication disabled - handled by Oathkeeper)
   adminer:
-    image: adminer:4.8.4
+    image: adminer:latest
     restart: always
     environment:
       - ADMINER_DEFAULT_SERVER=postgres
@@ -226,6 +228,7 @@ services:
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
+    platform: linux/amd64
     restart: always
     ports:
       - "1025:1025" # SMTP port (for sending test emails)

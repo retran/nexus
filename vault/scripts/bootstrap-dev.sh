@@ -4,7 +4,8 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "${SCRIPT_DIR}/../.." && pwd)
-COMPOSE_FILE="${REPO_ROOT}/docker-compose.dev.yaml"
+COMPOSE_FILE_BASE="${REPO_ROOT}/docker-compose.base.yaml"
+COMPOSE_FILE_DEV="${REPO_ROOT}/docker-compose.dev.yaml"
 STATE_DIR="${REPO_ROOT}/vault/.dev"
 VAULT_ADDR_IN_CONTAINER="http://127.0.0.1:8200"
 VAULT_SERVICE_NAME="vault"
@@ -27,9 +28,9 @@ fi
 
 compose() {
   if [ "${DOCKER_COMPOSE_BIN}" = "docker-compose" ]; then
-    docker-compose -f "${COMPOSE_FILE}" "$@"
+    docker-compose -f "${COMPOSE_FILE_BASE}" -f "${COMPOSE_FILE_DEV}" "$@"
   else
-    docker compose -f "${COMPOSE_FILE}" "$@"
+    docker compose -f "${COMPOSE_FILE_BASE}" -f "${COMPOSE_FILE_DEV}" "$@"
   fi
 }
 
@@ -83,50 +84,11 @@ if [ -z "${status_json}" ]; then
   exit 1
 fi
 
-initialized=$(echo "${status_json}" | jq -r '.initialized')
-sealed=$(echo "${status_json}" | jq -r '.sealed')
+# In dev mode, Vault is always initialized with token "root"
+# No need to check sealed/initialized status or perform init/unseal operations
+root_token="root"
 
-root_token_file="${STATE_DIR}/root-token"
-unseal_key_file="${STATE_DIR}/unseal-key"
-root_token=""
-unseal_key=""
-
-if [ "${initialized}" = "false" ]; then
-  echo "[INFO] Initializing Vault (1 key share, 1 key threshold)..."
-  init_json=$(vault_exec "" vault operator init -key-shares=1 -key-threshold=1 -format=json)
-  unseal_key=$(echo "${init_json}" | jq -r '.unseal_keys_b64[0]')
-  root_token=$(echo "${init_json}" | jq -r '.root_token')
-
-  printf "%s\n" "${unseal_key}" > "${unseal_key_file}"
-  printf "%s\n" "${root_token}" > "${root_token_file}"
-  chmod 600 "${unseal_key_file}" "${root_token_file}"
-
-  echo "[INFO] Vault initialized. Credentials written to vault/.dev"
-
-  echo "[INFO] Unsealing Vault..."
-  vault_exec "" vault operator unseal "${unseal_key}" >/dev/null
-else
-  if [ -f "${unseal_key_file}" ]; then
-    unseal_key=$(<"${unseal_key_file}")
-  fi
-  if [ -f "${root_token_file}" ]; then
-    root_token=$(<"${root_token_file}")
-  fi
-fi
-
-if [ "${sealed}" = "true" ]; then
-  if [ -z "${unseal_key}" ]; then
-    echo "[ERROR] Vault is sealed and no unseal key found at ${unseal_key_file}" >&2
-    exit 1
-  fi
-  echo "[INFO] Vault is sealed. Unsealing..."
-  vault_exec "" vault operator unseal "${unseal_key}" >/dev/null
-fi
-
-if [ -z "${root_token}" ]; then
-  echo "[ERROR] Root token not available. Expected at ${root_token_file}" >&2
-  exit 1
-fi
+echo "[INFO] Using dev mode token: root"
 
 echo "[INFO] Validating root token access..."
 vault_exec "${root_token}" vault token lookup >/dev/null
@@ -150,5 +112,4 @@ fi
 # For production setup with PKI/AppRole/Policies, run manually or see bootstrap-prod.sh
 
 echo "[SUCCESS] Vault dev bootstrap complete"
-echo "[INFO] Root token stored at ${root_token_file}"
-echo "[INFO] Access Vault UI at http://vault.nexus.local (token: root)"
+echo "[INFO] Access Vault UI at http://localhost:8200 (token: root)"

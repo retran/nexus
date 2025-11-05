@@ -274,26 +274,26 @@ tasks:
   seed:dev:
     desc: "Seed development data"
     silent: true
-    dir: "{{.ROOT_DIR}}/postgres"
+    dir: "{{.ROOT_DIR}}"
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Seeding development data...\n"
       - |
         docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec -T postgres \
-          psql -U admin nexus_db < seeds/dev.sql
+          psql -U admin nexus_db < postgres/seeds/dev.sql
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Development data seeded\n"
 
   seed:test:
     desc: "Seed test data"
     silent: true
-    dir: "{{.ROOT_DIR}}/postgres"
+    dir: "{{.ROOT_DIR}}"
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Seeding test data...\n"
       - |
         docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec -T postgres \
-          psql -U admin nexus_db < seeds/test.sql
+          psql -U admin nexus_db < postgres/seeds/test.sql
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Test data seeded\n"
 
