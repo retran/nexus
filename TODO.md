@@ -1,3 +1,7 @@
+- [ ] No hardcoded values in configs
+- [ ] Put infra components in infra folder
+- [ ] rename postgres to db
+
 # Nexus TO-DO
 
 ## Production (Mac Mini Deployment)
