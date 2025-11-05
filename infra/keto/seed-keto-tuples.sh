@@ -9,7 +9,7 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "${SCRIPT_DIR}/../.." && pwd)
-COMPOSE_FILE="${REPO_ROOT}/docker-compose.dev.yaml"
+COMPOSE_FILE="${REPO_ROOT}/docker-compose.yaml"
 
 if command -v docker-compose >/dev/null 2>&1; then
   DOCKER_COMPOSE_BIN="docker-compose"
@@ -32,7 +32,15 @@ keto_exec() {
   compose exec -T keto "$@"
 }
 
-echo "[INFO] Creating admin role..."
+echo "[INFO] Getting admin user ID from Kratos..."
+ADMIN_ID=$(curl -s http://localhost:4434/admin/identities | jq -r '.[] | select(.traits.email=="admin@nexus.local") | .id')
+
+if [ -z "$ADMIN_ID" ] || [ "$ADMIN_ID" = "null" ]; then
+  echo "[ERROR] Admin user not found in Kratos. Please run 'task infra:kratos:seed' first." >&2
+  exit 1
+fi
+
+echo "[INFO] Creating admin role for user: $ADMIN_ID..."
 keto_exec keto relation-tuple create \
   --insecure-disable-transport-security \
   /dev/stdin <<EOF
@@ -40,7 +48,7 @@ keto_exec keto relation-tuple create \
   "namespace": "Role",
   "object": "admin",
   "relation": "members",
-  "subject_id": "test-admin-user-id"
+  "subject_id": "$ADMIN_ID"
 }
 EOF
 

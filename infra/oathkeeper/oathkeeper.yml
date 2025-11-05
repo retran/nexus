@@ -18,7 +18,6 @@ serve:
       allowed_origins:
         - http://nexus.local
         - http://api.nexus.local
-        - http://graphql.nexus.local
         - http://auth.nexus.local
       allowed_methods:
         - POST
@@ -61,7 +60,7 @@ errors:
         verbose: true
 
 access_rules:
-  matching_strategy: glob
+  matching_strategy: regexp
   repositories:
     - file:///etc/config/oathkeeper/access-rules.yml
 

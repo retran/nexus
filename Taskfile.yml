@@ -23,6 +23,47 @@ tasks:
         msg: |
           .env.example file not found
 
+  hosts:setup:
+    desc: "Setup /etc/hosts entries for *.nexus.local domains"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Setting up /etc/hosts entries...\n"
+
+        HOSTS_ENTRY="127.0.0.1 nexus.local api.nexus.local auth.nexus.local adminer.nexus.local redis.nexus.local mail.nexus.local temporal.nexus.local traefik.nexus.local"
+
+        if grep -q "nexus.local" /etc/hosts; then
+          printf "{{.YELLOW}}[INFO]{{.NC}} nexus.local entries already exist in /etc/hosts\n"
+          printf "{{.YELLOW}}[INFO]{{.NC}} Current entries:\n"
+          grep "nexus.local" /etc/hosts | sed 's/^/  /'
+          printf "\n{{.YELLOW}}[INFO]{{.NC}} To update, remove old entries and run this task again\n"
+        else
+          printf "{{.BLUE}}[INFO]{{.NC}} Adding nexus.local entries to /etc/hosts...\n"
+          printf "\n# Nexus Development Environment\n%s\n" "$HOSTS_ENTRY" | sudo tee -a /etc/hosts > /dev/null
+          printf "{{.GREEN}}[OK]{{.NC}} Successfully added entries to /etc/hosts\n"
+        fi
+
+        printf "\n{{.BLUE}}[INFO]{{.NC}} Verifying entries:\n"
+        grep "nexus.local" /etc/hosts | sed 's/^/  /'
+        printf "\n"
+
+  hosts:remove:
+    desc: "Remove /etc/hosts entries for *.nexus.local domains"
+    silent: true
+    prompt: "This will remove all nexus.local entries from /etc/hosts. Continue?"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing nexus.local entries from /etc/hosts...\n"
+
+        if grep -q "nexus.local" /etc/hosts; then
+          sudo sed -i.bak '/nexus.local/d' /etc/hosts
+          sudo sed -i.bak '/# Nexus Development Environment/d' /etc/hosts
+          printf "{{.GREEN}}[OK]{{.NC}} Successfully removed entries from /etc/hosts\n"
+          printf "{{.YELLOW}}[INFO]{{.NC}} Backup saved to /etc/hosts.bak\n"
+        else
+          printf "{{.YELLOW}}[INFO]{{.NC}} No nexus.local entries found in /etc/hosts\n"
+        fi
+
   # === Development Bootstrap ===
 
   bootstrap:dev:
@@ -366,20 +407,80 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Checking status of all services...\n"
       - docker compose ps
 
+  wait:
+    desc: "Wait for all services to be healthy"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Waiting for all services to be healthy...\n"
+        printf "This may take a few minutes...\n\n"
+
+        # Wait for critical infrastructure
+        printf "{{.BLUE}}[INFO]{{.NC}} Waiting for infrastructure...\n"
+        docker compose up -d postgres redis vault temporal
+
+        max_wait=180
+        elapsed=0
+        while [ $elapsed -lt $max_wait ]; do
+          healthy=$(docker compose ps --format json | jq -r 'select(.Service=="postgres" or .Service=="redis" or .Service=="vault" or .Service=="temporal") | select(.Health=="healthy") | .Service' | wc -l | tr -d ' ')
+          if [ "$healthy" = "4" ]; then
+            printf "{{.GREEN}}[OK]{{.NC}} Infrastructure is healthy\n"
+            break
+          fi
+          printf "."
+          sleep 2
+          elapsed=$((elapsed + 2))
+        done
+
+        if [ $elapsed -ge $max_wait ]; then
+          printf "\n{{.RED}}[ERROR]{{.NC}} Timeout waiting for infrastructure\n"
+          exit 1
+        fi
+
+        # Wait for Ory stack
+        printf "\n{{.BLUE}}[INFO]{{.NC}} Waiting for Ory stack...\n"
+        docker compose up -d kratos keto oathkeeper
+
+        elapsed=0
+        while [ $elapsed -lt $max_wait ]; do
+          healthy=$(docker compose ps --format json | jq -r 'select(.Service=="kratos" or .Service=="keto" or .Service=="oathkeeper") | select(.Health=="healthy") | .Service' | wc -l | tr -d ' ')
+          if [ "$healthy" = "3" ]; then
+            printf "{{.GREEN}}[OK]{{.NC}} Ory stack is healthy\n"
+            break
+          fi
+          printf "."
+          sleep 2
+          elapsed=$((elapsed + 2))
+        done
+
+        if [ $elapsed -ge $max_wait ]; then
+          printf "\n{{.RED}}[ERROR]{{.NC}} Timeout waiting for Ory stack\n"
+          exit 1
+        fi
+
+        printf "\n{{.GREEN}}[OK]{{.NC}} All critical services are healthy\n"
+
   health:
     desc: "Check health of all services"
     silent: true
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Checking health of all services...\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} PostgreSQL...\n"
-        docker compose exec postgres pg_isready -U admin || printf "{{.RED}}[ERROR]{{.NC}} PostgreSQL not ready\n"
-        printf "{{.BLUE}}[INFO]{{.NC}} Redis...\n"
-        docker compose exec redis redis-cli ping || printf "{{.RED}}[ERROR]{{.NC}} Redis not ready\n"
-        printf "{{.BLUE}}[INFO]{{.NC}} Vault...\n"
-        docker compose exec vault vault status || printf "{{.RED}}[ERROR]{{.NC}} Vault not ready\n"
-        printf "{{.GREEN}}[OK]{{.NC}} Health check complete\n"
+        printf "\n"
+
+        printf "{{.BLUE}}Infrastructure:{{.NC}}\n"
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(traefik|postgres|redis|vault|temporal|kratos|keto|oathkeeper)" || true
+
+        printf "\n{{.BLUE}}Backend Services:{{.NC}}\n"
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(data|gateway|system|worker)" || true
+
+        printf "\n{{.BLUE}}Frontend:{{.NC}}\n"
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep frontend || true
+
+        printf "\n{{.BLUE}}Admin Tools:{{.NC}}\n"
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(adminer|redis-commander|mailhog|kratos-ui|temporal-ui)" || true
+
+        printf "\n{{.GREEN}}[OK]{{.NC}} Health check complete\n"
 
   # === Help & Documentation ===
 

@@ -1,6 +1,6 @@
 - [ ] No hardcoded values in configs
-- [ ] add health checks for everything
 - [ ] local configs for dev tools and proper local taskfiles
+- [ ] destroy working strange = [ ] use hosts of health checks instead of IP
 - [ ] observability stack
 - [ ] tooling stack (review)
 

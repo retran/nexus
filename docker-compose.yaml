@@ -13,11 +13,17 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
+      - "--ping=true"
     ports:
       - "80:80"
       - "8888:8080" # Dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   postgres:
     image: postgres:18-alpine
@@ -113,12 +119,19 @@ services:
   temporal-ui:
     image: temporalio/ui:latest
     restart: always
+    ports:
+      - "8088:8080"
     environment:
       - TEMPORAL_ADDRESS=temporal:7233
       - TEMPORAL_CORS_ORIGINS=http://localhost:3000
     depends_on:
       temporal:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   data:
     build:
@@ -143,6 +156,12 @@ services:
         condition: service_healthy
       vault:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8081"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   gateway:
     build:
@@ -165,6 +184,12 @@ services:
     depends_on:
       vault:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   system:
     build:
@@ -182,6 +207,7 @@ services:
     environment:
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
+      - SERVER_PORT=8082
       - AIR_PROXY_PORT=8082
       - AIR_BUILD_DIR=/app/tmp
       - KRATOS_WEBHOOK_SECRET=${KRATOS_WEBHOOK_SECRET}
@@ -190,6 +216,12 @@ services:
         condition: service_healthy
       vault:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   worker:
     build:
@@ -219,7 +251,7 @@ services:
       dockerfile: Dockerfile.dev
     restart: always
     ports:
-      - "5173:5173" # Vite HMR
+      - "5173:3000" # Refine dev server
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -227,6 +259,12 @@ services:
     environment:
       - VITE_API_URL=http://api.nexus.local
       - VITE_AUTH_URL=http://auth.nexus.local
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   kratos-migrate:
     image: oryd/kratos:v1.3.1
@@ -251,9 +289,39 @@ services:
       - DSN=${DSN}
       - SECRETS_COOKIE=${KRATOS_COOKIE_SECRET}
       - SECRETS_CIPHER=${KRATOS_CIPHER_SECRET}
+      # Public API URLs and CORS
+      - SERVE_PUBLIC_BASE_URL=${KRATOS_PUBLIC_BASE_URL}
       - SERVE_PUBLIC_CORS_ENABLED=true
-      - SERVE_PUBLIC_CORS_ALLOWED_ORIGINS=http://nexus.local
-      - KRATOS_WEBHOOK_SECRET=${KRATOS_WEBHOOK_SECRET}
+      - SERVE_PUBLIC_CORS_ALLOWED_ORIGINS=${KRATOS_CORS_ALLOWED_ORIGINS}
+      # Selfservice URLs
+      - SELFSERVICE_DEFAULT_BROWSER_RETURN_URL=${KRATOS_DEFAULT_BROWSER_RETURN_URL}
+      - SELFSERVICE_ALLOWED_RETURN_URLS=${KRATOS_ALLOWED_RETURN_URLS}
+      # UI URLs for flows
+      - SELFSERVICE_FLOWS_ERROR_UI_URL=${KRATOS_ERROR_UI_URL}
+      - SELFSERVICE_FLOWS_SETTINGS_UI_URL=${KRATOS_SETTINGS_UI_URL}
+      - SELFSERVICE_FLOWS_RECOVERY_UI_URL=${KRATOS_RECOVERY_UI_URL}
+      - SELFSERVICE_FLOWS_VERIFICATION_UI_URL=${KRATOS_VERIFICATION_UI_URL}
+      - SELFSERVICE_FLOWS_LOGIN_UI_URL=${KRATOS_LOGIN_UI_URL}
+      - SELFSERVICE_FLOWS_REGISTRATION_UI_URL=${KRATOS_REGISTRATION_UI_URL}
+      - SELFSERVICE_FLOWS_LOGOUT_AFTER_DEFAULT_BROWSER_RETURN_URL=${KRATOS_LOGOUT_AFTER_RETURN_URL}
+      - SELFSERVICE_FLOWS_VERIFICATION_AFTER_DEFAULT_BROWSER_RETURN_URL=${KRATOS_VERIFICATION_AFTER_RETURN_URL}
+      - SELFSERVICE_FLOWS_LOGIN_AFTER_DEFAULT_BROWSER_RETURN_URL=${KRATOS_LOGIN_AFTER_RETURN_URL}
+      # Google OIDC provider credentials
+      - SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_ID=${KRATOS_GOOGLE_CLIENT_ID}
+      - SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_SECRET=${KRATOS_GOOGLE_CLIENT_SECRET}
+      # Webhook URLs
+      - SELFSERVICE_FLOWS_LOGIN_AFTER_HOOKS_0_CONFIG_URL=${KRATOS_WEBHOOK_LOGIN_URL}
+      - SELFSERVICE_FLOWS_LOGIN_AFTER_OIDC_HOOKS_0_CONFIG_URL=${KRATOS_WEBHOOK_LOGIN_URL}
+      - SELFSERVICE_FLOWS_REGISTRATION_AFTER_PASSWORD_HOOKS_0_CONFIG_URL=${KRATOS_WEBHOOK_REGISTRATION_URL}
+      # Webhook secrets
+      - SELFSERVICE_FLOWS_LOGIN_AFTER_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE=${KRATOS_WEBHOOK_SECRET}
+      - SELFSERVICE_FLOWS_LOGIN_AFTER_OIDC_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE=${KRATOS_WEBHOOK_SECRET}
+      - SELFSERVICE_FLOWS_REGISTRATION_AFTER_PASSWORD_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE=${KRATOS_WEBHOOK_SECRET}
+      # Courier/SMTP
+      - COURIER_SMTP_CONNECTION_URI=${KRATOS_COURIER_SMTP_URI}
+      # Logging
+      - LOG_LEVEL=${KRATOS_LOG_LEVEL}
+      - LOG_LEAK_SENSITIVE_VALUES=${KRATOS_LOG_LEAK_SENSITIVE}
     command: serve -c /etc/config/kratos/kratos.yml --watch-courier --dev
     depends_on:
       kratos-migrate:
@@ -271,16 +339,24 @@ services:
     restart: always
     env_file: .env
     environment:
-      - KRATOS_PUBLIC_URL=http://auth.nexus.local
-      - KRATOS_BROWSER_URL=http://auth.nexus.local
+      - KRATOS_PUBLIC_URL=${KRATOS_UI_PUBLIC_URL}
+      - KRATOS_BROWSER_URL=${KRATOS_UI_BROWSER_URL}
       - PORT=4455
       - SECURITY_MODE=cookie
-      - COOKIE_SECRET=${COOKIE_SECRET}
-      - CSRF_COOKIE_NAME=${CSRF_COOKIE_NAME}
-      - CSRF_COOKIE_SECRET=${CSRF_COOKIE_SECRET}
+      - COOKIE_SECRET=${KRATOS_UI_COOKIE_SECRET}
+      - CSRF_COOKIE_NAME=${KRATOS_UI_CSRF_COOKIE_NAME}
+      - CSRF_COOKIE_SECRET=${KRATOS_UI_CSRF_COOKIE_SECRET}
+    extra_hosts:
+      - "auth.nexus.local:host-gateway"
     depends_on:
       kratos:
         condition: service_healthy
+    healthcheck:
+      test:
+        ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4455/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   keto-migrate:
     image: oryd/keto:v0.14.0
@@ -309,6 +385,13 @@ services:
     depends_on:
       keto-migrate:
         condition: service_completed_successfully
+    healthcheck:
+      test:
+        ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4467/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   oathkeeper:
     image: oryd/oathkeeper:v0.40.9
@@ -323,27 +406,49 @@ services:
       - LOG_LEVEL=debug
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.oathkeeper.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.nexus.local`)"
+      - "traefik.http.routers.oathkeeper.rule=HostRegexp(`^[a-z0-9-]+\\.nexus\\.local$`)"
       - "traefik.http.routers.oathkeeper.entrypoints=web"
-      - "traefik.http.routers.oathkeeper.priority=1"
+      - "traefik.http.routers.oathkeeper.priority=100"
       - "traefik.http.services.oathkeeper.loadbalancer.server.port=4455"
     depends_on:
       kratos:
         condition: service_started
+    healthcheck:
+      test:
+        ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4456/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   adminer:
     image: adminer:latest
     restart: always
+    ports:
+      - "8089:8080"
     environment:
       - ADMINER_DEFAULT_SERVER=postgres
       - ADMINER_DESIGN=pepa-linha-dark
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "php",
+          "-r",
+          "exit(file_get_contents('http://localhost:8080') ? 0 : 1);",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   redis-commander:
     image: ghcr.io/joeferner/redis-commander:latest
     restart: always
+    ports:
+      - "8087:8081"
     environment:
       - REDIS_HOSTS=local:redis:6379:0:${REDIS_PASSWORD}
       - HTTP_USER=
@@ -351,6 +456,11 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8081"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
@@ -361,6 +471,11 @@ services:
       - "8025:8025" # Web UI
     environment:
       - MH_AUTH_FILE=
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8025"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
 volumes:
   postgres_data:

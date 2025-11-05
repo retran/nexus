@@ -33,8 +33,24 @@ tasks:
       - task: temporal:up
       - task: vault:bootstrap:dev
       - task: kratos:migrate
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Kratos, Keto, Oathkeeper...\n"
+      - docker compose up -d kratos keto oathkeeper
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Waiting for Ory services to be healthy...\n"
+      - |
+        max_wait=60
+        elapsed=0
+        while [ $elapsed -lt $max_wait ]; do
+          kratos_healthy=$(docker compose ps kratos --format json | jq -r 'select(.Health=="healthy") | .Service' | wc -l | tr -d ' ')
+          keto_healthy=$(docker compose ps keto --format json | jq -r 'select(.Health=="healthy") | .Service' | wc -l | tr -d ' ')
+          if [ "$kratos_healthy" = "1" ] && [ "$keto_healthy" = "1" ]; then
+            break
+          fi
+          sleep 2
+          elapsed=$((elapsed + 2))
+        done
       - task: kratos:seed
-      - task: keto:migrate
       - task: keto:seed
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Infrastructure bootstrap complete\n"
@@ -165,8 +181,9 @@ tasks:
       - |
         for seed in seeds/*.json; do
           printf "  - Importing $(basename $seed)...\n"
-          docker compose -f ../../docker-compose.yaml exec -T kratos \
-            kratos identities create --endpoint http://localhost:4434 < "$seed" 2>/dev/null || true
+          curl -s -X POST http://localhost:4434/admin/identities \
+            -H "Content-Type: application/json" \
+            -d @"$seed" > /dev/null 2>&1 || true
         done
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Kratos seeding complete\n"

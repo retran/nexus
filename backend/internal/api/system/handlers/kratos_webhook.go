@@ -38,21 +38,15 @@ func NewKratosWebhookHandler(temporalClient temporalclient.Client, taskQueue, we
 
 // KratosWebhookPayload represents the payload from Kratos webhooks.
 type KratosWebhookPayload struct {
-	Identity struct {
-		ID     string `json:"id"`
-		Traits struct {
-			Email string `json:"email"`
-			Name  struct {
-				First string `json:"first"`
-				Last  string `json:"last"`
-			} `json:"name"`
-			Role string `json:"role"`
-		} `json:"traits"`
-	} `json:"identity"`
-	Flow struct {
-		Type string `json:"type"` // "login" or "registration"
-		ID   string `json:"id"`
-	} `json:"flow"`
+	IdentityID string `json:"identity_id"`
+	Email      string `json:"email"`
+	Name       struct {
+		First string `json:"first"`
+		Last  string `json:"last"`
+	} `json:"name"`
+	Picture  string `json:"picture"`
+	FlowType string `json:"flow_type"`
+	FlowID   string `json:"flow_id"`
 }
 
 // HandleRegistration handles user registration webhooks from Kratos.
@@ -117,7 +111,7 @@ func (h *KratosWebhookHandler) logAuditEvent(ctx context.Context, eventType stri
 		return errors.New("temporal client not configured")
 	}
 
-	workflowID := fmt.Sprintf("audit-%s-%s-%d", eventType, payload.Identity.ID, time.Now().Unix())
+	workflowID := fmt.Sprintf("audit-%s-%s-%d", eventType, payload.IdentityID, time.Now().Unix())
 
 	workflowOptions := temporalclient.StartWorkflowOptions{
 		ID:        workflowID,
@@ -125,7 +119,7 @@ func (h *KratosWebhookHandler) logAuditEvent(ctx context.Context, eventType stri
 	}
 
 	// Parse Kratos identity ID to UUID
-	identityID, err := uuid.Parse(payload.Identity.ID)
+	identityID, err := uuid.Parse(payload.IdentityID)
 	if err != nil {
 		return fmt.Errorf("parse identity ID: %w", err)
 	}
@@ -136,11 +130,12 @@ func (h *KratosWebhookHandler) logAuditEvent(ctx context.Context, eventType stri
 		EventType: eventType,
 		Source:    "kratos",
 		Metadata: map[string]interface{}{
-			"identity_id": payload.Identity.ID,
-			"email":       payload.Identity.Traits.Email,
-			"role":        payload.Identity.Traits.Role,
-			"flow_id":     payload.Flow.ID,
-			"flow_type":   payload.Flow.Type,
+			"identity_id": payload.IdentityID,
+			"email":       payload.Email,
+			"name":        payload.Name,
+			"picture":     payload.Picture,
+			"flow_id":     payload.FlowID,
+			"flow_type":   payload.FlowType,
 		},
 	}
 

@@ -10,15 +10,11 @@ dsn: ${DSN}
 
 serve:
   public:
-    base_url: http://localhost:4433 # Dev: local access; Prod: will use actual domain via env
+    # All public server config set via env vars:
+    # - SERVE_PUBLIC_BASE_URL
+    # - SERVE_PUBLIC_CORS_ENABLED
+    # - SERVE_PUBLIC_CORS_ALLOWED_ORIGINS
     cors:
-      enabled: true
-      allowed_origins:
-        - http://localhost:3000
-        - http://localhost:8001
-        - http://localhost:8002
-        - http://localhost:8003
-        - http://localhost:4433
       allowed_methods:
         - POST
         - GET
@@ -34,15 +30,15 @@ serve:
         - Set-Cookie
       allow_credentials: true
   admin:
-    base_url: http://localhost:4434 # Dev: no TLS for admin API
+    base_url: http://localhost:4434
 
 selfservice:
-  default_browser_return_url: http://localhost:3000/
+  # URLs overridden by env vars:
+  # - SELFSERVICE_DEFAULT_BROWSER_RETURN_URL
+  # - SELFSERVICE_ALLOWED_RETURN_URLS
+  default_browser_return_url: "http://localhost"
   allowed_return_urls:
-    - http://localhost:3000
-    - http://localhost:8001
-    - http://localhost:8002
-    - http://localhost:8003
+    - "http://localhost"
 
   methods:
     password:
@@ -67,8 +63,8 @@ selfservice:
         providers:
           - id: google
             provider: google
-            client_id: ${GOOGLE_CLIENT_ID}
-            client_secret: ${GOOGLE_CLIENT_SECRET}
+            client_id: "" # Overridden by SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_ID env var
+            client_secret: "" # Overridden by SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_SECRET env var
             mapper_url: file:///etc/config/kratos/oidc.google.jsonnet
             scope:
               - email
@@ -85,83 +81,84 @@ selfservice:
                 hd: null
 
   flows:
+    # All ui_url and URL values overridden by env vars
     error:
-      ui_url: http://localhost:4433/error
+      ui_url: "http://localhost" # Overridden by SELFSERVICE_FLOWS_ERROR_UI_URL
 
     settings:
-      ui_url: http://localhost:4433/settings
+      ui_url: "http://localhost" # Overridden by SELFSERVICE_FLOWS_SETTINGS_UI_URL
       privileged_session_max_age: 15m
       required_aal: highest_available
 
     recovery:
       enabled: true
-      ui_url: http://localhost:4433/recovery
+      ui_url: "http://localhost" # Overridden by SELFSERVICE_FLOWS_RECOVERY_UI_URL
       use: code
 
     verification:
       enabled: true
-      ui_url: http://localhost:4433/verification
+      ui_url: "http://localhost" # Overridden by SELFSERVICE_FLOWS_VERIFICATION_UI_URL
       use: code
-      after:
-        default_browser_return_url: http://localhost:3000/
+      # after.default_browser_return_url overridden by SELFSERVICE_FLOWS_VERIFICATION_AFTER_DEFAULT_BROWSER_RETURN_URL
 
     logout:
-      after:
-        default_browser_return_url: http://localhost:4433/login
+      # after.default_browser_return_url overridden by SELFSERVICE_FLOWS_LOGOUT_AFTER_DEFAULT_BROWSER_RETURN_URL
+      after: {}
 
     login:
-      ui_url: http://localhost:4433/login
+      ui_url: "http://localhost" # Overridden by SELFSERVICE_FLOWS_LOGIN_UI_URL
       lifespan: 10m
       after:
-        default_browser_return_url: http://localhost:3000/
+        # default_browser_return_url overridden by SELFSERVICE_FLOWS_LOGIN_AFTER_DEFAULT_BROWSER_RETURN_URL
         hooks:
           - hook: web_hook
             config:
-              url: http://system:8083/webhooks/kratos/login
+              url: "http://localhost" # Overridden by SELFSERVICE_FLOWS_LOGIN_AFTER_HOOKS_0_CONFIG_URL
               method: POST
               body: file:///etc/config/kratos/webhook.jsonnet
               auth:
                 type: api_key
                 config:
                   name: X-Webhook-Secret
-                  value: ${KRATOS_WEBHOOK_SECRET}
+                  value: "" # Overridden by SELFSERVICE_FLOWS_LOGIN_AFTER_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE
                   in: header
         oidc:
           hooks:
             - hook: web_hook
               config:
-                url: http://system:8083/webhooks/kratos/login
+                url: "http://localhost" # Overridden by SELFSERVICE_FLOWS_LOGIN_AFTER_OIDC_HOOKS_0_CONFIG_URL
                 method: POST
                 body: file:///etc/config/kratos/webhook.jsonnet
                 auth:
                   type: api_key
                   config:
                     name: X-Webhook-Secret
-                    value: ${KRATOS_WEBHOOK_SECRET}
+                    value: "" # Overridden by SELFSERVICE_FLOWS_LOGIN_AFTER_OIDC_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE
                     in: header
 
     registration:
       lifespan: 10m
-      ui_url: http://localhost:4433/registration
+      ui_url: "http://localhost" # Overridden by SELFSERVICE_FLOWS_REGISTRATION_UI_URL
       after:
         password:
           hooks:
             - hook: web_hook
               config:
-                url: http://system:8083/webhooks/kratos/registration
+                url: "http://localhost" # Overridden by SELFSERVICE_FLOWS_REGISTRATION_AFTER_PASSWORD_HOOKS_0_CONFIG_URL
                 method: POST
                 body: file:///etc/config/kratos/webhook.jsonnet
                 auth:
                   type: api_key
                   config:
                     name: X-Webhook-Secret
-                    value: ${KRATOS_WEBHOOK_SECRET}
+                    value: "" # Overridden by SELFSERVICE_FLOWS_REGISTRATION_AFTER_PASSWORD_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE
                     in: header
 
 log:
-  level: debug
+  # level and leak_sensitive_values overridden by env vars:
+  # - LOG_LEVEL
+  # - LOG_LEAK_SENSITIVE_VALUES
   format: text
-  leak_sensitive_values: true
 
 ciphers:
   algorithm: xchacha20-poly1305
@@ -169,7 +166,7 @@ ciphers:
 hashers:
   algorithm: bcrypt
   bcrypt:
-    cost: 8
+    cost: 8 # For prod use 12+
 
 identity:
   default_schema_id: default
@@ -178,5 +175,5 @@ identity:
       url: file:///etc/config/kratos/identity.schema.json
 
 courier:
-  smtp:
-    connection_uri: smtps://test:test@mailhog:1025/?skip_ssl_verify=true
+  # smtp.connection_uri overridden by COURIER_SMTP_CONNECTION_URI env var
+  smtp: {}
