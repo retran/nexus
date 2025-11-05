@@ -42,20 +42,18 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Step 2/7: PostgreSQL (migrations + seeds)...\n"
       - task: db:bootstrap:dev
+      # Infrastructure bootstrap includes Vault and Ory (Kratos, Keto)
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 3/7: Vault (dev mode, shared secrets only)...\n"
-      - task: vault:bootstrap:dev
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 5/7: Infrastructure tooling dependencies...\n"
+      - task: infra:deps:install
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 4/7: Ory stack (Kratos + Keto + seeds)...\n"
-      - task: ory:bootstrap:dev
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 5/7: Backend dependencies...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 6/7: Backend dependencies...\n"
       - task: backend:deps:install
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 6/7: Frontend dependencies...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 7/7: Frontend dependencies...\n"
       - task: frontend:deps:install
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 7/7: Starting all application services...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 8/8: Starting all application services...\n"
       - docker compose up -d
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Nexus development environment ready!\n"
@@ -115,10 +113,10 @@ tasks:
       - task: db:migrate:up
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Kratos migrations...\n"
-      - task: ory:kratos:migrate
+      - task: infra:kratos:migrate
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Keto migrations...\n"
-      - task: ory:keto:migrate
+      - task: infra:keto:migrate
       - |
         printf "{{.GREEN}}[OK]{{.NC}} All migrations complete\n"
 
@@ -165,8 +163,11 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} PostgreSQL migrations (Atlas)...\n"
       - task: db:validate
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Ory configs (Kratos, Keto, Oathkeeper)...\n"
-      - task: ory:validate
+        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (YAML/JSON)...\n"
+      - task: infra:lint
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Ory configs (Kratos, Oathkeeper)...\n"
+      - task: infra:validate
       - |
         printf "{{.GREEN}}[OK]{{.NC}} All linting and validation complete\n"
 
@@ -185,6 +186,9 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff --fix)...\n"
       - task: db:lint:fix
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (Prettier)...\n"
+      - task: infra:lint:fix
       - |
         printf "{{.GREEN}}[OK]{{.NC}} All auto-fixes applied\n"
 
@@ -206,6 +210,9 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
       - task: db:fmt
       - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (Prettier)...\n"
+      - task: infra:fmt
+      - |
         printf "{{.GREEN}}[OK]{{.NC}} All code formatted\n"
 
   fmt:check:
@@ -220,6 +227,9 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
       - task: db:fmt:check
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (Prettier)...\n"
+      - task: infra:fmt:check
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Code formatting check complete\n"
 
@@ -293,20 +303,8 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} PostgreSQL (Atlas migrations)...\n"
       - task: db:validate
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Kratos config...\n"
-      - task: ory:kratos:validate
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Keto config...\n"
-      - task: ory:keto:validate
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Keto namespaces...\n"
-      - task: ory:keto:validate:namespaces
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Oathkeeper config...\n"
-      - task: ory:oathkeeper:validate
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Oathkeeper rules...\n"
-      - task: ory:oathkeeper:rules:validate
+        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs...\n"
+      - task: infra:validate
       - |
         printf "{{.GREEN}}[OK]{{.NC}} All validations passed\n"
 
@@ -400,16 +398,6 @@ tasks:
     cmds:
       - task -t db/Taskfile.yml -l
 
-  help:ory:
-    desc: "Show Ory stack component commands"
-    cmds:
-      - task -t ory/Taskfile.yml -l
-
-  help:vault:
-    desc: "Show Vault component commands"
-    cmds:
-      - task -t vault/Taskfile.yml -l
-
   help:infra:
     desc: "Show infrastructure component commands"
     cmds:
@@ -454,9 +442,7 @@ tasks:
         printf "  task help:backend     - Backend commands (Go services)\n"
         printf "  task help:frontend    - Frontend commands (React/Vite)\n"
         printf "  task help:db          - Database commands (migrations, SQL)\n"
-        printf "  task help:ory         - Ory stack commands (Kratos, Keto, Oathkeeper)\n"
-        printf "  task help:vault       - Vault commands (secrets storage)\n"
-        printf "  task help:infra       - Infrastructure commands (Redis, Temporal, Traefik)\n"
+        printf "  task help:infra       - Infrastructure commands (Redis, Temporal, Vault, Ory stack)\n"
         printf "\n"
         printf "{{.BLUE}}═══════════════════════════════════════════════════════════════{{.NC}}\n"
         printf "\n"
@@ -471,12 +457,6 @@ includes:
   db:
     taskfile: ./db/Taskfile.yml
     dir: ./db
-  ory:
-    taskfile: ./ory/Taskfile.yml
-    dir: ./ory
-  vault:
-    taskfile: ./vault/Taskfile.yml
-    dir: ./vault
   infra:
     taskfile: ./infra/Taskfile.yml
     dir: ./infra

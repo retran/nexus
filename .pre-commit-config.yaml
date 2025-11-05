@@ -106,12 +106,20 @@ repos:
         files: ^db/migrations/.*\.sql$
         pass_filenames: false
 
+      - id: infra-prettier
+        name: Prettier (infrastructure configs)
+        entry: bash -c 'cd infra && npx prettier --write "**/*.{yml,yaml,json,ts}" --ignore-path .prettierignore'
+        language: system
+        files: ^infra/.*\.(yml|yaml|json|ts)$
+        exclude: ^infra/.*\.jsonnet$
+        pass_filenames: false
+
       - id: repo-prettier
         name: Prettier (repo-wide)
         entry: npx prettier --write
         language: system
         files: ^(.*\.(md|ya?ml|json))|(\.github/.*\.(md|ya?ml))|(docs/.*\.md)$
-        exclude: ^(frontend/|backend/|db/)
+        exclude: ^(frontend/|backend/|db/|infra/)
 
   - repo: https://github.com/hadolint/hadolint
     rev: v2.12.0

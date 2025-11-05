@@ -26,7 +26,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./ory/scripts/init-kratos-db.sh:/docker-entrypoint-initdb.d/init-kratos-db.sh
+      - ./infra/kratos/init-kratos-db.sh:/docker-entrypoint-initdb.d/init-kratos-db.sh
     env_file: .env
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -245,7 +245,7 @@ services:
       - "4433:4433"
       - "4434:4434" # Admin API
     volumes:
-      - ./ory/config:/etc/config/kratos:ro
+      - ./infra/kratos:/etc/config/kratos:ro
     env_file: .env
     environment:
       - DSN=${DSN}
@@ -285,7 +285,7 @@ services:
   keto-migrate:
     image: oryd/keto:v0.14.0
     volumes:
-      - ./ory/config:/etc/config/keto:ro
+      - ./infra/keto:/etc/config/keto:ro
     env_file: .env
     environment:
       - DSN=${KETO_DSN}
@@ -301,7 +301,7 @@ services:
       - "4466:4466"
       - "4467:4467"
     volumes:
-      - ./ory/config:/etc/config/keto:ro
+      - ./infra/keto:/etc/config/keto:ro
     env_file: .env
     environment:
       - DSN=${KETO_DSN}
@@ -317,7 +317,7 @@ services:
       - "4455:4455"
       - "4456:4456" # Admin API
     volumes:
-      - ./ory/config:/etc/config/oathkeeper:ro
+      - ./infra/oathkeeper:/etc/config/oathkeeper:ro
     command: serve --config /etc/config/oathkeeper/oathkeeper.yml
     environment:
       - LOG_LEVEL=debug

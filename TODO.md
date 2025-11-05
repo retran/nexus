@@ -1,7 +1,8 @@
 - [ ] No hardcoded values in configs
-- [ ] Put infra components in infra folder
 - [ ] add health checks for everything
-- [ ] local configs for dev tools
+- [ ] local configs for dev tools and proper local taskfiles
+- [ ] observability stack
+- [ ] tooling stack (review)
 
 # Nexus TO-DO
 

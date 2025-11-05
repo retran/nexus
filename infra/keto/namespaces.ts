@@ -8,16 +8,16 @@ class User implements Namespace {}
 
 class Role implements Namespace {
   related: {
-    members: User[]
-  }
+    members: User[];
+  };
 }
 
 class Resource implements Namespace {
   related: {
-    viewers: (User | SubjectSet<Role, "members">)[]
-    editors: (User | SubjectSet<Role, "members">)[]
-    admins: (User | SubjectSet<Role, "members">)[]
-  }
+    viewers: (User | SubjectSet<Role, 'members'>)[];
+    editors: (User | SubjectSet<Role, 'members'>)[];
+    admins: (User | SubjectSet<Role, 'members'>)[];
+  };
 
   permits = {
     view: (ctx: Context): boolean =>
@@ -30,6 +30,6 @@ class Resource implements Namespace {
       this.related.admins.includes(ctx.subject),
 
     delete: (ctx: Context): boolean =>
-      this.related.admins.includes(ctx.subject)
-  }
+      this.related.admins.includes(ctx.subject),
+  };
 }

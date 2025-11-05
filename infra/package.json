@@ -1,0 +1,17 @@
+{
+  "name": "@nexus/infra",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Infrastructure configuration and tooling for Nexus",
+  "license": "Apache-2.0",
+  "scripts": {
+    "lint": "prettier --check '**/*.{yml,yaml,json,jsonnet,ts}'",
+    "lint:fix": "prettier --write '**/*.{yml,yaml,json,jsonnet,ts}'",
+    "fmt": "prettier --write '**/*.{yml,yaml,json,jsonnet,ts}'",
+    "fmt:check": "prettier --check '**/*.{yml,yaml,json,jsonnet,ts}'"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.1",
+    "prettier-plugin-organize-imports": "^4.1.0"
+  }
+}
