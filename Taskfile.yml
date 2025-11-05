@@ -455,7 +455,7 @@ tasks:
         printf "  task help:frontend    - Frontend commands (React/Vite)\n"
         printf "  task help:postgres    - PostgreSQL commands (migrations, SQL)\n"
         printf "  task help:ory         - Ory stack commands (Kratos, Keto, Oathkeeper)\n"
-        printf "  task help:vault       - Vault commands (secrets, PKI)\n"
+        printf "  task help:vault       - Vault commands (secrets storage)\n"
         printf "  task help:infra       - Infrastructure commands (Redis, Temporal, Traefik)\n"
         printf "\n"
         printf "{{.BLUE}}═══════════════════════════════════════════════════════════════{{.NC}}\n"

@@ -6,45 +6,32 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/retran/nexus/backend/internal/api/gateway"
+	"github.com/retran/nexus/backend/internal/config"
 )
 
 func main() {
 	cfg := gateway.Config{
-		Port:                8080,
-		Host:                "0.0.0.0",
-		ReadTimeout:         10 * time.Second,
-		WriteTimeout:        10 * time.Second,
-		ShutdownTimeout:     30 * time.Second,
-		GraphQLEndpoint:     getEnv("GRAPHQL_ENDPOINT", "http://localhost:8081/graphql"),
-		AllowedOrigins:      getAllowedOrigins(),
-		DatabaseURL:         getDatabaseURL(),
-		RedisHost:           getEnv("REDIS_HOST", "localhost"),
-		RedisPort:           getEnvInt("REDIS_PORT", 6379),
-		RedisPassword:       getEnv("REDIS_PASSWORD", ""),
-		RedisDB:             getEnvInt("REDIS_DB", 0),
-		GoogleClientID:      getEnv("GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret:  getEnv("GOOGLE_CLIENT_SECRET", ""),
-		GoogleRedirectURL:   getEnv("GOOGLE_REDIRECT_URL", "http://api.nexus.local/api/auth/google/callback"),
-		FrontendURL:         getEnv("FRONTEND_URL", "http://nexus.local"),
-		VaultAddress:        getEnv("VAULT_ADDR", "http://vault:8200"),
-		VaultRoleID:         getEnv("VAULT_ROLE_ID", ""),
-		VaultSecretID:       getEnv("VAULT_SECRET_ID", ""),
-		VaultAuthMountPath:  getEnv("VAULT_AUTH_MOUNT_PATH", "approle"),
-		VaultKVMountPath:    getEnv("VAULT_KV_MOUNT_PATH", "kv"),
-		InternalAPIURL:      getEnv("INTERNAL_API_URL", "http://system:8083"),
-		InternalAPIAudience: parseCSVEnv("INTERNAL_API_AUDIENCE", "system"),
-		KratosAdminURL:      getEnv("KRATOS_ADMIN_URL", "http://kratos:4434"),
-		// Rate limiting removed - now handled by Traefik at edge level
-		// Authorization now handled by Keto directly via Oathkeeper
+		Port:            config.GetEnvInt("SERVER_PORT", 8080),
+		Host:            config.GetEnv("SERVER_HOST", "0.0.0.0"),
+		ReadTimeout:     10 * time.Second,
+		WriteTimeout:    10 * time.Second,
+		ShutdownTimeout: 30 * time.Second,
+		GraphQLEndpoint: config.MustGetEnv("DATA_API_ENDPOINT"),
+		AllowedOrigins:  config.MustGetEnvCSV("ALLOWED_ORIGINS"),
+		RedisHost:       config.MustGetEnv("REDIS_HOST"),
+		RedisPort:       config.MustGetEnvInt("REDIS_PORT"),
+		RedisPassword:   config.GetEnv("REDIS_PASSWORD", ""),
+		RedisDB:         config.GetEnvInt("REDIS_DB", 0),
+		FrontendURL:     config.MustGetEnv("FRONTEND_URL"),
+		InternalAPIURL:  config.MustGetEnv("SYSTEM_API_ENDPOINT"),
+		KratosAdminURL:  config.MustGetEnv("KRATOS_ADMIN_URL"),
 	}
 
 	server, err := gateway.New(&cfg)
@@ -73,69 +60,4 @@ func main() {
 	}
 
 	log.Println("Server exited")
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		var result int
-		if _, err := fmt.Sscanf(value, "%d", &result); err == nil {
-			return result
-		}
-	}
-	return defaultValue
-}
-
-func getAllowedOrigins() []string {
-	// In development, allow localhost:3000 by default
-	// In production, set via ALLOWED_ORIGINS env var (comma-separated)
-	origins := getEnv("ALLOWED_ORIGINS", "http://localhost:3000")
-	if origins == "*" {
-		return []string{"*"}
-	}
-
-	return parseCSV(origins)
-}
-
-func parseCSVEnv(key, defaultValue string) []string {
-	return parseCSV(getEnv(key, defaultValue))
-}
-
-func getDatabaseURL() string {
-	if url := os.Getenv("DATABASE_URL"); url != "" {
-		return url
-	}
-
-	host := getEnv("POSTGRES_HOST", "localhost")
-	port := getEnv("POSTGRES_PORT", "5432")
-	user := getEnv("POSTGRES_USER", "admin")
-	password := getEnv("POSTGRES_PASSWORD", "")
-	dbname := getEnv("POSTGRES_DB", "nexus_db")
-	sslmode := getEnv("POSTGRES_SSLMODE", "disable")
-
-	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		user, password, host, port, dbname, sslmode,
-	)
-}
-
-func parseCSV(value string) []string {
-	if strings.TrimSpace(value) == "" {
-		return nil
-	}
-
-	parts := strings.Split(value, ",")
-	result := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if trimmed := strings.TrimSpace(part); trimmed != "" {
-			result = append(result, trimmed)
-		}
-	}
-	return result
 }

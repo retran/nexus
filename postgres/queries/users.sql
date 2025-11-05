@@ -23,9 +23,10 @@ INSERT INTO users (
   kratos_identity_id,
   email,
   display_name,
-  picture
+  picture,
+  user_role
 ) VALUES (
-  $1, $2, $3, $4
+  $1, $2, $3, $4, $5
 )
 RETURNING *;
 
@@ -34,15 +35,17 @@ INSERT INTO users (
   kratos_identity_id,
   email,
   display_name,
-  picture
+  picture,
+  user_role
 ) VALUES (
-  $1, $2, $3, $4
+  $1, $2, $3, $4, $5
 )
 ON CONFLICT (kratos_identity_id) DO UPDATE
 SET
   email = EXCLUDED.email,
   display_name = EXCLUDED.display_name,
   picture = EXCLUDED.picture,
+  user_role = EXCLUDED.user_role,
   updated_at = NOW()
 RETURNING *;
 
@@ -51,6 +54,7 @@ UPDATE users
 SET
   display_name = COALESCE($2, display_name),
   picture = COALESCE($3, picture),
+  user_role = COALESCE(sqlc.narg('user_role')::user_role, user_role),
   updated_at = NOW()
 WHERE id = $1
 RETURNING *;

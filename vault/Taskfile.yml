@@ -37,64 +37,6 @@ tasks:
         docker compose exec vault \
           vault status
 
-  # === PKI (TLS Certificates) ===
-
-  pki:init:
-    desc: "Initialize PKI for internal mTLS"
-    silent: true
-    dir: "{{.ROOT_DIR}}/vault"
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Initializing PKI for internal mTLS...\n"
-      - ./scripts/init-pki.sh
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} PKI initialized\n"
-
-  pki:issue:
-    desc: "Issue certificate (usage: task vault:pki:issue SERVICE=data)"
-    silent: true
-    dir: "{{.ROOT_DIR}}"
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Issuing certificate for {{.SERVICE}}.nexus.local...\n"
-      - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml exec vault \
-          vault write pki_int/issue/nexus-internal \
-          common_name={{.SERVICE}}.nexus.local \
-          ttl=720h
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} Certificate issued\n"
-    requires:
-      vars:
-        - SERVICE
-
-  pki:list:
-    desc: "List issued certificates"
-    silent: true
-    dir: "{{.ROOT_DIR}}"
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Listing issued certificates...\n"
-      - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml exec vault \
-          vault list pki_int/certs
-
-  pki:revoke:
-    desc: "Revoke certificate (usage: task vault:pki:revoke SERIAL=<serial>)"
-    silent: true
-    dir: "{{.ROOT_DIR}}"
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Revoking certificate {{.SERIAL}}...\n"
-      - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.prod.yaml exec vault \
-          vault write pki_int/revoke serial_number={{.SERIAL}}
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} Certificate revoked\n"
-    requires:
-      vars:
-        - SERIAL
-
   # === Secrets Management ===
 
   secrets:put:
@@ -257,12 +199,9 @@ tasks:
         printf "{{.YELLOW}}[WARN]{{.NC}} Production bootstrap requires manual steps:\n"
         printf "  1. Initialize Vault: vault operator init (save keys!)\n"
         printf "  2. Unseal Vault with recovery keys\n"
-        printf "  3. Run: task vault:pki:init (mTLS certificates)\n"
-        printf "  4. Run: task vault:policies:init (AppRole policies)\n"
-        printf "  5. Create AppRoles for each service\n"
-        printf "  6. Store recovery keys in secure location (Backblaze B2)\n"
-        printf "\n"
-        printf "{{.BLUE}}[INFO]{{.NC}} Note: OIDC and Transit engines NOT used in Nexus\n"
+        printf "  3. Run: task vault:policies:init (AppRole policies)\n"
+        printf "  4. Create AppRoles for each service\n"
+        printf "  5. Store recovery keys in secure location (Backblaze B2)\n"
 
   # === Logs ===
 

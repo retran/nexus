@@ -16,6 +16,7 @@ import (
 
 	"github.com/retran/nexus/backend/internal/activities"
 	gqlclient "github.com/retran/nexus/backend/internal/client/data"
+	"github.com/retran/nexus/backend/internal/config"
 	"github.com/retran/nexus/backend/internal/workflows"
 )
 
@@ -26,9 +27,9 @@ func main() {
 }
 
 func run() error {
-	temporalHost := getEnv("TEMPORAL_HOST", "localhost:7233")
-	namespace := getEnv("TEMPORAL_NAMESPACE", "default")
-	taskQueue := getEnv("TEMPORAL_TASK_QUEUE", "nexus-task-queue")
+	temporalHost := config.MustGetEnv("TEMPORAL_HOST")
+	namespace := config.GetEnv("TEMPORAL_NAMESPACE", "default")
+	taskQueue := config.MustGetEnv("TEMPORAL_TASK_QUEUE")
 
 	log.Printf("Connecting to Temporal at %s...", temporalHost)
 
@@ -42,9 +43,9 @@ func run() error {
 	defer c.Close()
 	log.Println("Connected to Temporal")
 
-	apiURL := getEnv("API_URL", "http://data:8081/graphql")
-	gqlClient := gqlclient.NewClient(apiURL)
-	log.Printf("Initialized GraphQL client for: %s", apiURL)
+	dataAPIEndpoint := config.MustGetEnv("DATA_API_ENDPOINT")
+	gqlClient := gqlclient.NewClient(dataAPIEndpoint)
+	log.Printf("Initialized Data API client for: %s", dataAPIEndpoint)
 
 	w := worker.New(c, taskQueue, worker.Options{})
 
@@ -76,11 +77,4 @@ func run() error {
 	w.Stop()
 	log.Println("Worker stopped")
 	return nil
-}
-
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
 }

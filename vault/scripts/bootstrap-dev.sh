@@ -101,13 +101,11 @@ fi
 
 # Note: Dev mode uses Vault ONLY as KV secrets storage
 # Production features NOT configured in dev:
-# - NO Transit engine (JWT signing not used in Nexus)
-# - NO PKI engine (mTLS only for production - see init-pki.sh)
 # - NO AppRole auth (services don't authenticate to Vault in dev)
 # - NO policies (not needed without AppRole - see init-policies.sh)
 # - NO OIDC (Vault UI accessed via token in dev)
 #
-# For production setup with PKI/AppRole/Policies, run manually or see bootstrap-prod.sh
+# For production setup with AppRole/Policies, run manually or see bootstrap-prod.sh
 
 echo "[SUCCESS] Vault dev bootstrap complete"
 echo "[INFO] Access Vault UI at http://localhost:8200 (token: root)"

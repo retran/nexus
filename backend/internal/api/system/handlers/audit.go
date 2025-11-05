@@ -18,27 +18,19 @@ import (
 
 // AuditHandler accepts audit events and forwards them to Temporal workflows.
 type AuditHandler struct {
-	client          client.Client
-	taskQueue       string
-	allowedSubjects []string
+	client    client.Client
+	taskQueue string
 }
 
 // NewAuditHandler constructs a handler for audit events.
-func NewAuditHandler(temporalClient client.Client, taskQueue string, allowedSubjects []string) *AuditHandler {
+func NewAuditHandler(temporalClient client.Client, taskQueue string) *AuditHandler {
 	if temporalClient == nil {
 		return nil
 	}
 
-	normalized := make([]string, 0, len(allowedSubjects))
-	for _, subject := range allowedSubjects {
-		if trimmed := strings.TrimSpace(subject); trimmed != "" {
-			normalized = append(normalized, strings.ToLower(trimmed))
-		}
-	}
 	return &AuditHandler{
-		client:          temporalClient,
-		taskQueue:       taskQueue,
-		allowedSubjects: normalized,
+		client:    temporalClient,
+		taskQueue: taskQueue,
 	}
 }
 
@@ -46,20 +38,6 @@ func NewAuditHandler(temporalClient client.Client, taskQueue string, allowedSubj
 func (h *AuditHandler) HandleAuditEvent(w http.ResponseWriter, r *http.Request) {
 	if h == nil {
 		http.Error(w, "Audit service not configured", http.StatusServiceUnavailable)
-		return
-	}
-
-	// Extract subject from mTLS client certificate CN
-	subject := ""
-	if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		subject = r.TLS.PeerCertificates[0].Subject.CommonName
-	}
-	if subject == "" {
-		http.Error(w, "Unauthorized: missing client certificate", http.StatusUnauthorized)
-		return
-	}
-	if !h.subjectAllowed(subject) {
-		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -75,19 +53,6 @@ func (h *AuditHandler) HandleAuditEvent(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.WriteHeader(http.StatusAccepted)
-}
-
-func (h *AuditHandler) subjectAllowed(subject string) bool {
-	if len(h.allowedSubjects) == 0 {
-		return true
-	}
-	subject = strings.ToLower(strings.TrimSpace(subject))
-	for _, allowed := range h.allowedSubjects {
-		if subject == allowed {
-			return true
-		}
-	}
-	return false
 }
 
 func (h *AuditHandler) dispatchWorkflow(ctx context.Context, event *domain.AuditEvent) error {

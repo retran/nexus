@@ -19,6 +19,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 
 	"github.com/retran/nexus/backend/internal/api/data"
+	"github.com/retran/nexus/backend/internal/config"
 	"github.com/retran/nexus/backend/internal/repository/postgres"
 )
 
@@ -31,15 +32,25 @@ func main() {
 func run() error {
 	ctx := context.Background()
 
+	maxConns := config.MustGetEnvInt("POSTGRES_MAX_CONNS")
+	if maxConns < 1 || maxConns > 2147483647 {
+		return fmt.Errorf("POSTGRES_MAX_CONNS must be between 1 and 2147483647, got: %d", maxConns)
+	}
+
+	minConns := config.MustGetEnvInt("POSTGRES_MIN_CONNS")
+	if minConns < 0 || minConns > 2147483647 {
+		return fmt.Errorf("POSTGRES_MIN_CONNS must be between 0 and 2147483647, got: %d", minConns)
+	}
+
 	dbConfig := &postgres.Config{
-		Host:            getEnv("POSTGRES_HOST", "localhost"),
-		Port:            5432,
-		Database:        getEnv("POSTGRES_DB", "nexus"),
-		User:            getEnv("POSTGRES_USER", "postgres"),
-		Password:        getEnv("POSTGRES_PASSWORD", "postgres"),
-		SSLMode:         getEnv("DB_SSLMODE", "disable"),
-		MaxConns:        25,
-		MinConns:        5,
+		Host:            config.MustGetEnv("POSTGRES_HOST"),
+		Port:            config.MustGetEnvInt("POSTGRES_PORT"),
+		Database:        config.MustGetEnv("POSTGRES_DB"),
+		User:            config.MustGetEnv("POSTGRES_USER"),
+		Password:        config.MustGetEnv("POSTGRES_PASSWORD"),
+		SSLMode:         config.MustGetEnv("POSTGRES_SSLMODE"),
+		MaxConns:        int32(maxConns), //nolint:gosec // G115: bounds checked above
+		MinConns:        int32(minConns),
 		MaxConnLifetime: time.Hour,
 		MaxConnIdleTime: 30 * time.Minute,
 	}
@@ -73,7 +84,7 @@ func run() error {
 		}
 	})
 
-	port := getEnv("SERVER_PORT", "8081")
+	port := config.GetEnv("SERVER_PORT", "8081")
 
 	httpServer := &http.Server{
 		Addr:         ":" + port,
@@ -103,13 +114,6 @@ func run() error {
 		return fmt.Errorf("graceful shutdown: %w", err)
 	}
 
-	log.Println("Server stopped")
+	log.Println("Server stopped gracefully")
 	return nil
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }

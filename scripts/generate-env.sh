@@ -78,10 +78,10 @@ sed -i.bak "s|DATABASE_URL=postgres://admin:SUPER_SECRET_PASSWORD@|DATABASE_URL=
 sed -i.bak "s/REDIS_PASSWORD=redis_password/REDIS_PASSWORD=$REDIS_PASSWORD/" "$ENV_FILE"
 
 # Update DSN with new password (for Kratos)
-sed -i.bak "s|DSN=postgres://admin:\${POSTGRES_PASSWORD}@|DSN=postgres://admin:$POSTGRES_PASSWORD@|" "$ENV_FILE"
+sed -i.bak "s|DSN=postgres://admin:SUPER_SECRET_PASSWORD@|DSN=postgres://admin:$POSTGRES_PASSWORD@|" "$ENV_FILE"
 
 # Update KETO_DSN with new password
-sed -i.bak "s|KETO_DSN=postgres://admin:\${POSTGRES_PASSWORD}@|KETO_DSN=postgres://admin:$POSTGRES_PASSWORD@|" "$ENV_FILE"
+sed -i.bak "s|KETO_DSN=postgres://admin:SUPER_SECRET_PASSWORD@|KETO_DSN=postgres://admin:$POSTGRES_PASSWORD@|" "$ENV_FILE"
 
 # Kratos secrets
 sed -i.bak "s/KRATOS_COOKIE_SECRET=CHANGEME_SECRET_EXACTLY_32CHARSS/KRATOS_COOKIE_SECRET=$KRATOS_COOKIE_SECRET/" "$ENV_FILE"

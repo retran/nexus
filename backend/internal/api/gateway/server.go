@@ -19,35 +19,24 @@ import (
 	"github.com/retran/nexus/backend/internal/api/gateway/handlers"
 	"github.com/retran/nexus/backend/internal/api/gateway/services"
 	gql "github.com/retran/nexus/backend/internal/client/data"
-	"github.com/retran/nexus/backend/internal/repository/postgres"
 )
 
 // Config contains REST API Gateway server configuration.
 type Config struct {
-	VaultSecretID       string
-	VaultRoleID         string
-	GoogleClientID      string
-	GraphQLEndpoint     string
-	DatabaseURL         string
-	RedisHost           string
-	GoogleRedirectURL   string
-	Host                string
-	RedisPassword       string
-	FrontendURL         string
-	GoogleClientSecret  string
-	InternalAPIURL      string
-	KratosAdminURL      string
-	InternalAPIAudience []string
-	VaultAuthMountPath  string
-	VaultKVMountPath    string
-	VaultAddress        string
-	AllowedOrigins      []string
-	ShutdownTimeout     time.Duration
-	WriteTimeout        time.Duration
-	ReadTimeout         time.Duration
-	Port                int
-	RedisDB             int
-	RedisPort           int
+	GraphQLEndpoint string
+	RedisHost       string
+	Host            string
+	RedisPassword   string
+	FrontendURL     string
+	InternalAPIURL  string
+	KratosAdminURL  string
+	AllowedOrigins  []string
+	ShutdownTimeout time.Duration
+	WriteTimeout    time.Duration
+	ReadTimeout     time.Duration
+	Port            int
+	RedisDB         int
+	RedisPort       int
 }
 
 // Server represents the REST API Gateway HTTP server.
@@ -55,14 +44,9 @@ type Server struct {
 	gqlClient      graphql.Client
 	auditClient    *services.TemporalAuditService
 	authMiddleware *middleware.AuthMiddleware
-	pool           interface {
-		postgres.DBTX
-		Close()
-	}
-	httpServer  *http.Server
-	redisClient *redis.Client
-	db          *postgres.Queries
-	config      Config
+	httpServer     *http.Server
+	redisClient    *redis.Client
+	config         Config
 }
 
 // New creates a new Server instance.
@@ -89,13 +73,6 @@ func New(cfg *Config) (*Server, error) {
 		log.Println("Connected to Redis")
 	}
 
-	pool, err := postgres.NewPoolFromURL(context.Background(), cfg.DatabaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create database pool: %w", err)
-	}
-
-	db := postgres.New(pool)
-
 	// Create JWT verifier for Oathkeeper tokens
 	authMiddleware := middleware.NewAuthMiddleware()
 
@@ -105,8 +82,6 @@ func New(cfg *Config) (*Server, error) {
 		auditClient:    auditService,
 		authMiddleware: authMiddleware,
 		redisClient:    redisClient,
-		db:             db,
-		pool:           pool,
 	}, nil
 }
 
@@ -192,10 +167,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		if err := s.redisClient.Close(); err != nil {
 			log.Printf("Error closing Redis client: %v", err)
 		}
-	}
-
-	if s.pool != nil {
-		s.pool.Close()
 	}
 
 	if s.httpServer != nil {

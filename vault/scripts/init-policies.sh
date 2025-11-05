@@ -96,20 +96,6 @@ path "kv/metadata/shared/*" {
   capabilities = ["list"]
 }
 
-# PKI Engine - Issue mTLS certificates for this service
-path "pki_int/issue/${service}-role" {
-  capabilities = ["update"]
-}
-
-# PKI Engine - Read CA certificate for client validation
-path "pki_int/cert/ca" {
-  capabilities = ["read"]
-}
-
-path "pki_int/ca/pem" {
-  capabilities = ["read"]
-}
-
 path "sys/health" {
   capabilities = ["read"]
 }

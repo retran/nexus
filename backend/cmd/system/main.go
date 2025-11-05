@@ -21,6 +21,7 @@ import (
 	temporalclient "go.temporal.io/sdk/client"
 
 	"github.com/retran/nexus/backend/internal/api/system/handlers"
+	"github.com/retran/nexus/backend/internal/config"
 )
 
 func main() {
@@ -30,16 +31,12 @@ func main() {
 }
 
 func run() error {
-	port := getEnv("PORT", "8083")
-	graphqlEndpoint := getEnv("GRAPHQL_ENDPOINT", "http://localhost:8081/graphql")
-	allowedRolesEnv := getEnv("INTERNAL_ALLOWED_ROLES", "none,member,admin")
-	kratosAdminURL := getEnv("KRATOS_ADMIN_URL", "http://kratos:4434")
-	temporalHost := getEnv("TEMPORAL_HOST", "temporal:7233")
-	temporalNamespace := getEnv("TEMPORAL_NAMESPACE", "default")
-	taskQueue := getEnv("TEMPORAL_TASK_QUEUE", "nexus-task-queue")
-	auditSubjects := getEnv("AUDIT_ALLOWED_SUBJECTS", "gateway")
-
-	log.Printf("GraphQL endpoint: %s", graphqlEndpoint)
+	port := config.GetEnv("SERVER_PORT", "8083")
+	kratosAdminURL := config.MustGetEnv("KRATOS_ADMIN_URL")
+	temporalHost := config.MustGetEnv("TEMPORAL_HOST")
+	temporalNamespace := config.GetEnv("TEMPORAL_NAMESPACE", "default")
+	taskQueue := config.MustGetEnv("TEMPORAL_TASK_QUEUE")
+	webhookSecret := config.MustGetEnv("KRATOS_WEBHOOK_SECRET")
 
 	temporalClient, err := newTemporalClient(temporalHost, temporalNamespace)
 	if err != nil {
@@ -51,7 +48,7 @@ func run() error {
 		}
 	}()
 
-	roleHandler, auditHandler, kratosWebhookHandler, err := initServices(graphqlEndpoint, allowedRolesEnv, kratosAdminURL, temporalClient, taskQueue, auditSubjects)
+	roleHandler, auditHandler, kratosWebhookHandler, err := initServices(kratosAdminURL, temporalClient, taskQueue, webhookSecret)
 	if err != nil {
 		return err
 	}
@@ -79,23 +76,6 @@ func internalHealthHandler(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-func parseCSV(raw string) []string {
-	parts := strings.Split(raw, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if trimmed := strings.TrimSpace(p); trimmed != "" {
-			out = append(out, trimmed)
-		}
-	}
-	return out
-}
 func configureMux(mux *http.ServeMux, roleHandler *handlers.AdminHandler, auditHandler *handlers.AuditHandler, kratosWebhookHandler *handlers.KratosWebhookHandler) {
 	mux.HandleFunc("GET /health", healthHandler)
 	mux.HandleFunc("GET /internal/healthz", internalHealthHandler)
@@ -112,18 +92,13 @@ func configureMux(mux *http.ServeMux, roleHandler *handlers.AdminHandler, auditH
 	}
 }
 
-func initServices(_ string, allowedRolesEnv, kratosAdminURL string, temporalClient temporalclient.Client, taskQueue, auditSubjects string) (*handlers.AdminHandler, *handlers.AuditHandler, *handlers.KratosWebhookHandler, error) {
-	webhookSecret := getEnv("KRATOS_WEBHOOK_SECRET", "")
-	if webhookSecret == "" {
-		log.Println("Warning: KRATOS_WEBHOOK_SECRET not set, webhook validation disabled")
-	}
-
-	roleHandler, err := handlers.NewAdminHandler(kratosAdminURL, parseCSV(allowedRolesEnv))
+func initServices(kratosAdminURL string, temporalClient temporalclient.Client, taskQueue, webhookSecret string) (*handlers.AdminHandler, *handlers.AuditHandler, *handlers.KratosWebhookHandler, error) {
+	roleHandler, err := handlers.NewAdminHandler(kratosAdminURL)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create admin handler: %w", err)
 	}
 
-	auditHandler := handlers.NewAuditHandler(temporalClient, taskQueue, parseCSV(auditSubjects))
+	auditHandler := handlers.NewAuditHandler(temporalClient, taskQueue)
 	kratosWebhookHandler := handlers.NewKratosWebhookHandler(temporalClient, taskQueue, webhookSecret)
 
 	return roleHandler, auditHandler, kratosWebhookHandler, nil
@@ -131,9 +106,6 @@ func initServices(_ string, allowedRolesEnv, kratosAdminURL string, temporalClie
 
 func adminRoleHandler(roleHandler *handlers.AdminHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Role validation is now handled by the gateway, which already verifies admin role
-		// before calling this endpoint.
-
 		identityID := strings.TrimSpace(r.PathValue("id"))
 		if identityID == "" {
 			http.Error(w, "Bad Request: missing identity id", http.StatusBadRequest)
@@ -147,10 +119,6 @@ func adminRoleHandler(roleHandler *handlers.AdminHandler) http.HandlerFunc {
 		}
 
 		if err := roleHandler.UpdateUserRole(r.Context(), identityID, payload); err != nil {
-			if errors.Is(err, handlers.ErrUnknownRole) {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
 			http.Error(w, "Failed to update role: "+err.Error(), http.StatusInternalServerError)
 			return
 		}

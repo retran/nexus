@@ -19,12 +19,12 @@ type contextKey string
 const authInfoKey contextKey = "gateway-auth-info"
 
 // AuthMiddleware validates requests that pass through Oathkeeper before reaching the gateway.
-// It uses mTLS client certificate CN validation instead of JWT.
+// It validates user information from Oathkeeper-provided headers.
 type AuthMiddleware struct {
-	// No configuration needed - we just check CN from TLS
+	// No configuration needed - we trust headers from Oathkeeper
 }
 
-// AuthInfo describes the authenticated user extracted from Oathkeeper headers via mTLS.
+// AuthInfo describes the authenticated user extracted from Oathkeeper headers.
 type AuthInfo struct {
 	Email     string
 	Role      string
@@ -33,7 +33,7 @@ type AuthInfo struct {
 	UserID    uuid.UUID
 }
 
-// NewAuthMiddleware builds a middleware instance that validates requests coming from Oathkeeper via mTLS.
+// NewAuthMiddleware builds a middleware instance that validates requests coming from Oathkeeper.
 func NewAuthMiddleware() *AuthMiddleware {
 	return &AuthMiddleware{}
 }
@@ -51,7 +51,7 @@ func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 	})
 }
 
-// OptionalAuth attempts to authenticate requests but allows anonymous access when no cert is provided.
+// OptionalAuth attempts to authenticate requests but allows anonymous access when no auth headers are provided.
 func (m *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		info, err := m.authenticateRequest(r)
@@ -60,7 +60,7 @@ func (m *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
-		if errors.Is(err, errMissingCert) {
+		if errors.Is(err, errMissingAuth) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -69,25 +69,13 @@ func (m *AuthMiddleware) OptionalAuth(next http.Handler) http.Handler {
 }
 
 var (
-	errMissingCert    = errors.New("missing client certificate")
-	errInvalidCN      = errors.New("invalid client certificate CN")
+	errMissingAuth    = errors.New("missing authentication")
 	errInvalidHeaders = errors.New("invalid oathkeeper headers")
 )
 
-const expectedCN = "oathkeeper.service.local"
-
 func (m *AuthMiddleware) authenticateRequest(r *http.Request) (*AuthInfo, error) {
-	// Check mTLS client certificate CN
-	if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-		return nil, errMissingCert
-	}
-
-	cn := r.TLS.PeerCertificates[0].Subject.CommonName
-	if cn != expectedCN {
-		return nil, fmt.Errorf("%w: got %q, expected %q", errInvalidCN, cn, expectedCN)
-	}
-
-	// CN is valid - now read user info from Oathkeeper headers (Trusted Subsystem pattern)
+	// Read user info from Oathkeeper headers (Trusted Subsystem pattern)
+	// Oathkeeper validates the user session and adds these headers
 	info, err := buildAuthInfoFromHeaders(r)
 	if err != nil {
 		return nil, err

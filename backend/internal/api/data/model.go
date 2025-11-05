@@ -15,10 +15,11 @@ type CreateAuditLogInput struct {
 }
 
 type CreateUserInput struct {
-	KratosIdentityID string  `json:"kratosIdentityId"`
-	Email            string  `json:"email"`
-	Name             *string `json:"name,omitempty"`
-	Picture          *string `json:"picture,omitempty"`
+	KratosIdentityID string             `json:"kratosIdentityId"`
+	Email            string             `json:"email"`
+	Name             *string            `json:"name,omitempty"`
+	Picture          *string            `json:"picture,omitempty"`
+	Role             *postgres.UserRole `json:"role,omitempty"`
 }
 
 type Mutation struct {
@@ -28,6 +29,7 @@ type Query struct {
 }
 
 type UpdateUserInput struct {
-	Name    *string `json:"name,omitempty"`
-	Picture *string `json:"picture,omitempty"`
+	Name    *string            `json:"name,omitempty"`
+	Picture *string            `json:"picture,omitempty"`
+	Role    *postgres.UserRole `json:"role,omitempty"`
 }

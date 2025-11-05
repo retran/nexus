@@ -5,16 +5,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"strings"
 )
-
-// ErrUnknownRole indicates that the requested role is not permitted.
-var ErrUnknownRole = errors.New("unknown role")
 
 type identityPatch struct {
 	Traits struct {
@@ -26,15 +22,13 @@ type identityPatch struct {
 type AdminHandler struct {
 	client      *http.Client
 	kratosAdmin string
-	allowed     []string
 }
 
 // NewAdminHandler creates a new handler for role management.
-func NewAdminHandler(kratosAdminURL string, allowedRoles []string) (*AdminHandler, error) {
+func NewAdminHandler(kratosAdminURL string) (*AdminHandler, error) {
 	return &AdminHandler{
 		client:      &http.Client{},
 		kratosAdmin: strings.TrimSuffix(kratosAdminURL, "/"),
-		allowed:     allowedRoles,
 	}, nil
 }
 
@@ -46,9 +40,6 @@ type UpdateRoleRequest struct {
 // UpdateUserRole synchronises the requested role with Kratos identity traits.
 func (h *AdminHandler) UpdateUserRole(ctx context.Context, identityID string, req UpdateRoleRequest) error {
 	role := strings.TrimSpace(req.Role)
-	if !h.roleAllowed(role) {
-		return fmt.Errorf("%w: %s", ErrUnknownRole, role)
-	}
 
 	patch := identityPatch{}
 	patch.Traits.Role = role
@@ -86,16 +77,4 @@ func (h *AdminHandler) UpdateUserRole(ctx context.Context, identityID string, re
 	}
 
 	return nil
-}
-
-func (h *AdminHandler) roleAllowed(role string) bool {
-	if len(h.allowed) == 0 {
-		return true
-	}
-	for _, allowed := range h.allowed {
-		if strings.EqualFold(role, allowed) {
-			return true
-		}
-	}
-	return false
 }

@@ -84,6 +84,7 @@ type ComplexityRoot struct {
 		KratosIdentityID func(childComplexity int) int
 		Name             func(childComplexity int) int
 		Picture          func(childComplexity int) int
+		Role             func(childComplexity int) int
 		UpdatedAt        func(childComplexity int) int
 	}
 }
@@ -115,6 +116,8 @@ type UserResolver interface {
 	KratosIdentityID(ctx context.Context, obj *postgres.User) (string, error)
 
 	Name(ctx context.Context, obj *postgres.User) (*string, error)
+
+	Role(ctx context.Context, obj *postgres.User) (postgres.UserRole, error)
 }
 
 type executableSchema struct {
@@ -339,6 +342,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.User.Picture(childComplexity), true
+	case "User.role":
+		if e.complexity.User.Role == nil {
+			break
+		}
+
+		return e.complexity.User.Role(childComplexity), true
 	case "User.updatedAt":
 		if e.complexity.User.UpdatedAt == nil {
 			break
@@ -460,6 +469,12 @@ var sources = []*ast.Source{
 scalar Time
 scalar UUID
 
+enum UserRole {
+  NONE
+  MEMBER
+  ADMIN
+}
+
 enum AuditEventType {
   USER_CREATED
   USER_UPDATED
@@ -496,6 +511,7 @@ type User {
   email: String!
   name: String
   picture: String
+  role: UserRole!
   createdAt: Time!
   updatedAt: Time!
 }
@@ -506,11 +522,13 @@ input CreateUserInput {
   email: String!
   name: String
   picture: String
+  role: UserRole
 }
 
 input UpdateUserInput {
   name: String
   picture: String
+  role: UserRole
 }
 
 type Query {
@@ -847,6 +865,8 @@ func (ec *executionContext) fieldContext_AuditLog_user(_ context.Context, field 
 				return ec.fieldContext_User_name(ctx, field)
 			case "picture":
 				return ec.fieldContext_User_picture(ctx, field)
+			case "role":
+				return ec.fieldContext_User_role(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -1038,6 +1058,8 @@ func (ec *executionContext) fieldContext_Mutation_createUser(ctx context.Context
 				return ec.fieldContext_User_name(ctx, field)
 			case "picture":
 				return ec.fieldContext_User_picture(ctx, field)
+			case "role":
+				return ec.fieldContext_User_role(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -1095,6 +1117,8 @@ func (ec *executionContext) fieldContext_Mutation_updateUser(ctx context.Context
 				return ec.fieldContext_User_name(ctx, field)
 			case "picture":
 				return ec.fieldContext_User_picture(ctx, field)
+			case "role":
+				return ec.fieldContext_User_role(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -1252,6 +1276,8 @@ func (ec *executionContext) fieldContext_Query_user(ctx context.Context, field g
 				return ec.fieldContext_User_name(ctx, field)
 			case "picture":
 				return ec.fieldContext_User_picture(ctx, field)
+			case "role":
+				return ec.fieldContext_User_role(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -1309,6 +1335,8 @@ func (ec *executionContext) fieldContext_Query_userByEmail(ctx context.Context, 
 				return ec.fieldContext_User_name(ctx, field)
 			case "picture":
 				return ec.fieldContext_User_picture(ctx, field)
+			case "role":
+				return ec.fieldContext_User_role(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -1366,6 +1394,8 @@ func (ec *executionContext) fieldContext_Query_userByKratosId(ctx context.Contex
 				return ec.fieldContext_User_name(ctx, field)
 			case "picture":
 				return ec.fieldContext_User_picture(ctx, field)
+			case "role":
+				return ec.fieldContext_User_role(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -1423,6 +1453,8 @@ func (ec *executionContext) fieldContext_Query_users(ctx context.Context, field 
 				return ec.fieldContext_User_name(ctx, field)
 			case "picture":
 				return ec.fieldContext_User_picture(ctx, field)
+			case "role":
+				return ec.fieldContext_User_role(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_User_createdAt(ctx, field)
 			case "updatedAt":
@@ -1840,6 +1872,35 @@ func (ec *executionContext) fieldContext_User_picture(_ context.Context, field g
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _User_role(ctx context.Context, field graphql.CollectedField, obj *postgres.User) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_User_role,
+		func(ctx context.Context) (any, error) {
+			return ec.resolvers.User().Role(ctx, obj)
+		},
+		nil,
+		ec.marshalNUserRole2githubᚗcomᚋretranᚋnexusᚋbackendᚋinternalᚋrepositoryᚋpostgresᚐUserRole,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_User_role(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "User",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type UserRole does not have child fields")
 		},
 	}
 	return fc, nil
@@ -3411,7 +3472,7 @@ func (ec *executionContext) unmarshalInputCreateUserInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"kratosIdentityId", "email", "name", "picture"}
+	fieldsInOrder := [...]string{"kratosIdentityId", "email", "name", "picture", "role"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -3446,6 +3507,13 @@ func (ec *executionContext) unmarshalInputCreateUserInput(ctx context.Context, o
 				return it, err
 			}
 			it.Picture = data
+		case "role":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
+			data, err := ec.unmarshalOUserRole2ᚖgithubᚗcomᚋretranᚋnexusᚋbackendᚋinternalᚋrepositoryᚋpostgresᚐUserRole(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Role = data
 		}
 	}
 
@@ -3459,7 +3527,7 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"name", "picture"}
+	fieldsInOrder := [...]string{"name", "picture", "role"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -3480,6 +3548,13 @@ func (ec *executionContext) unmarshalInputUpdateUserInput(ctx context.Context, o
 				return it, err
 			}
 			it.Picture = data
+		case "role":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("role"))
+			data, err := ec.unmarshalOUserRole2ᚖgithubᚗcomᚋretranᚋnexusᚋbackendᚋinternalᚋrepositoryᚋpostgresᚐUserRole(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Role = data
 		}
 	}
 
@@ -4062,6 +4137,42 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "picture":
 			out.Values[i] = ec._User_picture(ctx, field, obj)
+		case "role":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_role(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			if field.Deferrable != nil {
+				dfs, ok := deferred[field.Deferrable.Label]
+				di := 0
+				if ok {
+					dfs.AddField(field)
+					di = len(dfs.Values) - 1
+				} else {
+					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
+					deferred[field.Deferrable.Label] = dfs
+				}
+				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
+					return innerFunc(ctx, dfs)
+				})
+
+				// don't run the out.Concurrently() call below
+				out.Values[i] = graphql.Null
+				continue
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "createdAt":
 			out.Values[i] = ec._User_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -4658,6 +4769,23 @@ func (ec *executionContext) marshalNUser2ᚖgithubᚗcomᚋretranᚋnexusᚋback
 	return ec._User(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNUserRole2githubᚗcomᚋretranᚋnexusᚋbackendᚋinternalᚋrepositoryᚋpostgresᚐUserRole(ctx context.Context, v any) (postgres.UserRole, error) {
+	tmp, err := graphql.UnmarshalString(v)
+	res := postgres.UserRole(tmp)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNUserRole2githubᚗcomᚋretranᚋnexusᚋbackendᚋinternalᚋrepositoryᚋpostgresᚐUserRole(ctx context.Context, sel ast.SelectionSet, v postgres.UserRole) graphql.Marshaler {
+	_ = sel
+	res := graphql.MarshalString(string(v))
+	if res == graphql.Null {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+	}
+	return res
+}
+
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {
 	return ec.___Directive(ctx, sel, &v)
 }
@@ -5026,6 +5154,25 @@ func (ec *executionContext) marshalOUser2ᚖgithubᚗcomᚋretranᚋnexusᚋback
 		return graphql.Null
 	}
 	return ec._User(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOUserRole2ᚖgithubᚗcomᚋretranᚋnexusᚋbackendᚋinternalᚋrepositoryᚋpostgresᚐUserRole(ctx context.Context, v any) (*postgres.UserRole, error) {
+	if v == nil {
+		return nil, nil
+	}
+	tmp, err := graphql.UnmarshalString(v)
+	res := postgres.UserRole(tmp)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOUserRole2ᚖgithubᚗcomᚋretranᚋnexusᚋbackendᚋinternalᚋrepositoryᚋpostgresᚐUserRole(ctx context.Context, sel ast.SelectionSet, v *postgres.UserRole) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	_ = sel
+	_ = ctx
+	res := graphql.MarshalString(string(*v))
+	return res
 }
 
 func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler {

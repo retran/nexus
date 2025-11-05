@@ -27,9 +27,10 @@ INSERT INTO users (
   kratos_identity_id,
   email,
   display_name,
-  picture
+  picture,
+  user_role
 ) VALUES (
-  $1, $2, $3, $4
+  $1, $2, $3, $4, $5
 )
 RETURNING id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at
 `
@@ -39,6 +40,7 @@ type CreateUserParams struct {
 	Email            string    `json:"email"`
 	DisplayName      *string   `json:"display_name"`
 	Picture          *string   `json:"picture"`
+	UserRole         UserRole  `json:"user_role"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -47,6 +49,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.Email,
 		arg.DisplayName,
 		arg.Picture,
+		arg.UserRole,
 	)
 	var i User
 	err := row.Scan(
@@ -183,19 +186,26 @@ UPDATE users
 SET
   display_name = COALESCE($2, display_name),
   picture = COALESCE($3, picture),
+  user_role = COALESCE($4::user_role, user_role),
   updated_at = NOW()
 WHERE id = $1
 RETURNING id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at
 `
 
 type UpdateUserParams struct {
-	ID          uuid.UUID `json:"id"`
-	DisplayName *string   `json:"display_name"`
-	Picture     *string   `json:"picture"`
+	ID          uuid.UUID    `json:"id"`
+	DisplayName *string      `json:"display_name"`
+	Picture     *string      `json:"picture"`
+	UserRole    NullUserRole `json:"user_role"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, UpdateUser, arg.ID, arg.DisplayName, arg.Picture)
+	row := q.db.QueryRow(ctx, UpdateUser,
+		arg.ID,
+		arg.DisplayName,
+		arg.Picture,
+		arg.UserRole,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -215,15 +225,17 @@ INSERT INTO users (
   kratos_identity_id,
   email,
   display_name,
-  picture
+  picture,
+  user_role
 ) VALUES (
-  $1, $2, $3, $4
+  $1, $2, $3, $4, $5
 )
 ON CONFLICT (kratos_identity_id) DO UPDATE
 SET
   email = EXCLUDED.email,
   display_name = EXCLUDED.display_name,
   picture = EXCLUDED.picture,
+  user_role = EXCLUDED.user_role,
   updated_at = NOW()
 RETURNING id, kratos_identity_id, email, display_name, picture, user_role, created_at, updated_at
 `
@@ -233,6 +245,7 @@ type UpsertUserParams struct {
 	Email            string    `json:"email"`
 	DisplayName      *string   `json:"display_name"`
 	Picture          *string   `json:"picture"`
+	UserRole         UserRole  `json:"user_role"`
 }
 
 func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error) {
@@ -241,6 +254,7 @@ func (q *Queries) UpsertUser(ctx context.Context, arg UpsertUserParams) (User, e
 		arg.Email,
 		arg.DisplayName,
 		arg.Picture,
+		arg.UserRole,
 	)
 	var i User
 	err := row.Scan(

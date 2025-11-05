@@ -4,6 +4,12 @@
 scalar Time
 scalar UUID
 
+enum UserRole {
+  NONE
+  MEMBER
+  ADMIN
+}
+
 enum AuditEventType {
   USER_CREATED
   USER_UPDATED
@@ -40,6 +46,7 @@ type User {
   email: String!
   name: String
   picture: String
+  role: UserRole!
   createdAt: Time!
   updatedAt: Time!
 }
@@ -50,11 +57,13 @@ input CreateUserInput {
   email: String!
   name: String
   picture: String
+  role: UserRole
 }
 
 input UpdateUserInput {
   name: String
   picture: String
+  role: UserRole
 }
 
 type Query {

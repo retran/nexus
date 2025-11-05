@@ -22,6 +22,9 @@ autobind:
   - "github.com/retran/nexus/backend/internal/repository/postgres"
 
 models:
+  UserRole:
+    model:
+      - github.com/retran/nexus/backend/internal/repository/postgres.UserRole
   AuditEventType:
     model:
       - github.com/retran/nexus/backend/internal/repository/postgres.AuditEventType

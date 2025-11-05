@@ -97,8 +97,13 @@ func (r *userResolver) KratosIdentityID(_ context.Context, _ *postgres.User) (st
 }
 
 // Name is the resolver for the name field.
-func (r *userResolver) Name(_ context.Context, _ *postgres.User) (*string, error) {
-	panic(fmt.Errorf("not implemented: Name - name"))
+func (r *userResolver) Name(_ context.Context, obj *postgres.User) (*string, error) {
+	return obj.DisplayName, nil
+}
+
+// Role is the resolver for the role field.
+func (r *userResolver) Role(_ context.Context, obj *postgres.User) (postgres.UserRole, error) {
+	return obj.UserRole, nil
 }
 
 // AuditLog returns AuditLogResolver implementation.

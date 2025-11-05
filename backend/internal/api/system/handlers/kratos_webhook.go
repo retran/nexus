@@ -14,7 +14,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	temporalclient "go.temporal.io/sdk/client"
+
+	"github.com/retran/nexus/backend/internal/domain"
 )
 
 // KratosWebhookHandler handles webhook events from Ory Kratos.
@@ -121,22 +124,28 @@ func (h *KratosWebhookHandler) logAuditEvent(ctx context.Context, eventType stri
 		TaskQueue: h.taskQueue,
 	}
 
-	metadata := map[string]interface{}{
-		"identity_id": payload.Identity.ID,
-		"email":       payload.Identity.Traits.Email,
-		"role":        payload.Identity.Traits.Role,
-		"flow_id":     payload.Flow.ID,
-		"flow_type":   payload.Flow.Type,
+	// Parse Kratos identity ID to UUID
+	identityID, err := uuid.Parse(payload.Identity.ID)
+	if err != nil {
+		return fmt.Errorf("parse identity ID: %w", err)
 	}
 
-	input := map[string]interface{}{
-		"event_type": eventType,
-		"actor_id":   payload.Identity.ID,
-		"metadata":   metadata,
-		"timestamp":  time.Now().UTC().Format(time.RFC3339),
+	// Create domain.AuditEvent to match the workflow signature
+	event := domain.AuditEvent{
+		UserID:    &identityID,
+		EventType: eventType,
+		Source:    "kratos",
+		Metadata: map[string]interface{}{
+			"identity_id": payload.Identity.ID,
+			"email":       payload.Identity.Traits.Email,
+			"role":        payload.Identity.Traits.Role,
+			"flow_id":     payload.Flow.ID,
+			"flow_type":   payload.Flow.Type,
+		},
 	}
 
-	_, err := h.temporalClient.ExecuteWorkflow(ctx, workflowOptions, "AuditWorkflow", input)
+	// Use the correct workflow name and type
+	_, err = h.temporalClient.ExecuteWorkflow(ctx, workflowOptions, "AuditLogWorkflow", event)
 	if err != nil {
 		return fmt.Errorf("execute audit workflow: %w", err)
 	}
