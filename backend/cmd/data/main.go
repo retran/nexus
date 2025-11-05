@@ -20,7 +20,7 @@ import (
 
 	"github.com/retran/nexus/backend/internal/api/data"
 	"github.com/retran/nexus/backend/internal/config"
-	"github.com/retran/nexus/backend/internal/repository/postgres"
+	postgres "github.com/retran/nexus/backend/internal/repository"
 )
 
 func main() {

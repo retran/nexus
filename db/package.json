@@ -1,11 +1,11 @@
 {
-  "name": "postgres",
+  "name": "db",
   "version": "0.1.0",
   "private": true,
-  "description": "PostgreSQL migrations and SQL tooling for Nexus",
+  "description": "Database migrations and SQL tooling for Nexus",
   "scripts": {
-    "format": "sqlfluff fix migrations/",
-    "format:check": "sqlfluff lint migrations/",
+    "format": "prettier --write migrations/ && sqlfluff fix migrations/",
+    "format:check": "prettier --check migrations/ && sqlfluff lint migrations/",
     "lint": "sqlfluff lint migrations/",
     "lint:fix": "sqlfluff fix migrations/",
     "lint:check": "sqlfluff lint migrations/ --format github-annotation"

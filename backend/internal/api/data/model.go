@@ -3,7 +3,7 @@
 package data
 
 import (
-	"github.com/retran/nexus/backend/internal/repository/postgres"
+	"github.com/retran/nexus/backend/internal/repository"
 )
 
 type CreateAuditLogInput struct {

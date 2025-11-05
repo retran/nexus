@@ -39,7 +39,7 @@ services:
   atlas:
     image: arigaio/atlas:latest
     volumes:
-      - ./postgres:/work
+      - ./db:/work
     working_dir: /work
     env_file: .env
     depends_on:
@@ -345,7 +345,7 @@ services:
     image: ghcr.io/joeferner/redis-commander:latest
     restart: always
     environment:
-      - REDIS_HOSTS=local:redis:6379
+      - REDIS_HOSTS=local:redis:6379:0:${REDIS_PASSWORD}
       - HTTP_USER=
       - HTTP_PASSWORD=
     depends_on:

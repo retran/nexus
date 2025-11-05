@@ -19,12 +19,12 @@ resolver:
   filename_template: "{name}.resolvers.go"
 
 autobind:
-  - "github.com/retran/nexus/backend/internal/repository/postgres"
+  - "github.com/retran/nexus/backend/internal/repository"
 
 models:
   UserRole:
     model:
-      - github.com/retran/nexus/backend/internal/repository/postgres.UserRole
+      - github.com/retran/nexus/backend/internal/repository.UserRole
   AuditEventType:
     model:
-      - github.com/retran/nexus/backend/internal/repository/postgres.AuditEventType
+      - github.com/retran/nexus/backend/internal/repository.AuditEventType

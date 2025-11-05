@@ -8,7 +8,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/retran/nexus/backend/internal/repository/postgres"
+	postgres "github.com/retran/nexus/backend/internal/repository"
 )
 
 // ID is the resolver for the id field.

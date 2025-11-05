@@ -103,7 +103,7 @@ tasks:
   # === Migration Commands ===
 
   migrate:create:
-    desc: "Create a new migration file (usage: task postgres:migrate:create NAME=add_users_table)"
+    desc: "Create a new migration file (usage: task db:migrate:create NAME=add_users_table)"
     silent: true
     dir: "{{.ROOT_DIR}}/postgres"
     cmds:
@@ -125,13 +125,13 @@ tasks:
 
         EOF
         printf "{{.GREEN}}[OK]{{.NC}} Created migration: $FILENAME\n"
-        printf "{{.YELLOW}}[TIP]{{.NC}} Use 'task postgres:migrate:diff NAME={{.NAME}}' to auto-generate from schema.hcl\n"
+        printf "{{.YELLOW}}[TIP]{{.NC}} Use 'task db:migrate:diff NAME={{.NAME}}' to auto-generate from schema.hcl\n"
     requires:
       vars:
         - NAME
 
   migrate:diff:
-    desc: "Generate migration from schema.hcl diff (usage: task postgres:migrate:diff NAME=add_users_table)"
+    desc: "Generate migration from schema.hcl diff (usage: task db:migrate:diff NAME=add_users_table)"
     silent: true
     dir: "{{.ROOT_DIR}}"
     cmds:
@@ -146,7 +146,7 @@ tasks:
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Generated migration from schema.hcl\n"
       - |
-        printf "{{.YELLOW}}[TIP]{{.NC}} Review postgres/migrations/XXX_{{.NAME}}.sql and commit\n"
+        printf "{{.YELLOW}}[TIP]{{.NC}} Review db/migrations/XXX_{{.NAME}}.sql and commit\n"
     requires:
       vars:
         - NAME
@@ -238,7 +238,7 @@ tasks:
   # === Backup & Restore ===
 
   backup:
-    desc: "Create database backup (usage: task postgres:backup FILE=backup.sql)"
+    desc: "Create database backup (usage: task db:backup FILE=backup.sql)"
     silent: true
     dir: "{{.ROOT_DIR}}"
     cmds:
@@ -247,11 +247,11 @@ tasks:
       - |
         BACKUP_FILE="${FILE:-backup_$(date +%Y%m%d_%H%M%S).sql}"
         docker compose exec -T postgres \
-          pg_dump -U admin nexus_db > "postgres/backups/$BACKUP_FILE"
-        printf "{{.GREEN}}[OK]{{.NC}} Backup created: postgres/backups/$BACKUP_FILE\n"
+          pg_dump -U admin nexus_db > "db/backups/$BACKUP_FILE"
+        printf "{{.GREEN}}[OK]{{.NC}} Backup created: db/backups/$BACKUP_FILE\n"
 
   restore:
-    desc: "Restore database from backup (usage: task postgres:restore FILE=backup.sql)"
+    desc: "Restore database from backup (usage: task db:restore FILE=backup.sql)"
     silent: true
     dir: "{{.ROOT_DIR}}"
     cmds:
@@ -263,8 +263,8 @@ tasks:
           exit 1
         fi
         docker compose exec -T postgres \
-          psql -U admin nexus_db < "postgres/backups/{{.FILE}}"
-        printf "{{.GREEN}}[OK]{{.NC}} Database restored from: postgres/backups/{{.FILE}}\n"
+          psql -U admin nexus_db < "db/backups/{{.FILE}}"
+        printf "{{.GREEN}}[OK]{{.NC}} Database restored from: db/backups/{{.FILE}}\n"
     requires:
       vars:
         - FILE
@@ -280,7 +280,7 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Seeding development data...\n"
       - |
         docker compose exec -T postgres \
-          psql -U admin nexus_db < postgres/seeds/dev.sql
+          psql -U admin nexus_db < db/seeds/dev.sql
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Development data seeded\n"
 
@@ -293,7 +293,7 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Seeding test data...\n"
       - |
         docker compose exec -T postgres \
-          psql -U admin nexus_db < postgres/seeds/test.sql
+          psql -U admin nexus_db < db/seeds/test.sql
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Test data seeded\n"
 
@@ -325,7 +325,7 @@ tasks:
         printf "{{.RED}}[WARN]{{.NC}} Destroying PostgreSQL...\n"
       - docker compose down -v postgres
       - docker volume rm nexus_postgres_data 2>/dev/null || true
-      - rm -rf postgres/backups/* 2>/dev/null || true
+      - rm -rf db/backups/* 2>/dev/null || true
       - |
         printf "{{.GREEN}}[OK]{{.NC}} PostgreSQL destroyed\n"
 

@@ -151,11 +151,11 @@ tasks:
     silent: true
     dir: "{{.ROOT_DIR}}/backend"
     sources:
-      - "../postgres/queries/**/*.sql"
+      - "../db/queries/**/*.sql"
       - "sqlc.yml"
     generates:
-      - "internal/repository/postgres/models.go"
-      - "internal/repository/postgres/queries.go"
+      - "internal/repository/models.go"
+      - "internal/repository/queries.go"
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Generating type-safe SQL code (sqlc)...\n"

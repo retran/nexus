@@ -1,6 +1,7 @@
 - [ ] No hardcoded values in configs
 - [ ] Put infra components in infra folder
-- [ ] rename postgres to db
+- [ ] add health checks for everything
+- [ ] local configs for dev tools
 
 # Nexus TO-DO
 
@@ -48,22 +49,6 @@
 - [ ] Configure self-hosted runner on Mac Mini
 - [ ] Implement automated testing pipeline
 - [ ] Set up deployment automation (Ansible or similar)
-
-## Development
-
-### Dev Experience
-
-- [ ] Create docker-compose.override.yaml template with hot reload
-- [ ] Document local development setup
-- [ ] Add dev-specific tasks to Taskfile (format, lint, test)
-- [ ] Set up pre-commit hooks configuration
-
-### Code Quality
-
-- [ ] Configure golangci-lint for backend
-- [ ] Set up ESLint + Prettier for frontend
-- [ ] Add SQLFluff for database migrations
-- [ ] Configure automated security scanning (gosec, govulncheck, yarn audit)
 
 ## Future Enhancements
 

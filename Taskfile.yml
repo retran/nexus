@@ -41,7 +41,7 @@ tasks:
       - task: infra:bootstrap:dev
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Step 2/7: PostgreSQL (migrations + seeds)...\n"
-      - task: postgres:bootstrap:dev
+      - task: db:bootstrap:dev
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Step 3/7: Vault (dev mode, shared secrets only)...\n"
       - task: vault:bootstrap:dev
@@ -112,7 +112,7 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Running all database migrations...\n"
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} PostgreSQL migrations...\n"
-      - task: postgres:migrate:up
+      - task: db:migrate:up
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Kratos migrations...\n"
       - task: ory:kratos:migrate
@@ -160,10 +160,10 @@ tasks:
       - task: frontend:lint
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
-      - task: postgres:lint
+      - task: db:lint
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} PostgreSQL migrations (Atlas)...\n"
-      - task: postgres:validate
+      - task: db:validate
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Ory configs (Kratos, Keto, Oathkeeper)...\n"
       - task: ory:validate
@@ -184,7 +184,7 @@ tasks:
       - task: frontend:lint:fix
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff --fix)...\n"
-      - task: postgres:lint:fix
+      - task: db:lint:fix
       - |
         printf "{{.GREEN}}[OK]{{.NC}} All auto-fixes applied\n"
 
@@ -204,7 +204,7 @@ tasks:
       - task: frontend:fmt
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
-      - task: postgres:fmt
+      - task: db:fmt
       - |
         printf "{{.GREEN}}[OK]{{.NC}} All code formatted\n"
 
@@ -219,7 +219,7 @@ tasks:
       - task: frontend:fmt:check
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
-      - task: postgres:fmt:check
+      - task: db:fmt:check
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Code formatting check complete\n"
 
@@ -291,7 +291,7 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Validating all configurations and migrations...\n"
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} PostgreSQL (Atlas migrations)...\n"
-      - task: postgres:validate
+      - task: db:validate
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Kratos config...\n"
       - task: ory:kratos:validate
@@ -395,10 +395,10 @@ tasks:
     cmds:
       - task -t frontend/Taskfile.yml -l
 
-  help:postgres:
-    desc: "Show PostgreSQL component commands"
+  help:db:
+    desc: "Show database component commands"
     cmds:
-      - task -t postgres/Taskfile.yml -l
+      - task -t db/Taskfile.yml -l
 
   help:ory:
     desc: "Show Ory stack component commands"
@@ -453,7 +453,7 @@ tasks:
         printf "{{.GREEN}}COMPONENT HELP:{{.NC}}\n"
         printf "  task help:backend     - Backend commands (Go services)\n"
         printf "  task help:frontend    - Frontend commands (React/Vite)\n"
-        printf "  task help:postgres    - PostgreSQL commands (migrations, SQL)\n"
+        printf "  task help:db          - Database commands (migrations, SQL)\n"
         printf "  task help:ory         - Ory stack commands (Kratos, Keto, Oathkeeper)\n"
         printf "  task help:vault       - Vault commands (secrets storage)\n"
         printf "  task help:infra       - Infrastructure commands (Redis, Temporal, Traefik)\n"
@@ -468,9 +468,9 @@ includes:
   frontend:
     taskfile: ./frontend/Taskfile.yml
     dir: ./frontend
-  postgres:
-    taskfile: ./postgres/Taskfile.yml
-    dir: ./postgres
+  db:
+    taskfile: ./db/Taskfile.yml
+    dir: ./db
   ory:
     taskfile: ./ory/Taskfile.yml
     dir: ./ory

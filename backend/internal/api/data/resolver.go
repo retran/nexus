@@ -1,6 +1,6 @@
 package data
 
-import "github.com/retran/nexus/backend/internal/repository/postgres"
+import postgres "github.com/retran/nexus/backend/internal/repository"
 
 // This file will not be regenerated automatically.
 //
