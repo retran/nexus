@@ -178,7 +178,7 @@ seed_shared_secret() {
 ensure_vault_running
 import_env
 
-require_var "WEBHOOK_SECRET"
+require_var "KRATOS_WEBHOOK_SECRET"
 require_var "OATHKEEPER_SHARED_SECRET"
 
 ensure_vault_running
@@ -195,7 +195,7 @@ vault_exec "${ROOT_TOKEN}" vault token lookup >/dev/null
 
 echo "[INFO] Seeding shared secrets..."
 
-seed_shared_secret "shared/webhook" "${WEBHOOK_SECRET}"
+seed_shared_secret "shared/webhook" "${KRATOS_WEBHOOK_SECRET}"
 seed_shared_secret "shared/oathkeeper" "${OATHKEEPER_SHARED_SECRET}"
 
 echo "[SUCCESS] Vault dev secrets seeded from ${ENV_FILE}"

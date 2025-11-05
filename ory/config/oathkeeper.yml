@@ -7,17 +7,19 @@
 version: v0.40.6
 
 log:
-  level: ${LOG_LEVEL:-info}
-  format: ${LOG_FORMAT:-json}
+  level: debug
+  format: json
+  leak_sensitive_values: false
 
 serve:
   proxy:
     cors:
       enabled: true
       allowed_origins:
-        - https://${DOMAIN}
-        - https://api.${DOMAIN}
-        - https://graphql.${DOMAIN}
+        - http://nexus.local
+        - http://api.nexus.local
+        - http://graphql.nexus.local
+        - http://auth.nexus.local
       allowed_methods:
         - POST
         - GET
@@ -42,7 +44,9 @@ errors:
     redirect:
       enabled: true
       config:
-        to: https://auth.${DOMAIN}/login
+        to: http://auth.nexus.local/login
+        code: 302
+        return_to_query_param: return_to
         when:
           - error:
               - unauthorized
@@ -93,6 +97,18 @@ authorizers:
       remote: http://keto:4466/relation-tuples/check
       headers:
         Content-Type: application/json
+
+  remote_json:
+    enabled: true
+    config:
+      remote: http://keto:4466/relation-tuples/check
+      payload: |
+        {
+          "namespace": "{{ print .MatchContext.namespace }}",
+          "object": "{{ print .MatchContext.object }}",
+          "relation": "{{ print .MatchContext.relation }}",
+          "subject_id": "{{ print .Subject }}"
+        }
 
 mutators:
   noop:
