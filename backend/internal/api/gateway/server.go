@@ -6,13 +6,10 @@ package gateway
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/Khan/genqlient/graphql"
@@ -74,15 +71,8 @@ func New(cfg *Config) (*Server, error) {
 		return nil, errors.New("config is nil")
 	}
 
-	gqlClient, err := createGraphQLClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	internalAPIClient, err := createInternalAPIClient()
-	if err != nil {
-		return nil, err
-	}
+	gqlClient := createGraphQLClient(cfg)
+	internalAPIClient := createInternalAPIClient()
 	auditService := services.NewTemporalAuditService(internalAPIClient, cfg.InternalAPIURL)
 
 	redisClient := redis.NewClient(&redis.Options{
@@ -107,7 +97,6 @@ func New(cfg *Config) (*Server, error) {
 	db := postgres.New(pool)
 
 	// Create JWT verifier for Oathkeeper tokens
-	// Create auth middleware (mTLS-based, no JWT verification needed)
 	authMiddleware := middleware.NewAuthMiddleware()
 
 	return &Server{
@@ -180,24 +169,18 @@ func (s *Server) Start() error {
 	handler = middleware.CORS(s.config.AllowedOrigins)(handler)
 
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
-	// Load TLS configuration for mTLS
-	tlsConfig, err := loadMTLSConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load mTLS config: %w", err)
-	}
 
 	s.httpServer = &http.Server{
 		Addr:         addr,
 		Handler:      handler,
 		ReadTimeout:  s.config.ReadTimeout,
 		WriteTimeout: s.config.WriteTimeout,
-		TLSConfig:    tlsConfig,
 	}
 
-	fmt.Printf("REST API Gateway starting with mTLS on https://%s\n", addr)
-	if err := s.httpServer.ListenAndServeTLS("/secrets/tls.crt", "/secrets/tls.key"); err != nil {
+	fmt.Printf("REST API Gateway starting on http://%s\n", addr)
+	if err := s.httpServer.ListenAndServe(); err != nil {
 		if !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("listen and serve TLS: %w", err)
+			return fmt.Errorf("listen and serve: %w", err)
 		}
 	}
 	return nil
@@ -223,56 +206,16 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func createGraphQLClient(cfg *Config) (graphql.Client, error) {
-	tlsConfig, err := loadMTLSConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load mTLS config: %w", err)
-	}
-
-	transport := &http.Transport{
-		TLSClientConfig: tlsConfig,
-	}
-
+func createGraphQLClient(cfg *Config) graphql.Client {
 	httpClient := &http.Client{
-		Transport: transport,
-		Timeout:   10 * time.Second,
+		Timeout: 10 * time.Second,
 	}
 
-	return gql.NewClientWithHTTPClient(cfg.GraphQLEndpoint, httpClient), nil
+	return gql.NewClientWithHTTPClient(cfg.GraphQLEndpoint, httpClient)
 }
 
-func createInternalAPIClient() (*http.Client, error) {
-	tlsConfig, err := loadMTLSConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load mTLS config: %w", err)
-	}
-
-	transport := &http.Transport{
-		TLSClientConfig: tlsConfig,
-	}
-
+func createInternalAPIClient() *http.Client {
 	return &http.Client{
-		Transport: transport,
-		Timeout:   10 * time.Second,
-	}, nil
-}
-
-// loadMTLSConfig loads TLS configuration for mutual TLS authentication.
-func loadMTLSConfig() (*tls.Config, error) {
-	// Load CA certificate for validating client certificates
-	caCert, err := os.ReadFile("/secrets/vault-ca.pem")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
+		Timeout: 10 * time.Second,
 	}
-
-	caCertPool := x509.NewCertPool()
-	if !caCertPool.AppendCertsFromPEM(caCert) {
-		return nil, fmt.Errorf("failed to parse CA certificate")
-	}
-
-	return &tls.Config{
-		ClientAuth: tls.RequireAndVerifyClientCert,
-		ClientCAs:  caCertPool,
-		MinVersion: tls.VersionTLS13,
-	}, nil
 }

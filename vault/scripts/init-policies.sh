@@ -4,7 +4,6 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "${SCRIPT_DIR}/../.." && pwd)
-COMPOSE_FILE="${REPO_ROOT}/docker-compose.dev.yaml"
 
 VAULT_TOKEN=${VAULT_TOKEN:-}
 VAULT_ADDR_IN_CONTAINER=${VAULT_ADDR:-"http://127.0.0.1:8200"}
@@ -29,7 +28,7 @@ fi
 
 compose() {
   if [ "${DOCKER_COMPOSE_BIN_RESOLVED}" = "docker-compose" ]; then
-    docker-compose -f "${COMPOSE_FILE}" "$@"
+    docker compose "$@"
   else
     docker compose -f "${COMPOSE_FILE}" "$@"
   fi

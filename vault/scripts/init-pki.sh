@@ -15,11 +15,10 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "${SCRIPT_DIR}/../.." && pwd)
-COMPOSE_FILE="${REPO_ROOT}/docker-compose.dev.yaml"
 
 vault_exec() {
   if [ "${DOCKER_COMPOSE_BIN:-docker-compose}" = "docker-compose" ]; then
-    docker-compose -f "${COMPOSE_FILE}" exec -T \
+    docker compose exec -T \
       -e VAULT_ADDR="${VAULT_ADDR}" \
       -e VAULT_TOKEN="${VAULT_TOKEN}" \
       vault "$@"

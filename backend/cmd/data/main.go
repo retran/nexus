@@ -7,8 +7,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"log"
 	"net/http"
@@ -65,8 +63,8 @@ func run() error {
 	}))
 
 	mux := http.NewServeMux()
-	mux.Handle("/graphql", mTLSAuthMiddleware(srv))
-	mux.Handle("/", mTLSAuthMiddleware(playground.Handler("GraphQL Playground", "/graphql")))
+	mux.Handle("/graphql", srv)
+	mux.Handle("/", playground.Handler("GraphQL Playground", "/graphql"))
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -77,23 +75,17 @@ func run() error {
 
 	port := getEnv("SERVER_PORT", "8081")
 
-	tlsConfig, err := loadMTLSConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load mTLS config: %w", err)
-	}
-
 	httpServer := &http.Server{
 		Addr:         ":" + port,
 		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
-		TLSConfig:    tlsConfig,
 	}
 
 	go func() {
-		log.Printf("GraphQL server starting with mTLS on https://localhost:%s/graphql", port)
-		log.Printf("GraphQL Playground available at https://localhost:%s/", port)
-		if err := httpServer.ListenAndServeTLS("/secrets/tls.crt", "/secrets/tls.key"); err != nil && err != http.ErrServerClosed {
+		log.Printf("GraphQL server starting on http://localhost:%s/graphql", port)
+		log.Printf("GraphQL Playground available at http://localhost:%s/", port)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %v", err)
 		}
 	}()
@@ -120,43 +112,4 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
-}
-
-func loadMTLSConfig() (*tls.Config, error) {
-	// Load CA certificate for validating client certificates
-	caCert, err := os.ReadFile("/secrets/vault-ca.pem")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
-	}
-
-	caCertPool := x509.NewCertPool()
-	if !caCertPool.AppendCertsFromPEM(caCert) {
-		return nil, fmt.Errorf("failed to parse CA certificate")
-	}
-
-	return &tls.Config{
-		ClientAuth: tls.RequireAndVerifyClientCert,
-		ClientCAs:  caCertPool,
-		MinVersion: tls.VersionTLS13,
-	}, nil
-}
-
-func mTLSAuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check mTLS client certificate CN
-		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-			http.Error(w, "Forbidden: missing client certificate", http.StatusForbidden)
-			return
-		}
-
-		cn := r.TLS.PeerCertificates[0].Subject.CommonName
-		// Allow gateway.service.local or worker.service.local
-		if cn != "gateway.service.local" && cn != "worker.service.local" {
-			log.Printf("Forbidden: invalid client CN: %s", cn)
-			http.Error(w, "Forbidden: invalid client certificate", http.StatusForbidden)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
 }

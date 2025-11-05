@@ -12,7 +12,6 @@ import (
 
 	"github.com/retran/nexus/backend/internal/api/common/middleware"
 	"github.com/retran/nexus/backend/internal/api/gateway/services"
-	"github.com/retran/nexus/backend/internal/client/mtls"
 )
 
 // MeHandlers handles /me endpoint for current user info.
@@ -55,13 +54,7 @@ func (h *MeHandlers) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client, err := mtls.NewTLSHTTPClient()
-	if err != nil {
-		log.Printf("Failed to create TLS HTTP client: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
+	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("Failed to revoke Kratos session: %v", err)

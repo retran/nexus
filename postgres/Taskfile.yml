@@ -23,7 +23,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Starting PostgreSQL...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d postgres
+      - docker compose up -d postgres
       - |
         printf "{{.GREEN}}[OK]{{.NC}} PostgreSQL started\n"
 
@@ -34,7 +34,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Stopping PostgreSQL...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml stop postgres
+      - docker compose stop postgres
       - |
         printf "{{.GREEN}}[OK]{{.NC}} PostgreSQL stopped\n"
 
@@ -43,7 +43,7 @@ tasks:
     silent: true
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}} postgres
+      - docker compose logs -f {{.CLI_ARGS}} postgres
 
   dev:psql:
     desc: "Connect to development database with psql"
@@ -52,7 +52,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Connecting to PostgreSQL...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec postgres psql -U admin -d nexus_db
+      - docker compose exec postgres psql -U admin -d nexus_db
 
   # === SQL Linting & Formatting ===
 
@@ -138,7 +138,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Generating migration from schema.hcl...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml run --rm atlas \
+        docker compose run --rm atlas \
           migrate diff {{.NAME}} \
           --dir "file://migrations" \
           --to "file://schema.hcl" \
@@ -158,7 +158,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Running pending migrations...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml run --rm atlas migrate apply --env local
+      - docker compose run --rm atlas migrate apply --env local
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Migrations applied\n"
 
@@ -169,7 +169,7 @@ tasks:
     cmds:
       - |
         printf "{{.RED}}[WARN]{{.NC}} Rolling back last migration...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml run --rm atlas migrate down --env local
+      - docker compose run --rm atlas migrate down --env local
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Migration rolled back\n"
 
@@ -180,7 +180,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Checking migration status...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml run --rm atlas migrate status --env local
+      - docker compose run --rm atlas migrate status --env local
 
   validate:
     desc: "Validate migrations"
@@ -189,7 +189,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Validating migrations...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml run --rm atlas migrate validate --env local
+      - docker compose run --rm atlas migrate validate --env local
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Migrations are valid\n"
 
@@ -200,7 +200,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Regenerating migration hashes...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml run --rm atlas migrate hash --env local
+      - docker compose run --rm atlas migrate hash --env local
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Migration hashes regenerated\n"
 
@@ -213,7 +213,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Inspecting database schema...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml run --rm atlas schema inspect --env local
+      - docker compose run --rm atlas schema inspect --env local
 
   schema:diff:
     desc: "Show diff between schema file and database"
@@ -222,7 +222,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Checking schema diff...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml run --rm atlas schema diff --env local
+      - docker compose run --rm atlas schema diff --env local
 
   schema:apply:
     desc: "Apply schema changes to database"
@@ -231,7 +231,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Applying schema changes...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml run --rm atlas schema apply --env local --auto-approve
+      - docker compose run --rm atlas schema apply --env local --auto-approve
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Schema changes applied\n"
 
@@ -246,7 +246,7 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Creating database backup...\n"
       - |
         BACKUP_FILE="${FILE:-backup_$(date +%Y%m%d_%H%M%S).sql}"
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec -T postgres \
+        docker compose exec -T postgres \
           pg_dump -U admin nexus_db > "postgres/backups/$BACKUP_FILE"
         printf "{{.GREEN}}[OK]{{.NC}} Backup created: postgres/backups/$BACKUP_FILE\n"
 
@@ -262,7 +262,7 @@ tasks:
           printf "{{.RED}}[ERROR]{{.NC}} FILE parameter required\n"
           exit 1
         fi
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec -T postgres \
+        docker compose exec -T postgres \
           psql -U admin nexus_db < "postgres/backups/{{.FILE}}"
         printf "{{.GREEN}}[OK]{{.NC}} Database restored from: postgres/backups/{{.FILE}}\n"
     requires:
@@ -279,7 +279,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Seeding development data...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec -T postgres \
+        docker compose exec -T postgres \
           psql -U admin nexus_db < postgres/seeds/dev.sql
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Development data seeded\n"
@@ -292,7 +292,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Seeding test data...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec -T postgres \
+        docker compose exec -T postgres \
           psql -U admin nexus_db < postgres/seeds/test.sql
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Test data seeded\n"
@@ -306,7 +306,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Bootstrapping PostgreSQL for development...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d postgres
+      - docker compose up -d postgres
       - sleep 5
       - task: migrate:up
       - task: seed:dev
@@ -323,7 +323,7 @@ tasks:
     cmds:
       - |
         printf "{{.RED}}[WARN]{{.NC}} Destroying PostgreSQL...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down -v postgres
+      - docker compose down -v postgres
       - docker volume rm nexus_postgres_data 2>/dev/null || true
       - rm -rf postgres/backups/* 2>/dev/null || true
       - |
@@ -339,7 +339,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Retrieving database statistics...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec postgres \
+        docker compose exec postgres \
           psql -U admin nexus_db -c "
             SELECT
               schemaname,
@@ -357,6 +357,6 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Running vacuum and analyze...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec postgres vacuumdb -U admin -d nexus_db --analyze --verbose
+      - docker compose exec postgres vacuumdb -U admin -d nexus_db --analyze --verbose
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Vacuum and analyze complete\n"

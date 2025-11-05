@@ -1,19 +1,13 @@
 # Copyright 2025 Andrew Vasilyev
 # SPDX-License-Identifier: Apache-2.0
 
-# Development Docker Compose overrides
-# Usage: docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up
-#
-# Development features:
-# - HTTP (no TLS)
-# - Vault dev mode (in-memory, token=root)
-# - Exposed ports for all services
-# - Hot reload (Air for backend, Vite for frontend)
-# - Admin tools: Adminer, Redis Commander, MailHog, Kratos UI, Temporal UI, Vault UI
-# - All protected by Oathkeeper SSO on *.nexus.local
+# Docker Compose configuration for Development
+# Usage: docker compose up
 
 services:
   traefik:
+    image: traefik:v3.5
+    restart: always
     command:
       - "--api.dashboard=true"
       - "--providers.docker=true"
@@ -21,19 +15,59 @@ services:
       - "--entrypoints.web.address=:80"
     ports:
       - "80:80"
-      - "8888:8080" # Dashboard (direct access without auth for debugging)
+      - "8888:8080" # Dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
   postgres:
+    image: postgres:18-alpine
+    restart: always
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./ory/scripts/init-kratos-db.sh:/docker-entrypoint-initdb.d/init-kratos-db.sh
+    env_file: .env
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  atlas:
+    image: arigaio/atlas:latest
+    volumes:
+      - ./postgres:/work
+    working_dir: /work
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   redis:
+    image: redis:8-alpine
+    restart: always
     ports:
       - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    env_file: .env
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   vault:
+    image: hashicorp/vault:1.21.0
+    restart: always
     ports:
       - "8200:8200"
+    cap_add:
+      - IPC_LOCK
     environment:
       - VAULT_DEV_ROOT_TOKEN_ID=root
       - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
@@ -41,12 +75,40 @@ services:
       - server
       - -dev
       - -dev-root-token-id=root
-    # Note: Vault UI access via vault.nexus.local is routed through Oathkeeper (see access-rules.yml)
-    # Direct access via localhost:8200 for debugging without auth
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "--quiet",
+          "http://127.0.0.1:8200/v1/sys/health?standbyok=true",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   temporal:
+    image: temporalio/auto-setup:1.29.1
+    restart: always
     ports:
       - "7233:7233"
+    env_file: .env
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD}
+      - POSTGRES_SEEDS=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   temporal-ui:
     image: temporalio/ui:latest
@@ -57,50 +119,58 @@ services:
     depends_on:
       temporal:
         condition: service_healthy
-    # Note: Temporal UI access via temporal.nexus.local is routed through Oathkeeper (see access-rules.yml protected:temporal-ui)
 
   data:
     build:
       context: ./backend
       dockerfile: docker/Dockerfile.data.dev
+    restart: always
     ports:
-      - "8081:8081" # Direct access for debugging (bypass Oathkeeper)
+      - "8081:8081"
       - "2345:2345" # Delve debug port
     volumes:
       - ./backend:/app
       - /app/bin
       - /app/tmp
+    env_file: .env
     environment:
-      - TLS_ENABLED=false
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
       - AIR_PROXY_PORT=8081
       - AIR_BUILD_DIR=/app/tmp
-    # Note: GraphQL access via graphql.nexus.local is routed through Oathkeeper (see access-rules.yml protected:graphql)
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
 
   gateway:
     build:
       context: ./backend
       dockerfile: docker/Dockerfile.gateway.dev
+    restart: always
     ports:
-      - "8080:8080" # Direct access for debugging (bypass Oathkeeper)
+      - "8080:8080"
       - "2346:2345" # Delve debug port
     volumes:
       - ./backend:/app
       - /app/bin
       - /app/tmp
+    env_file: .env
     environment:
-      - TLS_ENABLED=false
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
       - AIR_PROXY_PORT=8080
       - AIR_BUILD_DIR=/app/tmp
-    # Note: API Gateway access via api.nexus.local is routed through Oathkeeper (see access-rules.yml protected:api)
+    depends_on:
+      vault:
+        condition: service_healthy
 
   system:
     build:
       context: ./backend
       dockerfile: docker/Dockerfile.system.dev
+    restart: always
     ports:
       - "8082:8082"
       - "2347:2345" # Delve debug port
@@ -108,53 +178,91 @@ services:
       - ./backend:/app
       - /app/bin
       - /app/tmp
+    env_file: .env
     environment:
-      - TLS_ENABLED=false
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
       - AIR_PROXY_PORT=8082
       - AIR_BUILD_DIR=/app/tmp
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
 
   worker:
     build:
       context: ./backend
       dockerfile: docker/Dockerfile.worker.dev
+    restart: always
     ports:
       - "2348:2345" # Delve debug port
     volumes:
       - ./backend:/app
       - /app/bin
       - /app/tmp
+    env_file: .env
     environment:
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
       - AIR_BUILD_DIR=/app/tmp
+    depends_on:
+      temporal:
+        condition: service_started
+      vault:
+        condition: service_healthy
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
+    restart: always
     ports:
-      - "5173:5173" # Direct access for Vite HMR (bypass Oathkeeper)
+      - "5173:5173" # Vite HMR
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    env_file: .env
     environment:
       - VITE_API_URL=http://api.nexus.local
       - VITE_AUTH_URL=http://auth.nexus.local
-    # Note: Frontend access via nexus.local is routed through Oathkeeper (see access-rules.yml protected:frontend)
+
+  kratos-migrate:
+    image: oryd/kratos:v1.3.1
+    env_file: .env
+    environment:
+      - DSN=${DSN}
+    command: migrate sql -e --yes
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   kratos:
+    image: oryd/kratos:v1.3.1
+    restart: always
     ports:
-      - "4433:4433" # Direct access for debugging
+      - "4433:4433"
       - "4434:4434" # Admin API
     volumes:
       - ./ory/config:/etc/config/kratos:ro
-    command: serve -c /etc/config/kratos/kratos.yml --watch-courier --dev
+    env_file: .env
     environment:
+      - DSN=${DSN}
+      - SECRETS_COOKIE=${KRATOS_COOKIE_SECRET}
+      - SECRETS_CIPHER=${KRATOS_CIPHER_SECRET}
       - SERVE_PUBLIC_CORS_ENABLED=true
       - SERVE_PUBLIC_CORS_ALLOWED_ORIGINS=http://nexus.local
-    # Note: Kratos access via auth.nexus.local is routed through Oathkeeper (see access-rules.yml public:auth)
+    command: serve -c /etc/config/kratos/kratos.yml --watch-courier --dev
+    depends_on:
+      kratos-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4433/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   kratos-ui:
     image: oryd/kratos-selfservice-ui-node:v1.3.1
@@ -167,24 +275,40 @@ services:
     depends_on:
       kratos:
         condition: service_healthy
-    # Note: This UI is served at auth.nexus.local via Kratos upstream (not separately routed)
 
   keto-migrate:
+    image: oryd/keto:v0.14.0
     volumes:
       - ./ory/config:/etc/config/keto:ro
+    env_file: .env
+    environment:
+      - DSN=${KETO_DSN}
     command: migrate up --config /etc/config/keto/keto.yml -y
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   keto:
+    image: oryd/keto:v0.14.0
+    restart: always
     ports:
       - "4466:4466"
       - "4467:4467"
     volumes:
       - ./ory/config:/etc/config/keto:ro
+    env_file: .env
+    environment:
+      - DSN=${KETO_DSN}
     command: serve --config /etc/config/keto/keto.yml
+    depends_on:
+      keto-migrate:
+        condition: service_completed_successfully
 
   oathkeeper:
+    image: oryd/oathkeeper:v0.40.9
+    restart: always
     ports:
-      - "4455:4455" # Proxy port (bypass Traefik for direct testing)
+      - "4455:4455"
       - "4456:4456" # Admin API
     volumes:
       - ./ory/config:/etc/config/oathkeeper:ro
@@ -193,13 +317,14 @@ services:
       - LOG_LEVEL=debug
     labels:
       - "traefik.enable=true"
-      # Route ALL *.nexus.local traffic through Oathkeeper
       - "traefik.http.routers.oathkeeper.rule=HostRegexp(`{subdomain:[a-z0-9-]+}.nexus.local`)"
       - "traefik.http.routers.oathkeeper.entrypoints=web"
       - "traefik.http.routers.oathkeeper.priority=1"
       - "traefik.http.services.oathkeeper.loadbalancer.server.port=4455"
+    depends_on:
+      kratos:
+        condition: service_started
 
-  # Admin Tools (all authentication disabled - handled by Oathkeeper)
   adminer:
     image: adminer:latest
     restart: always
@@ -210,30 +335,28 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # Note: Adminer access via adminer.nexus.local is routed through Oathkeeper (see access-rules.yml protected:adminer)
-    # Authentication is handled by Oathkeeper → Kratos → Keto (admin role check)
 
   redis-commander:
     image: ghcr.io/joeferner/redis-commander:latest
     restart: always
     environment:
       - REDIS_HOSTS=local:redis:6379
-      - HTTP_USER= # Disable built-in auth
-      - HTTP_PASSWORD= # Disable built-in auth
+      - HTTP_USER=
+      - HTTP_PASSWORD=
     depends_on:
       redis:
         condition: service_healthy
-    # Note: Redis Commander access via redis.nexus.local is routed through Oathkeeper (see access-rules.yml protected:redis-ui)
-    # Authentication is handled by Oathkeeper → Kratos → Keto (admin role check)
 
   mailhog:
     image: mailhog/mailhog:v1.0.1
     platform: linux/amd64
     restart: always
     ports:
-      - "1025:1025" # SMTP port (for sending test emails)
-      - "8025:8025" # Direct HTTP access (bypass Oathkeeper for debugging)
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
     environment:
-      - MH_AUTH_FILE= # Disable built-in auth
-    # Note: MailHog web UI access via mail.nexus.local is routed through Oathkeeper (see access-rules.yml protected:mailhog)
-    # Authentication is handled by Oathkeeper → Kratos → Keto (admin role check)
+      - MH_AUTH_FILE=
+
+volumes:
+  postgres_data:
+  redis_data:

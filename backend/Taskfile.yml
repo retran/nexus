@@ -246,7 +246,7 @@ tasks:
     cmds:
       - |
         printf "{{.RED}}[WARN]{{.NC}} Destroying backend services...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down data gateway system worker
+      - docker compose down data gateway system worker
       - docker rmi nexus/data:dev nexus/gateway:dev nexus/system:dev nexus/worker:dev 2>/dev/null || true
       - docker rmi nexus/data:latest nexus/gateway:latest nexus/system:latest nexus/worker:latest 2>/dev/null || true
       - task: clean

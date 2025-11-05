@@ -7,8 +7,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,7 +21,6 @@ import (
 	temporalclient "go.temporal.io/sdk/client"
 
 	"github.com/retran/nexus/backend/internal/api/system/handlers"
-	"github.com/retran/nexus/backend/internal/client/mtls"
 )
 
 func main() {
@@ -62,10 +59,7 @@ func run() error {
 	mux := http.NewServeMux()
 	configureMux(mux, roleHandler, auditHandler, kratosWebhookHandler)
 
-	server, err := newHTTPServer(port, mux)
-	if err != nil {
-		return fmt.Errorf("create HTTP server: %w", err)
-	}
+	server := newHTTPServer(port, mux)
 	log.Printf("Starting internal API on port %s", port)
 
 	return serve(server)
@@ -78,16 +72,9 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func internalHealthHandler(w http.ResponseWriter, r *http.Request) {
-	// mTLS ensures the request comes from an authorized service (gateway.service.local)
-	response := "OK"
-	if r.TLS != nil && len(r.TLS.PeerCertificates) > 0 {
-		cn := r.TLS.PeerCertificates[0].Subject.CommonName
-		response = fmt.Sprintf("OK (%s)", cn)
-	}
-
+func internalHealthHandler(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	if _, err := w.Write([]byte(response)); err != nil {
+	if _, err := w.Write([]byte("OK")); err != nil {
 		log.Printf("Failed to write protected health response: %v", err)
 	}
 }
@@ -111,19 +98,17 @@ func parseCSV(raw string) []string {
 }
 func configureMux(mux *http.ServeMux, roleHandler *handlers.AdminHandler, auditHandler *handlers.AuditHandler, kratosWebhookHandler *handlers.KratosWebhookHandler) {
 	mux.HandleFunc("GET /health", healthHandler)
+	mux.HandleFunc("GET /internal/healthz", internalHealthHandler)
+	mux.Handle("POST /admin/users/{id}/role", adminRoleHandler(roleHandler))
 
-	// mTLS-protected endpoints (only gateway.service.local)
-	mux.Handle("GET /internal/healthz", mTLSAuthMiddleware("gateway.service.local", http.HandlerFunc(internalHealthHandler)))
-	mux.Handle("POST /admin/users/{id}/role", mTLSAuthMiddleware("gateway.service.local", adminRoleHandler(roleHandler)))
 	if auditHandler != nil {
-		mux.Handle("POST /internal/audit/events", mTLSAuthMiddleware("gateway.service.local", http.HandlerFunc(auditHandler.HandleAuditEvent)))
+		mux.HandleFunc("POST /internal/audit/events", auditHandler.HandleAuditEvent)
 	}
 
-	// Kratos webhooks (proxied via Oathkeeper with mTLS, CN = oathkeeper.service.local)
 	if kratosWebhookHandler != nil {
-		mux.Handle("POST /webhooks/kratos/registration", mTLSAuthMiddleware("oathkeeper.service.local", http.HandlerFunc(kratosWebhookHandler.HandleRegistration)))
-		mux.Handle("POST /webhooks/kratos/login", mTLSAuthMiddleware("oathkeeper.service.local", http.HandlerFunc(kratosWebhookHandler.HandleLogin)))
-		mux.Handle("POST /webhooks/kratos/logout", mTLSAuthMiddleware("oathkeeper.service.local", http.HandlerFunc(kratosWebhookHandler.HandleLogout)))
+		mux.HandleFunc("POST /webhooks/kratos/registration", kratosWebhookHandler.HandleRegistration)
+		mux.HandleFunc("POST /webhooks/kratos/login", kratosWebhookHandler.HandleLogin)
+		mux.HandleFunc("POST /webhooks/kratos/logout", kratosWebhookHandler.HandleLogout)
 	}
 }
 
@@ -147,7 +132,7 @@ func initServices(_ string, allowedRolesEnv, kratosAdminURL string, temporalClie
 func adminRoleHandler(roleHandler *handlers.AdminHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Role validation is now handled by the gateway, which already verifies admin role
-		// before calling this endpoint. mTLS ensures the request comes from gateway.service.local.
+		// before calling this endpoint.
 
 		identityID := strings.TrimSpace(r.PathValue("id"))
 		if identityID == "" {
@@ -180,49 +165,34 @@ func newTemporalClient(host, namespace string) (temporalclient.Client, error) {
 		return nil, errors.New("TEMPORAL_HOST is required")
 	}
 
-	// Load mTLS configuration for Temporal client
-	tlsConfig, err := mtls.LoadClientTLSConfig("", "", "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to load mTLS config: %w", err)
-	}
-
 	opts := temporalclient.Options{
 		HostPort:  host,
 		Namespace: strings.TrimSpace(namespace),
-		ConnectionOptions: temporalclient.ConnectionOptions{
-			TLS: tlsConfig,
-		},
 	}
 	cli, err := temporalclient.Dial(opts)
 	if err != nil {
-		return nil, fmt.Errorf("connect to Temporal with mTLS: %w", err)
+		return nil, fmt.Errorf("connect to Temporal: %w", err)
 	}
 	return cli, nil
 }
 
-func newHTTPServer(port string, handler http.Handler) (*http.Server, error) {
-	tlsConfig, err := loadMTLSConfig()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load mTLS config: %w", err)
-	}
-
+func newHTTPServer(port string, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),
 		Handler:      handler,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
-		TLSConfig:    tlsConfig,
-	}, nil
+	}
 }
 
 func serve(server *http.Server) error {
 	errCh := make(chan error, 1)
 
 	go func() {
-		log.Printf("Internal API starting with mTLS on https://localhost%s", server.Addr)
-		if err := server.ListenAndServeTLS("/secrets/tls.crt", "/secrets/tls.key"); err != nil && err != http.ErrServerClosed {
-			errCh <- fmt.Errorf("listen and serve TLS: %w", err)
+		log.Printf("Internal API starting on http://localhost%s", server.Addr)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- fmt.Errorf("listen and serve: %w", err)
 		}
 	}()
 
@@ -245,42 +215,4 @@ func serve(server *http.Server) error {
 
 	log.Println("Internal API stopped")
 	return nil
-}
-
-func loadMTLSConfig() (*tls.Config, error) {
-	// Load CA certificate for validating client certificates
-	caCert, err := os.ReadFile("/secrets/vault-ca.pem")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read CA certificate: %w", err)
-	}
-
-	caCertPool := x509.NewCertPool()
-	if !caCertPool.AppendCertsFromPEM(caCert) {
-		return nil, fmt.Errorf("failed to parse CA certificate")
-	}
-
-	return &tls.Config{
-		ClientAuth: tls.RequireAndVerifyClientCert,
-		ClientCAs:  caCertPool,
-		MinVersion: tls.VersionTLS13,
-	}, nil
-}
-
-func mTLSAuthMiddleware(expectedCN string, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check mTLS client certificate CN
-		if r.TLS == nil || len(r.TLS.PeerCertificates) == 0 {
-			http.Error(w, "Forbidden: missing client certificate", http.StatusForbidden)
-			return
-		}
-
-		cn := r.TLS.PeerCertificates[0].Subject.CommonName
-		if cn != expectedCN {
-			log.Printf("Forbidden: invalid client CN: %s (expected %s)", cn, expectedCN)
-			http.Error(w, "Forbidden: invalid client certificate", http.StatusForbidden)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
 }

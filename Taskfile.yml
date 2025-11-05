@@ -56,7 +56,7 @@ tasks:
       - task: frontend:deps:install
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Step 7/7: Starting all application services...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d
+      - docker compose up -d
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Nexus development environment ready!\n"
 
@@ -68,7 +68,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Starting all services in Docker...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d
+      - docker compose up -d
       - |
         printf "{{.GREEN}}[OK]{{.NC}} All services started\n"
 
@@ -78,7 +78,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Stopping all services...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml stop
+      - docker compose stop
       - |
         printf "{{.GREEN}}[OK]{{.NC}} All services stopped\n"
 
@@ -263,7 +263,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Showing logs from all services...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}}
+      - docker compose logs -f {{.CLI_ARGS}}
 
   logs:backend:
     desc: "Show backend service logs"
@@ -271,7 +271,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Showing backend logs...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f data gateway system worker
+      - docker compose logs -f data gateway system worker
 
   logs:infra:
     desc: "Show infrastructure logs (Postgres, Redis, Temporal, etc.)"
@@ -279,7 +279,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Showing infrastructure logs...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f postgres redis temporal vault kratos keto oathkeeper
+      - docker compose logs -f postgres redis temporal vault kratos keto oathkeeper
 
   # === Validation ===
 
@@ -338,7 +338,7 @@ tasks:
         printf "{{.RED}}[WARN]{{.NC}} Destroying entire Nexus stack...\n"
       - |
         printf "{{.RED}}[WARN]{{.NC}} Stopping all services...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down -v --remove-orphans
+      - docker compose down -v --remove-orphans
       - |
         printf "{{.RED}}[WARN]{{.NC}} Removing backend artifacts...\n"
       - task: backend:destroy
@@ -366,7 +366,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Checking status of all services...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml ps
+      - docker compose ps
 
   health:
     desc: "Check health of all services"
@@ -376,11 +376,11 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Checking health of all services...\n"
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} PostgreSQL...\n"
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec postgres pg_isready -U admin || printf "{{.RED}}[ERROR]{{.NC}} PostgreSQL not ready\n"
+        docker compose exec postgres pg_isready -U admin || printf "{{.RED}}[ERROR]{{.NC}} PostgreSQL not ready\n"
         printf "{{.BLUE}}[INFO]{{.NC}} Redis...\n"
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec redis redis-cli ping || printf "{{.RED}}[ERROR]{{.NC}} Redis not ready\n"
+        docker compose exec redis redis-cli ping || printf "{{.RED}}[ERROR]{{.NC}} Redis not ready\n"
         printf "{{.BLUE}}[INFO]{{.NC}} Vault...\n"
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault vault status || printf "{{.RED}}[ERROR]{{.NC}} Vault not ready\n"
+        docker compose exec vault vault status || printf "{{.RED}}[ERROR]{{.NC}} Vault not ready\n"
         printf "{{.GREEN}}[OK]{{.NC}} Health check complete\n"
 
   # === Help & Documentation ===

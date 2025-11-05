@@ -34,7 +34,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Checking Vault status...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+        docker compose exec vault \
           vault status
 
   # === PKI (TLS Certificates) ===
@@ -105,7 +105,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Storing secret at secret/{{.PATH}}...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+        docker compose exec vault \
           vault kv put secret/{{.PATH}} {{.KEY}}={{.VALUE}}
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Secret stored\n"
@@ -123,7 +123,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Retrieving secret from secret/{{.PATH}}...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+        docker compose exec vault \
           vault kv get secret/{{.PATH}}
     requires:
       vars:
@@ -138,7 +138,7 @@ tasks:
       - |
         printf "{{.RED}}[WARN]{{.NC}} Deleting secret at secret/{{.PATH}}...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+        docker compose exec vault \
           vault kv delete secret/{{.PATH}}
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Secret deleted\n"
@@ -154,7 +154,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Listing secrets at secret/{{.PATH}}...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+        docker compose exec vault \
           vault kv list secret/{{.PATH}}
     requires:
       vars:
@@ -215,7 +215,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Listing Vault policies...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+        docker compose exec vault \
           vault policy list
 
   policies:read:
@@ -226,7 +226,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Reading policy {{.POLICY}}...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec vault \
+        docker compose exec vault \
           vault policy read {{.POLICY}}
     requires:
       vars:
@@ -271,7 +271,7 @@ tasks:
     silent: true
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}} vault
+      - docker compose logs -f {{.CLI_ARGS}} vault
 
   # === Agent Management ===
 
@@ -349,7 +349,7 @@ tasks:
     cmds:
       - |
         printf "{{.RED}}[WARN]{{.NC}} Destroying Vault...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down vault
+      - docker compose down vault
       - docker volume rm nexus_vault_data 2>/dev/null || true
       - docker volume rm nexus_vault_logs 2>/dev/null || true
       - rm -rf vault/backups/* 2>/dev/null || true

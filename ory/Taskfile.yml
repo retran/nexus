@@ -25,7 +25,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Running Kratos database migrations...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml run --rm kratos-migrate
+        docker compose run --rm kratos-migrate
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Kratos migrations complete\n"
 
@@ -37,7 +37,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Listing identities...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec kratos \
+        docker compose exec kratos \
           kratos identities list --endpoint http://localhost:4434
 
   kratos:identities:get:
@@ -48,7 +48,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Getting identity {{.ID}}...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec kratos \
+        docker compose exec kratos \
           kratos identities get {{.ID}} --endpoint http://localhost:4434
     requires:
       vars:
@@ -62,7 +62,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Creating identity from {{.FILE}}...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec -T kratos \
+        docker compose exec -T kratos \
           kratos identities create --endpoint http://localhost:4434 < {{.FILE}}
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Identity created\n"
@@ -79,7 +79,7 @@ tasks:
       - |
         printf "{{.RED}}[WARN]{{.NC}} Deleting identity {{.ID}}...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec kratos \
+        docker compose exec kratos \
           kratos identities delete {{.ID}} --endpoint http://localhost:4434
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Identity deleted\n"
@@ -111,7 +111,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Running Keto database migrations...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml run --rm keto-migrate
+        docker compose run --rm keto-migrate
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Keto migrations complete\n"
 
@@ -123,7 +123,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Creating relation tuple...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec keto \
+        docker compose exec keto \
           keto relation-tuple create {{.CLI_ARGS}} --endpoint http://localhost:4467
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Relation tuple created\n"
@@ -136,7 +136,7 @@ tasks:
       - |
         printf "{{.RED}}[WARN]{{.NC}} Deleting relation tuple...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec keto \
+        docker compose exec keto \
           keto relation-tuple delete {{.CLI_ARGS}} --endpoint http://localhost:4467
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Relation tuple deleted\n"
@@ -149,7 +149,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Listing relation tuples...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec keto \
+        docker compose exec keto \
           keto relation-tuple get {{.CLI_ARGS}} --endpoint http://localhost:4467
 
   keto:check:
@@ -160,7 +160,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Checking permission...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec keto \
+        docker compose exec keto \
           keto check {{.CLI_ARGS}} --endpoint http://localhost:4466
 
   keto:expand:
@@ -171,7 +171,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Expanding subject set...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec keto \
+        docker compose exec keto \
           keto expand {{.CLI_ARGS}} --endpoint http://localhost:4466
 
   keto:validate:
@@ -212,7 +212,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Listing Oathkeeper access rules...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec oathkeeper \
+        docker compose exec oathkeeper \
           oathkeeper rules list --endpoint http://localhost:4456
 
   oathkeeper:rules:get:
@@ -223,7 +223,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Getting Oathkeeper rule {{.ID}}...\n"
       - |
-        docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec oathkeeper \
+        docker compose exec oathkeeper \
           oathkeeper rules get {{.ID}} --endpoint http://localhost:4456
     requires:
       vars:
@@ -340,7 +340,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Bootstrapping Ory stack for development...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d kratos keto oathkeeper
+      - docker compose up -d kratos keto oathkeeper
       - sleep 5
       - task: kratos:migrate
       - task: keto:migrate
@@ -355,7 +355,7 @@ tasks:
     silent: true
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}} kratos keto oathkeeper
+      - docker compose logs -f {{.CLI_ARGS}} kratos keto oathkeeper
 
   # === Validation ===
 
@@ -383,7 +383,7 @@ tasks:
     cmds:
       - |
         printf "{{.RED}}[WARN]{{.NC}} Destroying Ory stack...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down kratos keto oathkeeper
+      - docker compose down kratos keto oathkeeper
       - docker volume rm nexus_kratos_data 2>/dev/null || true
       - docker volume rm nexus_keto_data 2>/dev/null || true
       - |

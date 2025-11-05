@@ -11,8 +11,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-
-	"github.com/retran/nexus/backend/internal/client/mtls"
 )
 
 // ErrUnknownRole indicates that the requested role is not permitted.
@@ -33,13 +31,8 @@ type AdminHandler struct {
 
 // NewAdminHandler creates a new handler for role management.
 func NewAdminHandler(kratosAdminURL string, allowedRoles []string) (*AdminHandler, error) {
-	client, err := mtls.NewTLSHTTPClient()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create TLS HTTP client: %w", err)
-	}
-
 	return &AdminHandler{
-		client:      client,
+		client:      &http.Client{},
 		kratosAdmin: strings.TrimSuffix(kratosAdminURL, "/"),
 		allowed:     allowedRoles,
 	}, nil

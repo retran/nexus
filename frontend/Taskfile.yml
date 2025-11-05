@@ -209,7 +209,7 @@ tasks:
     cmds:
       - |
         printf "{{.RED}}[WARN]{{.NC}} Destroying frontend services...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down ui
+      - docker compose down ui
       - docker rmi nexus/ui:dev 2>/dev/null || true
       - docker rmi nexus/ui:latest 2>/dev/null || true
       - task: clean

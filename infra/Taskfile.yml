@@ -23,7 +23,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Starting Redis...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d redis
+      - docker compose up -d redis
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Redis started\n"
 
@@ -34,7 +34,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Stopping Redis...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml stop redis
+      - docker compose stop redis
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Redis stopped\n"
 
@@ -43,7 +43,7 @@ tasks:
     silent: true
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}} redis
+      - docker compose logs -f {{.CLI_ARGS}} redis
 
   redis:cli:
     desc: "Connect to Redis CLI"
@@ -52,7 +52,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Connecting to Redis CLI...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml exec redis redis-cli
+      - docker compose exec redis redis-cli
 
   redis:destroy:
     desc: "Destroy Redis data and container (WARNING: irreversible)"
@@ -62,7 +62,7 @@ tasks:
     cmds:
       - |
         printf "{{.RED}}[WARN]{{.NC}} Destroying Redis...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down redis
+      - docker compose down redis
       - docker volume rm nexus_redis_data 2>/dev/null || true
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Redis destroyed\n"
@@ -76,7 +76,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Starting Temporal...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d temporal
+      - docker compose up -d temporal
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Temporal started\n"
 
@@ -87,7 +87,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Stopping Temporal...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml stop temporal
+      - docker compose stop temporal
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Temporal stopped\n"
 
@@ -96,7 +96,7 @@ tasks:
     silent: true
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}} temporal
+      - docker compose logs -f {{.CLI_ARGS}} temporal
 
   temporal:destroy:
     desc: "Destroy Temporal data and container (WARNING: irreversible)"
@@ -106,7 +106,7 @@ tasks:
     cmds:
       - |
         printf "{{.RED}}[WARN]{{.NC}} Destroying Temporal...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down temporal
+      - docker compose down temporal
       - docker volume rm nexus_temporal_data 2>/dev/null || true
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Temporal destroyed\n"
@@ -120,7 +120,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Starting Traefik...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml up -d traefik
+      - docker compose up -d traefik
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Traefik started\n"
 
@@ -131,7 +131,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Stopping Traefik...\n"
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml stop traefik
+      - docker compose stop traefik
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Traefik stopped\n"
 
@@ -140,7 +140,7 @@ tasks:
     silent: true
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}} traefik
+      - docker compose logs -f {{.CLI_ARGS}} traefik
 
   # === All Infrastructure ===
 
@@ -185,7 +185,7 @@ tasks:
     silent: true
     dir: "{{.ROOT_DIR}}"
     cmds:
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml logs -f {{.CLI_ARGS}} traefik redis temporal
+      - docker compose logs -f {{.CLI_ARGS}} traefik redis temporal
 
   destroy:
     desc: "Destroy all infrastructure data and containers (WARNING: irreversible)"
@@ -197,6 +197,6 @@ tasks:
         printf "{{.RED}}[WARN]{{.NC}} Destroying all infrastructure...\n"
       - task: redis:destroy
       - task: temporal:destroy
-      - docker compose -f docker-compose.base.yaml -f docker-compose.dev.yaml down traefik
+      - docker compose down traefik
       - |
         printf "{{.GREEN}}[OK]{{.NC}} All infrastructure destroyed\n"
