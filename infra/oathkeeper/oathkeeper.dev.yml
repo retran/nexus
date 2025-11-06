@@ -1,15 +1,14 @@
 # Copyright 2025 Andrew Vasilyev
 # SPDX-License-Identifier: Apache-2.0
 
-# Oathkeeper Configuration - SHARED (Dev + Prod)
-# Environment-specific values configured via env vars in docker-compose files
+# Oathkeeper Configuration - DEVELOPMENT
 
 version: v0.40.6
 
 log:
   level: debug
   format: json
-  leak_sensitive_values: false
+  leak_sensitive_values: true
 
 serve:
   proxy:
@@ -62,7 +61,7 @@ errors:
 access_rules:
   matching_strategy: regexp
   repositories:
-    - file:///etc/config/oathkeeper/access-rules.yml
+    - file:///etc/config/oathkeeper/access-rules.dev.yml
 
 authenticators:
   anonymous:
@@ -117,6 +116,6 @@ mutators:
     enabled: true
     config:
       headers:
-        X-User: "{{ print .Subject }}"
+        X-User-ID: "{{ print .Subject }}"
         X-User-Email: "{{ print .Extra.identity.traits.email }}"
         X-User-Role: "{{ print .Extra.identity.traits.role }}"

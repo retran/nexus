@@ -15,6 +15,12 @@ export default defineConfig({
     // Production: will use different HMR settings for actual domain
     host: true,
     port: 3000,
+    allowedHosts: [
+      "frontend",
+      "nexus.local",
+      ".nexus.local",
+      "localhost",
+    ],
     hmr: {
       clientPort: 80,
       protocol: "ws",

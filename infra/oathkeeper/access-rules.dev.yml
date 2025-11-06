@@ -1,52 +1,11 @@
 # Copyright 2025 Andrew Vasilyev
 # SPDX-License-Identifier: Apache-2.0
 
-# Oathkeeper Access Rules - Development Environment
+# Oathkeeper Access Rules - DEVELOPMENT Environment
 # Uses nexus.local for local development
 
-# Kratos Public API - for browser self-service flows (must be BEFORE auth-ui rule)
-- id: "public:kratos-api"
-  upstream:
-    preserve_host: false
-    url: "http://kratos:4433"
-  match:
-    url: "<http|https>://auth.nexus.local/self-service<.*>"
-    methods:
-      - GET
-      - POST
-      - PUT
-      - PATCH
-      - DELETE
-      - HEAD
-  authenticators:
-    - handler: anonymous
-  authorizer:
-    handler: allow
-  mutators:
-    - handler: noop
-
-# Kratos UI - for login/registration pages
-- id: "public:auth-ui"
-  upstream:
-    preserve_host: true
-    url: "http://kratos-ui:4455"
-  match:
-    url: "<http|https>://auth.nexus.local<(?!/self-service).*>"
-    methods:
-      - GET
-      - POST
-      - HEAD
-  authenticators:
-    - handler: anonymous
-  authorizer:
-    handler: allow
-  mutators:
-    - handler: noop
-
+# API Gateway - Admin endpoints require admin role
 - id: "protected:api:admin"
-  upstream:
-    preserve_host: false
-    url: "http://gateway:8080"
   match:
     url: "<http|https>://api.nexus.local/api/admin<.*>"
     methods:
@@ -75,11 +34,17 @@
     - handler: redirect
       config:
         to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
 
+# API Gateway - Public API endpoints (authenticated users)
 - id: "protected:api"
-  upstream:
-    preserve_host: false
-    url: "http://gateway:8080"
   match:
     url: "<http|https>://api.nexus.local/api<.*>"
     methods:
@@ -99,33 +64,34 @@
     - handler: redirect
       config:
         to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
 
-- id: "protected:frontend"
-  upstream:
-    preserve_host: false
-    url: "http://frontend:3000"
+# Frontend - Temporary anonymous access (TODO: integrate Kratos auth in React app)
+- id: "public:frontend"
   match:
-    url: "<http|https>://nexus.local<.*>"
+    url: "<http|https|ws|wss>://nexus.local<.*>"
     methods:
       - GET
       - POST
       - HEAD
   authenticators:
-    - handler: cookie_session
+    - handler: anonymous
   authorizer:
     handler: allow
   mutators:
     - handler: noop
   errors:
-    - handler: redirect
-      config:
-        to: http://auth.nexus.local/login
+    - handler: json
 
 # Admin Tools - require admin role (development only)
 - id: "protected:adminer"
-  upstream:
-    preserve_host: false
-    url: "http://adminer:8080"
   match:
     url: "<http|https>://adminer.nexus.local<.*>"
     methods:
@@ -153,11 +119,16 @@
     - handler: redirect
       config:
         to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
 
 - id: "protected:redis-ui"
-  upstream:
-    preserve_host: false
-    url: "http://redis-commander:8081"
   match:
     url: "<http|https>://redis.nexus.local<.*>"
     methods:
@@ -183,11 +154,16 @@
     - handler: redirect
       config:
         to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
 
 - id: "protected:mailhog"
-  upstream:
-    preserve_host: false
-    url: "http://mailhog:8025"
   match:
     url: "<http|https>://mail.nexus.local<.*>"
     methods:
@@ -214,11 +190,16 @@
     - handler: redirect
       config:
         to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
 
 - id: "protected:vault-ui"
-  upstream:
-    preserve_host: false
-    url: "http://vault:8200"
   match:
     url: "<http|https>://vault.nexus.local<.*>"
     methods:
@@ -246,11 +227,16 @@
     - handler: redirect
       config:
         to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
 
 - id: "protected:temporal-ui"
-  upstream:
-    preserve_host: false
-    url: "http://temporal-ui:8080"
   match:
     url: "<http|https>://temporal.nexus.local<.*>"
     methods:
@@ -276,33 +262,11 @@
     - handler: redirect
       config:
         to: http://auth.nexus.local/login
-
-- id: "protected:traefik-dashboard"
-  upstream:
-    preserve_host: false
-    url: "http://traefik:8080"
-  match:
-    url: "<http|https>://traefik.nexus.local<.*>"
-    methods:
-      - GET
-      - POST
-      - HEAD
-  authenticators:
-    - handler: cookie_session
-  authorizer:
-    handler: remote_json
-    config:
-      remote: "http://keto:4466/relation-tuples/check"
-      payload: |
-        {
-          "namespace": "Role",
-          "object": "admin",
-          "relation": "members",
-          "subject_id": "{{ print .Subject }}"
-        }
-  mutators:
-    - handler: noop
-  errors:
-    - handler: redirect
-      config:
-        to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html

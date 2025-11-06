@@ -1,6 +1,7 @@
-- [ ] No hardcoded values in configs
+- [ ] secrets in vault
 - [ ] local configs for dev tools and proper local taskfiles
-- [ ] destroy working strange = [ ] use hosts of health checks instead of IP
+- [ ] destroy working strange
+
 - [ ] observability stack
 - [ ] tooling stack (review)
 

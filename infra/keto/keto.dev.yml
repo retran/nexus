@@ -1,12 +1,13 @@
 # Copyright 2025 Andrew Vasilyev
 # SPDX-License-Identifier: Apache-2.0
 
-# Ory Keto Configuration - SHARED (Dev + Prod)
-# Environment-specific values configured via env vars in docker-compose files
+# Ory Keto Configuration - DEVELOPMENT
+# For production, use keto.prod.yml with stricter CORS and logging
 
 version: v0.14.0
 
-dsn: ${DSN}
+# DSN configured via DSN env var
+dsn: memory
 
 serve:
   read:
@@ -15,8 +16,8 @@ serve:
     cors:
       enabled: true
       allowed_origins:
-        - https://${DOMAIN}
-        - https://api.${DOMAIN}
+        - http://nexus.local
+        - http://api.nexus.local
         - http://oathkeeper:4455
       allowed_methods:
         - POST
@@ -36,8 +37,8 @@ serve:
     cors:
       enabled: true
       allowed_origins:
-        - https://${DOMAIN}
-        - https://api.${DOMAIN}
+        - http://nexus.local
+        - http://api.nexus.local
         - http://oathkeeper:4455
       allowed_methods:
         - POST
@@ -56,5 +57,5 @@ namespaces:
   location: file:///etc/config/keto/namespaces.ts
 
 log:
-  level: ${LOG_LEVEL:-info}
-  format: ${LOG_FORMAT:-json}
+  level: debug
+  format: text

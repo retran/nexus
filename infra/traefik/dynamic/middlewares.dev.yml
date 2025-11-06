@@ -1,0 +1,37 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Traefik Dynamic Configuration - Middlewares - DEVELOPMENT
+# This file defines global middlewares used across all services
+
+http:
+  middlewares:
+    oathkeeper-auth:
+      forwardAuth:
+        address: "http://oathkeeper:4456/decisions"
+        trustForwardHeader: true
+        authResponseHeaders:
+          - "X-User-ID"
+          - "X-User-Email"
+          - "X-User-Role"
+          - "X-Session-ID"
+          - "X-User-Name"
+
+    auth-redirect:
+      errors:
+        status:
+          - "401"
+        service: error-redirect-svc
+        query: "/{status}"
+
+    oathkeeper-with-redirect:
+      chain:
+        middlewares:
+          - oathkeeper-auth
+          - auth-redirect
+
+  services:
+    error-redirect-svc:
+      loadBalancer:
+        servers:
+          - url: "http://kratos-ui:4455"
