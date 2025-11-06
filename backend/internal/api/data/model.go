@@ -2,9 +2,7 @@
 
 package data
 
-import (
-	"github.com/retran/nexus/backend/internal/repository"
-)
+import postgres "github.com/retran/nexus/backend/internal/repository"
 
 type CreateAuditLogInput struct {
 	UserID    *string                 `json:"userId,omitempty"`

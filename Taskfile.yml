@@ -9,9 +9,11 @@ vars:
   NC: \033[0m
 
 tasks:
-  # === Environment Setup ===
+  # ============================================================================
+  # SETUP - Initial project setup commands
+  # ============================================================================
 
-  env:generate:
+  setup:env:
     desc: "Generate .env file with secure random secrets"
     silent: true
     cmds:
@@ -23,7 +25,7 @@ tasks:
         msg: |
           .env.example file not found
 
-  hosts:setup:
+  setup:hosts:
     desc: "Setup /etc/hosts entries for *.nexus.local domains"
     silent: true
     cmds:
@@ -33,10 +35,10 @@ tasks:
         HOSTS_ENTRY="127.0.0.1 nexus.local api.nexus.local auth.nexus.local adminer.nexus.local redis.nexus.local mail.nexus.local temporal.nexus.local traefik.nexus.local"
 
         if grep -q "nexus.local" /etc/hosts; then
-          printf "{{.YELLOW}}[INFO]{{.NC}} nexus.local entries already exist in /etc/hosts\n"
-          printf "{{.YELLOW}}[INFO]{{.NC}} Current entries:\n"
+          printf "{{.WARN}}[WARN]{{.NC}} nexus.local entries already exist in /etc/hosts\n"
+          printf "{{.BLUE}}[INFO]{{.NC}} Current entries:\n"
           grep "nexus.local" /etc/hosts | sed 's/^/  /'
-          printf "\n{{.YELLOW}}[INFO]{{.NC}} To update, remove old entries and run this task again\n"
+          printf "\n{{.YELLOW}}[TIP]{{.NC}} To update, remove old entries and run this task again\n"
         else
           printf "{{.BLUE}}[INFO]{{.NC}} Adding nexus.local entries to /etc/hosts...\n"
           printf "\n# Nexus Development Environment\n%s\n" "$HOSTS_ENTRY" | sudo tee -a /etc/hosts > /dev/null
@@ -47,7 +49,7 @@ tasks:
         grep "nexus.local" /etc/hosts | sed 's/^/  /'
         printf "\n"
 
-  hosts:remove:
+  setup:hosts:remove:
     desc: "Remove /etc/hosts entries for *.nexus.local domains"
     silent: true
     prompt: "This will remove all nexus.local entries from /etc/hosts. Continue?"
@@ -59,14 +61,22 @@ tasks:
           sudo sed -i.bak '/nexus.local/d' /etc/hosts
           sudo sed -i.bak '/# Nexus Development Environment/d' /etc/hosts
           printf "{{.GREEN}}[OK]{{.NC}} Successfully removed entries from /etc/hosts\n"
-          printf "{{.YELLOW}}[INFO]{{.NC}} Backup saved to /etc/hosts.bak\n"
+          printf "{{.YELLOW}}[TIP]{{.NC}} Backup saved to /etc/hosts.bak\n"
         else
-          printf "{{.YELLOW}}[INFO]{{.NC}} No nexus.local entries found in /etc/hosts\n"
+          printf "{{.YELLOW}}[WARN]{{.NC}} No nexus.local entries found in /etc/hosts\n"
         fi
 
-  # === Development Bootstrap ===
+  setup:hooks:
+    desc: "Install pre-commit Git hooks"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Installing pre-commit Git hooks...\n"
+      - pre-commit install
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Pre-commit hooks installed\n"
 
-  bootstrap:dev:
+  setup:bootstrap:
     desc: "Bootstrap ALL services for development (one-command setup)"
     silent: true
     cmds:
@@ -83,7 +93,6 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Step 2/7: PostgreSQL (migrations + seeds)...\n"
       - task: db:bootstrap:dev
-      # Infrastructure bootstrap includes Vault and Ory (Kratos, Keto)
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Step 5/7: Infrastructure tooling dependencies...\n"
       - task: infra:deps:install
@@ -99,10 +108,12 @@ tasks:
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Nexus development environment ready!\n"
 
-  # === Development Servers ===
+  # ============================================================================
+  # DEV - Daily development commands
+  # ============================================================================
 
-  dev:
-    desc: "Start ALL services in Docker (backend + frontend + infra)"
+  dev:up:
+    desc: "Start ALL services in Docker"
     silent: true
     cmds:
       - |
@@ -121,194 +132,7 @@ tasks:
       - |
         printf "{{.GREEN}}[OK]{{.NC}} All services stopped\n"
 
-  # === Code Generation ===
-
-  gen:
-    desc: "Run ALL code generators (GraphQL, SQL, etc.)"
-    silent: true
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Running all code generators...\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Generating GraphQL server code...\n"
-      - task: backend:gen:graphql:server
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Generating GraphQL client code...\n"
-      - task: backend:gen:graphql:client
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Generating SQL code (sqlc)...\n"
-      - task: backend:gen:sqlc
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} All code generation complete\n"
-
-  # === Database Migrations ===
-
-  migrate:
-    desc: "Run ALL database migrations (PostgreSQL, Kratos, Keto)"
-    silent: true
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Running all database migrations...\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} PostgreSQL migrations...\n"
-      - task: db:migrate:up
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Kratos migrations...\n"
-      - task: infra:kratos:migrate
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Keto migrations...\n"
-      - task: infra:keto:migrate
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} All migrations complete\n"
-
-  # === Pre-commit Checks ===
-
-  pre-commit:
-    desc: "Run pre-commit hooks on all files (same as Git runs)"
-    silent: true
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Running pre-commit hooks...\n"
-      - pre-commit run --all-files
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} All pre-commit checks passed!\n"
-
-  pre-commit:install:
-    desc: "Install pre-commit Git hooks"
-    silent: true
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Installing pre-commit Git hooks...\n"
-      - pre-commit install
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} Pre-commit hooks installed\n"
-
-  # === Linting & Validation ===
-
-  lint:
-    desc: "Run linters for ALL components (code + configs + SQL)"
-    silent: true
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Running linters and validators...\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Backend Go code (golangci-lint)...\n"
-      - task: backend:lint
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Frontend code (ESLint)...\n"
-      - task: frontend:lint
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
-      - task: db:lint
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} PostgreSQL migrations (Atlas)...\n"
-      - task: db:validate
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (YAML/JSON)...\n"
-      - task: infra:lint
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Ory configs (Kratos, Oathkeeper)...\n"
-      - task: infra:validate
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} All linting and validation complete\n"
-
-  lint:fix:
-    desc: "Run linters with auto-fix for ALL components"
-    silent: true
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Running linters with auto-fix...\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Backend (golangci-lint --fix)...\n"
-      - task: backend:lint:fix
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Frontend (ESLint --fix)...\n"
-      - task: frontend:lint:fix
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff --fix)...\n"
-      - task: db:lint:fix
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (Prettier)...\n"
-      - task: infra:lint:fix
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} All auto-fixes applied\n"
-
-  # === Formatting ===
-
-  fmt:
-    desc: "Format ALL code (Go, TypeScript, React, SQL)"
-    silent: true
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Formatting all code...\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Backend (gofmt + goimports)...\n"
-      - task: backend:fmt
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Frontend (Prettier)...\n"
-      - task: frontend:fmt
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
-      - task: db:fmt
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (Prettier)...\n"
-      - task: infra:fmt
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} All code formatted\n"
-
-  fmt:check:
-    desc: "Check code formatting without modifying files"
-    silent: true
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Checking code formatting...\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Frontend (Prettier)...\n"
-      - task: frontend:fmt:check
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
-      - task: db:fmt:check
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (Prettier)...\n"
-      - task: infra:fmt:check
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} Code formatting check complete\n"
-
-  # === Testing ===
-
-  test:
-    desc: "Run ALL tests (backend + frontend)"
-    silent: true
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Running all tests...\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Backend unit tests...\n"
-      - task: backend:test:unit
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Frontend unit tests...\n"
-      - task: frontend:test:unit
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} All tests passed\n"
-
-  test:coverage:
-    desc: "Run tests with coverage for ALL components"
-    silent: true
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Running tests with coverage...\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Backend coverage...\n"
-      - task: backend:test:coverage
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Frontend coverage...\n"
-      - task: frontend:test:coverage
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} Coverage reports generated\n"
-
-  # === Logs ===
-
-  logs:
+  dev:logs:
     desc: "Show logs from ALL services (use CLI_ARGS for filtering)"
     silent: true
     cmds:
@@ -316,7 +140,7 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Showing logs from all services...\n"
       - docker compose logs -f {{.CLI_ARGS}}
 
-  logs:backend:
+  dev:logs:backend:
     desc: "Show backend service logs"
     silent: true
     cmds:
@@ -324,7 +148,7 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Showing backend logs...\n"
       - docker compose logs -f data gateway system worker
 
-  logs:infra:
+  dev:logs:infra:
     desc: "Show infrastructure logs (Postgres, Redis, Temporal, etc.)"
     silent: true
     cmds:
@@ -332,74 +156,7 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Showing infrastructure logs...\n"
       - docker compose logs -f postgres redis temporal vault kratos keto oathkeeper
 
-  # === Validation ===
-
-  validate:
-    desc: "Validate ALL configurations and migrations"
-    silent: true
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Validating all configurations and migrations...\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} PostgreSQL (Atlas migrations)...\n"
-      - task: db:validate
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs...\n"
-      - task: infra:validate
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} All validations passed\n"
-
-  # === Cleanup ===
-
-  clean:
-    desc: "Clean build artifacts and caches (safe, preserves data)"
-    silent: true
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Cleaning build artifacts and caches...\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Backend artifacts...\n"
-      - task: backend:clean
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Frontend artifacts...\n"
-      - task: frontend:clean
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} Cleanup complete\n"
-
-  # === Destroy ===
-
-  destroy:
-    desc: "⚠️  DESTROY EVERYTHING (containers, volumes, data) - IRREVERSIBLE!"
-    silent: true
-    prompt: "This will DESTROY ALL containers, volumes, and data across the entire stack. Continue?"
-    cmds:
-      - |
-        printf "{{.RED}}[WARN]{{.NC}} Destroying entire Nexus stack...\n"
-      - |
-        printf "{{.RED}}[WARN]{{.NC}} Stopping all services...\n"
-      - docker compose down -v --remove-orphans
-      - |
-        printf "{{.RED}}[WARN]{{.NC}} Removing backend artifacts...\n"
-      - task: backend:destroy
-      - |
-        printf "{{.RED}}[WARN]{{.NC}} Removing frontend artifacts...\n"
-      - task: frontend:destroy
-      - |
-        printf "{{.RED}}[WARN]{{.NC}} Removing all Docker volumes...\n"
-      - docker volume rm nexus_postgres_data 2>/dev/null || true
-      - docker volume rm nexus_redis_data 2>/dev/null || true
-      - docker volume rm nexus_temporal_data 2>/dev/null || true
-      - docker volume rm nexus_vault_data 2>/dev/null || true
-      - docker volume rm nexus_kratos_data 2>/dev/null || true
-      - docker volume rm nexus_keto_data 2>/dev/null || true
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} Complete destruction finished\n"
-      - |
-        printf "{{.YELLOW}}[TIP]{{.NC}} Run 'task bootstrap:dev' to start fresh\n"
-
-  # === Status & Health ===
-
-  status:
+  dev:status:
     desc: "Show status of all services"
     silent: true
     cmds:
@@ -407,7 +164,29 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Checking status of all services...\n"
       - docker compose ps
 
-  wait:
+  dev:health:
+    desc: "Check health of all services"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking health of all services...\n"
+        printf "\n"
+
+        printf "{{.BLUE}}Infrastructure:{{.NC}}\n"
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(traefik|postgres|redis|vault|temporal|kratos|keto|oathkeeper)" || true
+
+        printf "\n{{.BLUE}}Backend Services:{{.NC}}\n"
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(data|gateway|system|worker)" || true
+
+        printf "\n{{.BLUE}}Frontend:{{.NC}}\n"
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep frontend || true
+
+        printf "\n{{.BLUE}}Admin Tools:{{.NC}}\n"
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(adminer|redis-commander|mailhog|kratos-ui|temporal-ui)" || true
+
+        printf "\n{{.GREEN}}[OK]{{.NC}} Health check complete\n"
+
+  dev:wait:
     desc: "Wait for all services to be healthy"
     silent: true
     cmds:
@@ -415,7 +194,6 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Waiting for all services to be healthy...\n"
         printf "This may take a few minutes...\n\n"
 
-        # Wait for critical infrastructure
         printf "{{.BLUE}}[INFO]{{.NC}} Waiting for infrastructure...\n"
         docker compose up -d postgres redis vault temporal
 
@@ -437,7 +215,6 @@ tasks:
           exit 1
         fi
 
-        # Wait for Ory stack
         printf "\n{{.BLUE}}[INFO]{{.NC}} Waiting for Ory stack...\n"
         docker compose up -d kratos keto oathkeeper
 
@@ -460,51 +237,28 @@ tasks:
 
         printf "\n{{.GREEN}}[OK]{{.NC}} All critical services are healthy\n"
 
-  health:
-    desc: "Check health of all services"
+  dev:reset:
+    desc: "Fast reset: clear all data (DB, identities, permissions) without restarting containers"
     silent: true
+    prompt: "This will CLEAR all data (PostgreSQL, Kratos identities, Keto permissions). Continue?"
     cmds:
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Checking health of all services...\n"
-        printf "\n"
+        printf "{{.YELLOW}}[WARN]{{.NC}} Performing fast reset of all application data...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} This keeps containers running (~10s vs ~60s for full restart)\n\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 1/3: Resetting PostgreSQL database...\n"
+      - task: db:reset:data
+      - |
+        printf "\n{{.BLUE}}[INFO]{{.NC}} Step 2/3: Clearing Kratos identities...\n"
+      - task: infra:kratos:identities:clear
+      - |
+        printf "\n{{.BLUE}}[INFO]{{.NC}} Step 3/3: Clearing Keto permissions...\n"
+      - task: infra:keto:tuples:clear
+      - |
+        printf "\n{{.GREEN}}[OK]{{.NC}} Fast reset complete! Application is in fresh state.\n"
+        printf "{{.YELLOW}}[TIP]{{.NC}} Run 'task db:seed:dev' and 'task infra:kratos:seed' to restore test data\n"
 
-        printf "{{.BLUE}}Infrastructure:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(traefik|postgres|redis|vault|temporal|kratos|keto|oathkeeper)" || true
-
-        printf "\n{{.BLUE}}Backend Services:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(data|gateway|system|worker)" || true
-
-        printf "\n{{.BLUE}}Frontend:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep frontend || true
-
-        printf "\n{{.BLUE}}Admin Tools:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(adminer|redis-commander|mailhog|kratos-ui|temporal-ui)" || true
-
-        printf "\n{{.GREEN}}[OK]{{.NC}} Health check complete\n"
-
-  # === Help & Documentation ===
-
-  help:backend:
-    desc: "Show backend component commands"
-    cmds:
-      - task -t backend/Taskfile.yml -l
-
-  help:frontend:
-    desc: "Show frontend component commands"
-    cmds:
-      - task -t frontend/Taskfile.yml -l
-
-  help:db:
-    desc: "Show database component commands"
-    cmds:
-      - task -t db/Taskfile.yml -l
-
-  help:infra:
-    desc: "Show infrastructure component commands"
-    cmds:
-      - task -t infra/Taskfile.yml -l
-
-  default:
+  dev:help:
     desc: "Show available commands"
     silent: true
     cmds:
@@ -514,39 +268,291 @@ tasks:
         printf "{{.BLUE}}                    NEXUS TASK COMMANDS{{.NC}}\n"
         printf "{{.BLUE}}═══════════════════════════════════════════════════════════════{{.NC}}\n"
         printf "\n"
-        printf "{{.GREEN}}QUICK START:{{.NC}}\n"
-        printf "  task bootstrap:dev    - Bootstrap entire dev environment (one-command setup)\n"
-        printf "  task dev              - Start ALL services in Docker\n"
+        printf "{{.GREEN}}SETUP (First-time):{{.NC}}\n"
+        printf "  task setup:bootstrap  - Bootstrap entire dev environment (one-command)\n"
+        printf "  task setup:env        - Generate .env with secure secrets\n"
+        printf "  task setup:hosts      - Add *.nexus.local to /etc/hosts\n"
+        printf "  task setup:hooks      - Install pre-commit Git hooks\n"
+        printf "\n"
+        printf "{{.GREEN}}DEV (Daily):{{.NC}}\n"
+        printf "  task dev:up           - Start ALL services\n"
         printf "  task dev:stop         - Stop all services\n"
+        printf "  task dev:reset        - Fast reset: clear all data (keeps containers running)\n"
+        printf "  task dev:logs         - Show logs from all services\n"
+        printf "  task dev:status       - Show service status\n"
+        printf "  task dev:health       - Check service health\n"
         printf "\n"
-        printf "{{.GREEN}}DEVELOPMENT:{{.NC}}\n"
-        printf "  task gen              - Run all code generators (GraphQL, SQL)\n"
-        printf "  task migrate          - Run all database migrations\n"
-        printf "  task logs             - Show logs from all services\n"
-        printf "  task status           - Show status of all services\n"
-        printf "  task health           - Check health of all services\n"
+        printf "{{.GREEN}}CHECK (CI/Pre-commit):{{.NC}}\n"
+        printf "  task check:all        - Run all pre-commit checks\n"
+        printf "  task check:lint       - Run linters\n"
+        printf "  task check:fmt        - Check formatting\n"
+        printf "  task check:test       - Run tests\n"
+        printf "  task check:validate   - Validate configs\n"
         printf "\n"
-        printf "{{.GREEN}}QUALITY:{{.NC}}\n"
-        printf "  task pre-commit       - Run all pre-commit checks (lint, test, typecheck)\n"
-        printf "  task lint             - Run linters for all components\n"
-        printf "  task lint:fix         - Run linters with auto-fix\n"
-        printf "  task fmt              - Format all code\n"
-        printf "  task test             - Run all tests\n"
-        printf "  task test:coverage    - Run tests with coverage\n"
-        printf "  task validate         - Validate all configurations\n"
+        printf "{{.GREEN}}FIX (Auto-fix):{{.NC}}\n"
+        printf "  task fix:fmt          - Format all code\n"
+        printf "  task fix:lint         - Auto-fix lint issues\n"
+        printf "  task fix:gen          - Run code generators\n"
+        printf "  task fix:migrate      - Run database migrations\n"
         printf "\n"
         printf "{{.GREEN}}CLEANUP:{{.NC}}\n"
         printf "  task clean            - Clean build artifacts (safe)\n"
         printf "  task destroy          - Destroy everything (IRREVERSIBLE!)\n"
         printf "\n"
         printf "{{.GREEN}}COMPONENT HELP:{{.NC}}\n"
-        printf "  task help:backend     - Backend commands (Go services)\n"
-        printf "  task help:frontend    - Frontend commands (React/Vite)\n"
-        printf "  task help:db          - Database commands (migrations, SQL)\n"
-        printf "  task help:infra       - Infrastructure commands (Redis, Temporal, Vault, Ory stack)\n"
+        printf "  task dev:help:backend     - Backend commands\n"
+        printf "  task dev:help:frontend    - Frontend commands\n"
+        printf "  task dev:help:db          - Database commands\n"
+        printf "  task dev:help:infra       - Infrastructure commands\n"
         printf "\n"
         printf "{{.BLUE}}═══════════════════════════════════════════════════════════════{{.NC}}\n"
         printf "\n"
+
+  dev:help:backend:
+    desc: "Show backend component commands"
+    cmds:
+      - task -t backend/Taskfile.yml -l
+
+  dev:help:frontend:
+    desc: "Show frontend component commands"
+    cmds:
+      - task -t frontend/Taskfile.yml -l
+
+  dev:help:db:
+    desc: "Show database component commands"
+    cmds:
+      - task -t db/Taskfile.yml -l
+
+  dev:help:infra:
+    desc: "Show infrastructure component commands"
+    cmds:
+      - task -t infra/Taskfile.yml -l
+
+  # ============================================================================
+  # CHECK - Validation and CI checks (non-modifying)
+  # ============================================================================
+
+  check:all:
+    desc: "Run all pre-commit checks (lint, test, validate)"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running all pre-commit checks...\n"
+      - pre-commit run --all-files
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All pre-commit checks passed!\n"
+
+  check:lint:
+    desc: "Run linters for ALL components (code + configs + SQL)"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running linters and validators...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Backend Go code (golangci-lint)...\n"
+      - task: backend:lint
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Frontend code (ESLint)...\n"
+      - task: frontend:lint
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
+      - task: db:lint
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (YAML/JSON)...\n"
+      - task: infra:lint
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All linting complete\n"
+
+  check:fmt:
+    desc: "Check code formatting without modifying files"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking code formatting...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Frontend (Prettier)...\n"
+      - task: frontend:fmt:check
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
+      - task: db:fmt:check
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (Prettier)...\n"
+      - task: infra:fmt:check
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Code formatting check complete\n"
+
+  check:test:
+    desc: "Run ALL tests (backend + frontend)"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running all tests...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Backend unit tests...\n"
+      - task: backend:test:unit
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Frontend unit tests...\n"
+      - task: frontend:test:unit
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All tests passed\n"
+
+  check:test:coverage:
+    desc: "Run tests with coverage for ALL components"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running tests with coverage...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Backend coverage...\n"
+      - task: backend:test:coverage
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Frontend coverage...\n"
+      - task: frontend:test:coverage
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Coverage reports generated\n"
+
+  check:validate:
+    desc: "Validate ALL configurations and migrations"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Validating all configurations and migrations...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} PostgreSQL (Atlas migrations)...\n"
+      - task: db:validate
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs...\n"
+      - task: infra:validate
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All validations passed\n"
+
+  # ============================================================================
+  # FIX - Modification commands (formatting, generation, migrations)
+  # ============================================================================
+
+  fix:fmt:
+    desc: "Format ALL code (Go, TypeScript, React, SQL)"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Formatting all code...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Backend (gofmt + goimports)...\n"
+      - task: backend:fmt
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Frontend (Prettier)...\n"
+      - task: frontend:fmt
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
+      - task: db:fmt
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (Prettier)...\n"
+      - task: infra:fmt
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All code formatted\n"
+
+  fix:lint:
+    desc: "Run linters with auto-fix for ALL components"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running linters with auto-fix...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Backend (golangci-lint --fix)...\n"
+      - task: backend:lint:fix
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Frontend (ESLint --fix)...\n"
+      - task: frontend:lint:fix
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (Prettier)...\n"
+      - task: infra:lint:fix
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All auto-fixes applied\n"
+
+  fix:gen:
+    desc: "Run ALL code generators (GraphQL, SQL, etc.)"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running all code generators...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Generating GraphQL server code...\n"
+      - task: backend:gen:graphql:server
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Generating GraphQL client code...\n"
+      - task: backend:gen:graphql:client
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Generating SQL code (sqlc)...\n"
+      - task: backend:gen:sqlc
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All code generation complete\n"
+
+  fix:migrate:
+    desc: "Run ALL database migrations (PostgreSQL, Kratos, Keto)"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running all database migrations...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} PostgreSQL migrations...\n"
+      - task: db:migrate:up
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Kratos migrations...\n"
+      - task: infra:kratos:migrate
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Keto migrations...\n"
+      - task: infra:keto:migrate
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All migrations complete\n"
+
+  # ============================================================================
+  # CLEANUP & DESTROY
+  # ============================================================================
+
+  clean:
+    desc: "Clean build artifacts and caches (safe, preserves data)"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Cleaning build artifacts and caches...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Backend artifacts...\n"
+      - task: backend:clean
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Frontend artifacts...\n"
+      - task: frontend:clean
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Cleanup complete\n"
+
+  destroy:
+    desc: "⚠️  DESTROY EVERYTHING (containers, volumes, data) - IRREVERSIBLE!"
+    silent: true
+    prompt: "This will DESTROY ALL containers, volumes, and data across the entire stack. Continue?"
+    cmds:
+      - |
+        printf "{{.RED}}[WARN]{{.NC}} Destroying entire Nexus stack...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Stopping and removing all containers with volumes...\n"
+      - docker compose down -v --remove-orphans
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Cleaning backend build artifacts...\n"
+      - task: backend:clean
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Cleaning frontend build artifacts...\n"
+      - task: frontend:clean
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Complete destruction finished\n"
+      - |
+        printf "{{.YELLOW}}[TIP]{{.NC}} Run 'task setup:bootstrap' to start fresh\n"
+
+  default:
+    desc: "Show available commands"
+    cmds:
+      - task: dev:help
+
+# ============================================================================
+# COMPONENT INCLUDES (unchanged)
+# ============================================================================
 
 includes:
   backend:

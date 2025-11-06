@@ -85,16 +85,9 @@ repos:
         files: ^frontend/.*\.(ts|tsx)$
         pass_filenames: false
 
-      - id: sqlfluff-lint
-        name: SQLFluff lint
-        entry: bash -c 'cd db && sqlfluff lint migrations/'
-        language: system
-        files: ^db/migrations/.*\.sql$
-        pass_filenames: false
-
       - id: sqlfluff-fix
         name: SQLFluff fix
-        entry: bash -c 'cd db && sqlfluff fix --force migrations/'
+        entry: bash -c 'cd db && sqlfluff fix migrations/'
         language: system
         files: ^db/migrations/.*\.sql$
         pass_filenames: false
@@ -102,6 +95,13 @@ repos:
       - id: sql-prettier
         name: Prettier (SQL)
         entry: bash -c 'cd db && npx prettier --write'
+        language: system
+        files: ^db/migrations/.*\.sql$
+        pass_filenames: false
+
+      - id: sqlfluff-lint
+        name: SQLFluff lint
+        entry: bash -c 'cd db && sqlfluff lint migrations/'
         language: system
         files: ^db/migrations/.*\.sql$
         pass_filenames: false

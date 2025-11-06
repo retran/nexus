@@ -59,7 +59,7 @@ tasks:
   lint:
     desc: "Lint SQL migrations with sqlfluff"
     silent: true
-    dir: "{{.ROOT_DIR}}/postgres"
+    dir: "{{.ROOT_DIR}}/db"
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Linting SQL migrations...\n"
@@ -67,21 +67,10 @@ tasks:
       - |
         printf "{{.GREEN}}[OK]{{.NC}} SQL linting complete\n"
 
-  lint:fix:
-    desc: "Lint and auto-fix SQL migrations with sqlfluff"
-    silent: true
-    dir: "{{.ROOT_DIR}}/postgres"
-    cmds:
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Auto-fixing SQL migrations...\n"
-      - npm run lint:fix
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} SQL auto-fixes applied\n"
-
   fmt:
     desc: "Format SQL migrations with sqlfluff"
     silent: true
-    dir: "{{.ROOT_DIR}}/postgres"
+    dir: "{{.ROOT_DIR}}/db"
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Formatting SQL migrations...\n"
@@ -92,7 +81,7 @@ tasks:
   fmt:check:
     desc: "Check SQL formatting without modifying files"
     silent: true
-    dir: "{{.ROOT_DIR}}/postgres"
+    dir: "{{.ROOT_DIR}}/db"
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Checking SQL formatting...\n"
@@ -105,7 +94,7 @@ tasks:
   migrate:create:
     desc: "Create a new migration file (usage: task db:migrate:create NAME=add_users_table)"
     silent: true
-    dir: "{{.ROOT_DIR}}/postgres"
+    dir: "{{.ROOT_DIR}}/db"
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Creating migration {{.NAME}}...\n"
@@ -297,6 +286,33 @@ tasks:
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Test data seeded\n"
 
+  reset:data:
+    desc: "Fast reset: drop all data, re-run migrations and seeds (keeps container running)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    prompt: "This will DROP and recreate the database. Continue?"
+    cmds:
+      - |
+        printf "{{.YELLOW}}[WARN]{{.NC}} Resetting database (fast mode)...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Dropping database...\n"
+      - |
+        docker compose exec -T postgres \
+          psql -U admin postgres -c "DROP DATABASE IF EXISTS nexus_db;"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Creating fresh database...\n"
+      - |
+        docker compose exec -T postgres \
+          psql -U admin postgres -c "CREATE DATABASE nexus_db OWNER admin;"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running migrations...\n"
+      - task: migrate:up
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Seeding development data...\n"
+      - task: seed:dev
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Database reset complete \n"
+
   # === Bootstrap ===
 
   bootstrap:dev:
@@ -316,18 +332,17 @@ tasks:
   # === Destroy ===
 
   destroy:
-    desc: "Destroy all PostgreSQL data and containers (WARNING: irreversible)"
+    desc: "Remove PostgreSQL container and volume"
     silent: true
     dir: "{{.ROOT_DIR}}"
-    prompt: "This will DESTROY all PostgreSQL containers, volumes, and data. Continue?"
     cmds:
       - |
-        printf "{{.RED}}[WARN]{{.NC}} Destroying PostgreSQL...\n"
-      - docker compose down -v postgres
-      - docker volume rm nexus_postgres_data 2>/dev/null || true
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing PostgreSQL container and data...\n"
+      - docker compose stop postgres 2>/dev/null || true
+      - docker compose rm -f -v postgres 2>/dev/null || true
       - rm -rf db/backups/* 2>/dev/null || true
       - |
-        printf "{{.GREEN}}[OK]{{.NC}} PostgreSQL destroyed\n"
+        printf "{{.GREEN}}[OK]{{.NC}} PostgreSQL cleanup complete\n"
 
   # === Utilities ===
 

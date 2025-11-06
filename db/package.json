@@ -4,8 +4,8 @@
   "private": true,
   "description": "Database migrations and SQL tooling for Nexus",
   "scripts": {
-    "format": "prettier --write migrations/ && sqlfluff fix migrations/",
-    "format:check": "prettier --check migrations/ && sqlfluff lint migrations/",
+    "format": "sqlfluff fix migrations/ && prettier --write 'migrations/**/*.sql'",
+    "format:check": "prettier --check 'migrations/**/*.sql' && sqlfluff lint migrations/",
     "lint": "sqlfluff lint migrations/",
     "lint:fix": "sqlfluff fix migrations/",
     "lint:check": "sqlfluff lint migrations/ --format github-annotation"

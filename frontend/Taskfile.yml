@@ -202,16 +202,18 @@ tasks:
         printf "{{.GREEN}}[OK]{{.NC}} Cache cleaned\n"
 
   destroy:
-    desc: "Destroy all frontend containers, images, and data (WARNING: irreversible)"
+    desc: "Remove all frontend containers and images"
     silent: true
     dir: "{{.ROOT_DIR}}"
-    prompt: "This will DESTROY all frontend containers and images. Continue?"
     cmds:
       - |
-        printf "{{.RED}}[WARN]{{.NC}} Destroying frontend services...\n"
-      - docker compose down ui
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing frontend containers...\n"
+      - docker compose stop ui 2>/dev/null || true
+      - docker compose rm -f ui 2>/dev/null || true
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing frontend Docker images...\n"
       - docker rmi nexus/ui:dev 2>/dev/null || true
       - docker rmi nexus/ui:latest 2>/dev/null || true
       - task: clean
       - |
-        printf "{{.GREEN}}[OK]{{.NC}} Frontend destroyed\n"
+        printf "{{.GREEN}}[OK]{{.NC}} Frontend cleanup complete\n"

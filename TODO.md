@@ -1,6 +1,4 @@
 - [ ] secrets in vault
-- [ ] local configs for dev tools and proper local taskfiles
-- [ ] destroy working strange
 
 - [ ] observability stack
 - [ ] tooling stack (review)

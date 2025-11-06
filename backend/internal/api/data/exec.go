@@ -14,9 +14,10 @@ import (
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
-	"github.com/retran/nexus/backend/internal/repository"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
+
+	postgres "github.com/retran/nexus/backend/internal/repository"
 )
 
 // region    ************************** generated!.gotpl **************************

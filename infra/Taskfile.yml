@@ -92,20 +92,20 @@ tasks:
     dir: "{{.ROOT_DIR}}"
     cmds:
       - |
-        printf "{{.YELLOW}}[INFO]{{.NC}} Connecting to Redis CLI...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Connecting to Redis CLI...\n"
       - docker compose exec redis redis-cli -a ${REDIS_PASSWORD}
 
   redis:destroy:
-    desc: "Destroy Redis data"
+    desc: "Remove Redis containers and data"
     silent: true
     dir: "{{.ROOT_DIR}}"
-    prompt: "This will destroy all Redis data. Continue?"
     cmds:
       - |
-        printf "{{.RED}}[WARN]{{.NC}} Destroying Redis...\n"
-      - docker compose down -v redis redis-commander
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing Redis containers...\n"
+      - docker compose stop redis redis-commander 2>/dev/null || true
+      - docker compose rm -f -v redis redis-commander 2>/dev/null || true
       - |
-        printf "{{.GREEN}}[OK]{{.NC}} Redis destroyed\n"
+        printf "{{.GREEN}}[OK]{{.NC}} Redis cleanup complete\n"
 
   # === Temporal ===
 
@@ -147,16 +147,16 @@ tasks:
       - open http://localhost:8088 || xdg-open http://localhost:8088 || echo "Please open http://localhost:8088"
 
   temporal:destroy:
-    desc: "Destroy Temporal data"
+    desc: "Remove Temporal containers and data"
     silent: true
     dir: "{{.ROOT_DIR}}"
-    prompt: "This will destroy all Temporal data. Continue?"
     cmds:
       - |
-        printf "{{.RED}}[WARN]{{.NC}} Destroying Temporal...\n"
-      - docker compose down -v temporal temporal-ui
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing Temporal containers...\n"
+      - docker compose stop temporal temporal-ui 2>/dev/null || true
+      - docker compose rm -f -v temporal temporal-ui 2>/dev/null || true
       - |
-        printf "{{.GREEN}}[OK]{{.NC}} Temporal destroyed\n"
+        printf "{{.GREEN}}[OK]{{.NC}} Temporal cleanup complete\n"
 
   # === Kratos (Identity) ===
 
@@ -187,6 +187,16 @@ tasks:
         done
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Kratos seeding complete\n"
+
+  kratos:identities:clear:
+    desc: "Clear all test identities (preserves admin@nexus.local)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/kratos"
+    cmds:
+      - |
+        printf "{{.YELLOW}}[WARN]{{.NC}} Clearing all test identities...\n"
+      - chmod +x clear-identities.sh
+      - ./clear-identities.sh
 
   kratos:identities:list:
     desc: "List all Kratos identities"
@@ -258,6 +268,16 @@ tasks:
       - ./seed-keto-tuples.sh
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Keto seeding complete\n"
+
+  keto:tuples:clear:
+    desc: "Clear all permission tuples from Keto"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/keto"
+    cmds:
+      - |
+        printf "{{.YELLOW}}[WARN]{{.NC}} Clearing all permission tuples...\n"
+      - chmod +x clear-tuples.sh
+      - ./clear-tuples.sh
 
   keto:check:
     desc: "Check permission (usage: task infra:keto:check -- <namespace> <object> <relation> <subject>)"
@@ -386,19 +406,19 @@ tasks:
       - docker compose logs -f {{.CLI_ARGS}} vault
 
   vault:destroy:
-    desc: "Destroy Vault data"
+    desc: "Remove Vault container and data (WARNING: all secrets lost!)"
     silent: true
     dir: "{{.ROOT_DIR}}"
-    prompt: "This will destroy all Vault data and secrets. Continue?"
     cmds:
       - |
-        printf "{{.RED}}[WARN]{{.NC}} Destroying Vault...\n"
-      - docker compose down -v vault
+        printf "{{.RED}}[WARN]{{.NC}} Removing Vault will permanently delete ALL secrets!\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing Vault container...\n"
+      - docker compose stop vault 2>/dev/null || true
+      - docker compose rm -f -v vault 2>/dev/null || true
       - rm -rf infra/vault/.dev 2>/dev/null || true
       - |
-        printf "{{.RED}}[WARN]{{.NC}} All secrets are permanently lost!\n"
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} Vault destroyed\n"
+        printf "{{.GREEN}}[OK]{{.NC}} Vault cleanup complete\n"
 
   # === Dependencies ===
 
@@ -510,14 +530,14 @@ tasks:
       - docker compose logs -f {{.CLI_ARGS}} redis temporal vault kratos keto oathkeeper traefik
 
   destroy:
-    desc: "Destroy all infrastructure (WARNING: irreversible)"
+    desc: "Remove all infrastructure containers and data"
     silent: true
     dir: "{{.ROOT_DIR}}"
-    prompt: "This will DESTROY all infrastructure data. Continue?"
     cmds:
       - |
-        printf "{{.RED}}[WARN]{{.NC}} Destroying all infrastructure...\n"
-      - docker compose down -v redis temporal vault kratos keto oathkeeper traefik redis-commander temporal-ui
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing all infrastructure containers...\n"
+      - docker compose stop redis temporal vault kratos keto oathkeeper traefik redis-commander temporal-ui mailhog kratos-ui adminer 2>/dev/null || true
+      - docker compose rm -f -v redis temporal vault kratos keto oathkeeper traefik redis-commander temporal-ui mailhog kratos-ui adminer 2>/dev/null || true
       - rm -rf infra/vault/.dev 2>/dev/null || true
       - |
-        printf "{{.GREEN}}[OK]{{.NC}} All infrastructure destroyed\n"
+        printf "{{.GREEN}}[OK]{{.NC}} Infrastructure cleanup complete\n"

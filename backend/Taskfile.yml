@@ -239,19 +239,21 @@ tasks:
         printf "{{.GREEN}}[OK]{{.NC}} Build artifacts cleaned\n"
 
   destroy:
-    desc: "Destroy all backend containers, images, and data (WARNING: irreversible)"
+    desc: "Remove all backend containers and images"
     silent: true
     dir: "{{.ROOT_DIR}}"
-    prompt: "This will DESTROY all backend containers and images. Continue?"
     cmds:
       - |
-        printf "{{.RED}}[WARN]{{.NC}} Destroying backend services...\n"
-      - docker compose down data gateway system worker
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing backend containers...\n"
+      - docker compose stop data gateway system worker 2>/dev/null || true
+      - docker compose rm -f data gateway system worker 2>/dev/null || true
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing backend Docker images...\n"
       - docker rmi nexus/data:dev nexus/gateway:dev nexus/system:dev nexus/worker:dev 2>/dev/null || true
       - docker rmi nexus/data:latest nexus/gateway:latest nexus/system:latest nexus/worker:latest 2>/dev/null || true
       - task: clean
       - |
-        printf "{{.GREEN}}[OK]{{.NC}} Backend services destroyed\n"
+        printf "{{.GREEN}}[OK]{{.NC}} Backend cleanup complete\n"
 
   # === Format ===
 
