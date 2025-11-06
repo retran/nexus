@@ -5,18 +5,23 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 
 	"github.com/retran/nexus/backend/internal/activities"
 	gqlclient "github.com/retran/nexus/backend/internal/client/data"
 	"github.com/retran/nexus/backend/internal/config"
+	"github.com/retran/nexus/backend/internal/tracing"
 	"github.com/retran/nexus/backend/internal/workflows"
 )
 
@@ -27,6 +32,35 @@ func main() {
 }
 
 func run() error {
+	ctx := context.Background()
+
+	// Initialize OpenTelemetry tracing
+	shutdown, err := tracing.InitTracerProvider(ctx)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize tracing: %v", err)
+	} else {
+		defer func() {
+			if err := shutdown(ctx); err != nil {
+				log.Printf("Error shutting down tracer: %v", err)
+			}
+		}()
+	}
+
+	// Start Prometheus metrics server on port 9091
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		metricsServer := &http.Server{
+			Addr:              ":9091",
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		log.Println("Metrics server listening on :9091")
+		if err := metricsServer.ListenAndServe(); err != nil {
+			log.Printf("Metrics server error: %v", err)
+		}
+	}()
+
 	temporalHost := config.MustGetEnv("TEMPORAL_HOST")
 	namespace := config.GetEnv("TEMPORAL_NAMESPACE", "default")
 	taskQueue := config.MustGetEnv("TEMPORAL_TASK_QUEUE")

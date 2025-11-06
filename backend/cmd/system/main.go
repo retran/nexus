@@ -18,10 +18,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	temporalclient "go.temporal.io/sdk/client"
 
 	"github.com/retran/nexus/backend/internal/api/system/handlers"
 	"github.com/retran/nexus/backend/internal/config"
+	"github.com/retran/nexus/backend/internal/tracing"
 )
 
 func main() {
@@ -32,6 +35,33 @@ func main() {
 
 func run() error {
 	ctx := context.Background()
+
+	// Initialize OpenTelemetry tracing
+	shutdown, err := tracing.InitTracerProvider(ctx)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize tracing: %v", err)
+	} else {
+		defer func() {
+			if err := shutdown(ctx); err != nil {
+				log.Printf("Error shutting down tracer: %v", err)
+			}
+		}()
+	}
+
+	// Start Prometheus metrics server on port 9091
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		metricsServer := &http.Server{
+			Addr:              ":9091",
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		log.Println("Metrics server listening on :9091")
+		if err := metricsServer.ListenAndServe(); err != nil {
+			log.Printf("Metrics server error: %v", err)
+		}
+	}()
 
 	// Load secrets from Vault
 	vaultClient, err := config.NewVaultClient()
@@ -157,9 +187,12 @@ func newTemporalClient(host, namespace string) (temporalclient.Client, error) {
 }
 
 func newHTTPServer(port string, handler http.Handler) *http.Server {
+	// Wrap handler with OpenTelemetry middleware for distributed tracing
+	wrappedHandler := otelhttp.NewHandler(handler, "nexus-system")
+
 	return &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),
-		Handler:      handler,
+		Handler:      wrappedHandler,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,

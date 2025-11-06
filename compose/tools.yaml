@@ -1,0 +1,140 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Admin Tools & UIs
+# All admin UIs have profile 'tools'
+# CLI tools like atlas have NO profile for docker compose run usage
+
+services:
+  # CLI tool - NO profile for 'docker compose run atlas' usage
+  atlas:
+    image: arigaio/atlas:latest
+    volumes:
+      - ../db:/work
+    working_dir: /work
+    environment:
+      DATABASE_URL: postgres://admin:${POSTGRES_PASSWORD}@postgres:5432/nexus_db?sslmode=disable
+    env_file: ../.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Admin UIs - with 'tools' profile
+  adminer:
+    image: adminer:latest
+    restart: always
+    ports:
+      - "8089:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+      - ADMINER_DESIGN=pepa-linha-dark
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.adminer.rule=Host(`adminer.nexus.local`)"
+      - "traefik.http.routers.adminer.entrypoints=web"
+      - "traefik.http.services.adminer.loadbalancer.server.port=8080"
+      - "traefik.http.routers.adminer.middlewares=oathkeeper-auth@file"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "php",
+          "-r",
+          "exit(file_get_contents('http://127.0.0.1:8080') ? 0 : 1);",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - tools
+
+  redis-commander:
+    image: ghcr.io/joeferner/redis-commander:latest
+    restart: always
+    ports:
+      - "8087:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379:0:${REDIS_PASSWORD}
+      - HTTP_USER=
+      - HTTP_PASSWORD=
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.redis-commander.rule=Host(`redis.nexus.local`)"
+      - "traefik.http.routers.redis-commander.entrypoints=web"
+      - "traefik.http.services.redis-commander.loadbalancer.server.port=8081"
+      - "traefik.http.routers.redis-commander.middlewares=oathkeeper-auth@file"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8081"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    profiles:
+      - tools
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    restart: always
+    ports:
+      - "8088:8080"
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://nexus.local
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.temporal-ui.rule=Host(`temporal.nexus.local`)"
+      - "traefik.http.routers.temporal-ui.entrypoints=web"
+      - "traefik.http.services.temporal-ui.loadbalancer.server.port=8080"
+      - "traefik.http.routers.temporal-ui.middlewares=oathkeeper-auth@file"
+    depends_on:
+      temporal:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - tools
+
+  kratos-ui:
+    image: oryd/kratos-selfservice-ui-node:v1.3.1
+    restart: always
+    env_file: ../.env
+    environment:
+      # Kratos API endpoints for UI
+      - KRATOS_PUBLIC_URL=http://kratos:4433
+      - KRATOS_BROWSER_URL=http://auth.nexus.local
+      # UI server configuration
+      - PORT=4455
+      - SECURITY_MODE=cookie
+      # Secrets for UI cookies and CSRF
+      - COOKIE_SECRET=${KRATOS_UI_COOKIE_SECRET}
+      - CSRF_COOKIE_NAME=${KRATOS_UI_CSRF_COOKIE_NAME}
+      - CSRF_COOKIE_SECRET=${KRATOS_UI_CSRF_COOKIE_SECRET}
+    labels:
+      - "traefik.enable=true"
+      # Kratos UI (login/registration pages) - higher priority to match before Kratos API
+      - "traefik.http.routers.kratos-ui.rule=Host(`auth.nexus.local`)"
+      - "traefik.http.routers.kratos-ui.entrypoints=web"
+      - "traefik.http.services.kratos-ui.loadbalancer.server.port=4455"
+      - "traefik.http.routers.kratos-ui.priority=100"
+    extra_hosts:
+      - "auth.nexus.local:host-gateway"
+    depends_on:
+      kratos:
+        condition: service_healthy
+    healthcheck:
+      test:
+        ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4455/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - tools

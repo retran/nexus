@@ -45,10 +45,11 @@ automatically:
 
 Once the environment is running, the following services are available:
 
-> **Note**: Add these domains to your `/etc/hosts` for domain-based access:
+> **Note**: Add these domains to your `/etc/hosts` for domain-based access. Run
+> `task setup:hosts` to automatically configure:
 >
 > ```text
-> 127.0.0.1 nexus.local api.nexus.local auth.nexus.local adminer.nexus.local redis.nexus.local mail.nexus.local temporal.nexus.local traefik.nexus.local
+> 127.0.0.1 nexus.local api.nexus.local auth.nexus.local adminer.nexus.local redis.nexus.local mail.nexus.local temporal.nexus.local traefik.nexus.local grafana.nexus.local prometheus.nexus.local jaeger.nexus.local dozzle.nexus.local
 > ```
 
 ### Production-like URLs (via Traefik + Oathkeeper)
@@ -72,6 +73,10 @@ Once the environment is running, the following services are available:
 - **Email Testing (MailHog)**: <http://mail.nexus.local>
 - **Workflows (Temporal UI)**: <http://temporal.nexus.local>
 - **Reverse Proxy (Traefik)**: <http://traefik.nexus.local>
+- **Grafana**: <http://grafana.nexus.local> - Dashboards and visualization
+- **Prometheus**: <http://prometheus.nexus.local> - Metrics time-series database
+- **Jaeger**: <http://jaeger.nexus.local> - Distributed tracing UI
+- **Dozzle**: <http://dozzle.nexus.local> - Real-time Docker logs viewer
 
 ### Development/Debug URLs (Direct Access)
 
@@ -90,6 +95,11 @@ Once the environment is running, the following services are available:
 - **Redis Commander**: <http://localhost:8087>
 - **MailHog**: <http://localhost:8025>
 - **Temporal UI**: <http://localhost:8088>
+- **Grafana**: <http://localhost:3001>
+- **Prometheus**: <http://localhost:9090>
+- **Jaeger**: <http://localhost:16686>
+- **Dozzle**: <http://localhost:8086>
+- **Traefik Dashboard**: <http://localhost:8888>
 
 #### Ory Stack (Direct Access)
 
@@ -108,65 +118,6 @@ Once the environment is running, the following services are available:
 - **Vault**: <http://localhost:8200> (Token: `root`)
 - **Temporal**: `localhost:7233`
 - **SMTP (MailHog)**: `localhost:1025`
-
-### Common Tasks
-
-```bash
-# Development lifecycle
-task setup:bootstrap  # Complete setup from scratch (one-command)
-task dev:up           # Start all services
-task dev:stop         # Stop all services
-task dev:reset        # Fast reset: clear all data (keeps containers running)
-task destroy          # Destroy everything (containers + volumes)
-
-# Health & monitoring
-task dev:health       # Check health of all services
-task dev:status       # Show service status
-task dev:logs         # Show logs from all services
-task dev:logs:backend # Backend services only
-task dev:logs:infra   # Infrastructure only
-
-# Vault secret management
-task infra:vault:secrets:verify  # Verify all secrets exist in Vault
-task infra:vault:secrets:rotate  # Rotate shared secrets (webhook, oathkeeper)
-
-# Code quality
-task check:all        # Run all pre-commit checks
-task check:lint       # Run linters
-task check:fmt        # Check formatting
-task check:test       # Run tests
-
-# Auto-fix
-task fix:fmt          # Format all code
-task fix:lint         # Auto-fix lint issues
-task fix:gen          # Run code generators
-task fix:migrate      # Run database migrations
-
-# Clean build artifacts
-task clean            # Clean build artifacts (safe)
-
-# Help
-task dev:help         # Show all available commands
-```
-
-## Architecture
-
-### Secret Management
-
-Nexus uses **HashiCorp Vault** for centralized secret management:
-
-- **Dev Mode**: Vault runs with token authentication (token: `root`)
-- **Secret Structure**:
-  - `kv/shared/*` - Shared secrets with rotation support (postgres, redis,
-    webhook, oathkeeper)
-  - `kv/services/*` - Service-specific secrets (kratos/encryption, etc.)
-- **Rotation**: Shared secrets support versioned rotation with `current` and
-  `previous` values
-- **Access**: Go services load secrets at startup via Vault API, Kratos uses
-  init-container approach
-
-See [docs/vault-secrets-management.md](docs/vault-secrets-management.md) for
-detailed documentation.
 
 ## License
 

@@ -17,10 +17,13 @@ import (
 
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/retran/nexus/backend/internal/api/data"
 	"github.com/retran/nexus/backend/internal/config"
 	postgres "github.com/retran/nexus/backend/internal/repository"
+	"github.com/retran/nexus/backend/internal/tracing"
 )
 
 func main() {
@@ -29,8 +32,36 @@ func main() {
 	}
 }
 
+//nolint:gocognit,funlen // Sequential initialization logic is clearer as a single function
 func run() error {
 	ctx := context.Background()
+
+	// Initialize OpenTelemetry tracing
+	shutdown, err := tracing.InitTracerProvider(ctx)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize tracing: %v", err)
+	} else {
+		defer func() {
+			if err := shutdown(ctx); err != nil {
+				log.Printf("Error shutting down tracer: %v", err)
+			}
+		}()
+	}
+
+	// Start Prometheus metrics server on port 9091
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		metricsServer := &http.Server{
+			Addr:              ":9091",
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		log.Println("Metrics server listening on :9091")
+		if err := metricsServer.ListenAndServe(); err != nil {
+			log.Printf("Metrics server error: %v", err)
+		}
+	}()
 
 	// Load secrets from Vault
 	vaultClient, err := config.NewVaultClient()
@@ -97,11 +128,16 @@ func run() error {
 
 	port := config.GetEnv("SERVER_PORT", "8081")
 
+	// Wrap handler with OpenTelemetry middleware for distributed tracing
+	var wrappedHandler http.Handler = mux
+	wrappedHandler = otelhttp.NewHandler(wrappedHandler, "nexus-data")
+
 	httpServer := &http.Server{
-		Addr:         ":" + port,
-		Handler:      mux,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		Addr:              ":" + port,
+		Handler:           wrappedHandler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
 	}
 
 	go func() {

@@ -32,7 +32,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Setting up /etc/hosts entries...\n"
 
-        HOSTS_ENTRY="127.0.0.1 nexus.local api.nexus.local auth.nexus.local adminer.nexus.local redis.nexus.local mail.nexus.local temporal.nexus.local traefik.nexus.local"
+        HOSTS_ENTRY="127.0.0.1 nexus.local api.nexus.local auth.nexus.local adminer.nexus.local redis.nexus.local mail.nexus.local temporal.nexus.local traefik.nexus.local grafana.nexus.local prometheus.nexus.local jaeger.nexus.local dozzle.nexus.local"
 
         if grep -q "nexus.local" /etc/hosts; then
           printf "{{.WARN}}[WARN]{{.NC}} nexus.local entries already exist in /etc/hosts\n"
@@ -132,6 +132,87 @@ tasks:
       - |
         printf "{{.GREEN}}[OK]{{.NC}} All services stopped\n"
 
+  # ============================================================================
+  # TOOLS - Admin Tools Profile (Adminer, Redis Commander, etc.)
+  # ============================================================================
+
+  tools:up:
+    desc: "Start admin tools (Adminer, Redis Commander, Temporal UI, etc.)"
+    aliases: [tools]
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting admin tools...\n"
+      - docker compose --profile tools up -d
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Admin tools started\n"
+        printf "\n{{.BLUE}}Available at:{{.NC}}\n"
+        printf "  • Adminer:         http://adminer.nexus.local\n"
+        printf "  • Redis Commander: http://redis.nexus.local\n"
+        printf "  • Temporal UI:     http://temporal.nexus.local\n"
+        printf "  • Kratos UI:       http://auth.nexus.local\n"
+        printf "  • Mailhog:         http://mail.nexus.local\n"
+
+  tools:down:
+    desc: "Stop admin tools"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Stopping admin tools...\n"
+      - docker compose --profile tools stop
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Admin tools stopped\n"
+
+  tools:logs:
+    desc: "Show logs from admin tools"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Showing admin tools logs...\n"
+      - docker compose --profile tools logs -f
+
+  # ============================================================================
+  # O11Y - Observability Stack (Prometheus, Grafana, Jaeger, Dozzle)
+  # ============================================================================
+
+  o11y:up:
+    desc: "Start observability stack (Prometheus, Grafana, Jaeger, Dozzle)"
+    aliases: [o11y]
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting observability stack...\n"
+      - docker compose --profile o11y up -d
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Observability stack started\n"
+        printf "\n{{.BLUE}}Available at:{{.NC}}\n"
+        printf "  • Grafana:    http://grafana.nexus.local    (Dashboards)\n"
+        printf "  • Prometheus: http://prometheus.nexus.local (Metrics)\n"
+        printf "  • Jaeger:     http://jaeger.nexus.local     (Traces)\n"
+        printf "  • Dozzle:     http://dozzle.nexus.local     (Logs)\n"
+
+  o11y:down:
+    desc: "Stop observability stack"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Stopping observability stack...\n"
+      - docker compose --profile o11y stop
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Observability stack stopped\n"
+
+  o11y:logs:
+    desc: "Show logs from observability stack"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Showing observability stack logs...\n"
+      - docker compose --profile o11y logs -f
+
+  # ============================================================================
+  # DEV - Continuation of daily development commands
+  # ============================================================================
+
   dev:logs:
     desc: "Show logs from ALL services (use CLI_ARGS for filtering)"
     silent: true
@@ -172,17 +253,17 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Checking health of all services...\n"
         printf "\n"
 
-        printf "{{.BLUE}}Infrastructure:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(traefik|postgres|redis|vault|temporal|kratos|keto|oathkeeper)" || true
+        printf "{{.BLUE}}Infra:{{.NC}}\n"
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(traefik|postgres-[0-9]|redis-[0-9]|vault|temporal-[0-9]|kratos-[0-9]|keto|oathkeeper|exporter|jaeger|mailhog|dozzle)" | grep -v -E "(commander|adminer|ui)" || true
 
-        printf "\n{{.BLUE}}Backend Services:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(data|gateway|system|worker)" || true
+        printf "\n{{.BLUE}}Backend:{{.NC}}\n"
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(data-[0-9]|gateway-[0-9]|system-[0-9]|worker-[0-9])" || true
 
         printf "\n{{.BLUE}}Frontend:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep frontend || true
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep "frontend-[0-9]" || true
 
-        printf "\n{{.BLUE}}Admin Tools:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(adminer|redis-commander|mailhog|kratos-ui|temporal-ui)" || true
+        printf "\n{{.BLUE}}Tools:{{.NC}}\n"
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(adminer|redis-commander|kratos-ui|temporal-ui)" || true
 
         printf "\n{{.GREEN}}[OK]{{.NC}} Health check complete\n"
 

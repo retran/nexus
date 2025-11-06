@@ -36,3 +36,25 @@ log:
 
 accessLog:
   format: common
+
+# Prometheus metrics
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    buckets:
+      - 0.1
+      - 0.3
+      - 1.0
+      - 3.0
+      - 10.0
+
+# OpenTelemetry tracing
+tracing:
+  otlp:
+    http:
+      endpoint: "http://jaeger:4318"
+    grpc:
+      endpoint: "jaeger:4317"
+      insecure: true

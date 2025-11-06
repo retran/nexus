@@ -14,6 +14,7 @@ import (
 
 	"github.com/Khan/genqlient/graphql"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 	"github.com/retran/nexus/backend/internal/api/common/middleware"
 	"github.com/retran/nexus/backend/internal/api/gateway/handlers"
@@ -142,6 +143,8 @@ func (s *Server) Start() error {
 	handler = middleware.Recovery(handler)
 	handler = middleware.Logger(handler)
 	handler = middleware.CORS(s.config.AllowedOrigins)(handler)
+	// Wrap with OpenTelemetry middleware for distributed tracing
+	handler = otelhttp.NewHandler(handler, "nexus-gateway")
 
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 

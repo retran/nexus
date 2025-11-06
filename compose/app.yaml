@@ -1,0 +1,223 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Core Application Services
+# All custom application code services
+# These services have NO profile and start by default
+
+services:
+  data:
+    build:
+      context: ../backend
+      dockerfile: docker/Dockerfile.data.dev
+    restart: always
+    ports:
+      - "8081:8081"
+      - "9091:9091" # Prometheus metrics
+      - "2345:2345" # Delve debug port
+    volumes:
+      - ../backend:/app
+      - /app/bin
+      - /app/tmp
+    env_file: ../.env
+    environment:
+      # Service identification
+      - SERVICE_NAME=nexus-data
+      - SERVICE_VERSION=dev
+      # Vault configuration (dev only)
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
+      # Air hot-reload configuration
+      - AIR_PROXY_PORT=8081
+      - AIR_BUILD_DIR=/app/tmp
+      # PostgreSQL connection (password loaded from Vault)
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=admin
+      - POSTGRES_DB=nexus_db
+      - POSTGRES_SSLMODE=disable
+      - POSTGRES_MAX_CONNS=25
+      - POSTGRES_MIN_CONNS=5
+      # OpenTelemetry configuration
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8081"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  gateway:
+    build:
+      context: ../backend
+      dockerfile: docker/Dockerfile.gateway.dev
+    restart: always
+    ports:
+      - "8080:8080"
+      - "9092:9091" # Prometheus metrics (mapped to 9092 on host to avoid conflicts)
+      - "2346:2345" # Delve debug port
+    volumes:
+      - ../backend:/app
+      - /app/bin
+      - /app/tmp
+    env_file: ../.env
+    environment:
+      # Service identification
+      - SERVICE_NAME=nexus-gateway
+      - SERVICE_VERSION=dev
+      # Vault configuration (dev only)
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
+      # Air hot-reload configuration
+      - AIR_PROXY_PORT=8080
+      - AIR_BUILD_DIR=/app/tmp
+      # Data API endpoint
+      - DATA_API_ENDPOINT=http://data:8081/graphql
+      # System API endpoint
+      - SYSTEM_API_ENDPOINT=http://system:8082
+      # Frontend URL
+      - FRONTEND_URL=http://nexus.local
+      # Kratos Admin URL
+      - KRATOS_ADMIN_URL=http://kratos:4434
+      # Redis connection (password loaded from Vault)
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      # Gateway CORS configuration
+      - ALLOWED_ORIGINS=http://nexus.local,https://nexus.local
+      # OpenTelemetry configuration
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gateway.rule=Host(`api.nexus.local`)"
+      - "traefik.http.routers.gateway.entrypoints=web"
+      - "traefik.http.services.gateway.loadbalancer.server.port=8080"
+      - "traefik.http.routers.gateway.middlewares=oathkeeper-auth@file"
+    depends_on:
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  system:
+    build:
+      context: ../backend
+      dockerfile: docker/Dockerfile.system.dev
+    restart: always
+    ports:
+      - "8082:8082" # System API (internal webhooks & admin endpoints)
+      - "9093:9091" # Prometheus metrics (mapped to 9093 on host to avoid conflicts)
+      - "2347:2345" # Delve debug port
+    volumes:
+      - ../backend:/app
+      - /app/bin
+      - /app/tmp
+    env_file: ../.env
+    environment:
+      # Service identification
+      - SERVICE_NAME=nexus-system
+      - SERVICE_VERSION=dev
+      # Vault configuration (dev only)
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
+      # Air hot-reload configuration
+      - SERVER_PORT=8082
+      - AIR_PROXY_PORT=8082
+      - AIR_BUILD_DIR=/app/tmp
+      # Kratos configuration (webhook secret loaded from Vault)
+      - KRATOS_ADMIN_URL=http://kratos:4434
+      # Temporal configuration
+      - TEMPORAL_HOST=temporal:7233
+      - TEMPORAL_NAMESPACE=default
+      - TEMPORAL_TASK_QUEUE=nexus-task-queue
+      # PostgreSQL connection
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=nexus_db
+      - POSTGRES_SSLMODE=disable
+      - POSTGRES_MAX_CONNS=25
+      - POSTGRES_MIN_CONNS=5
+      # OpenTelemetry configuration
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8082/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  worker:
+    build:
+      context: ../backend
+      dockerfile: docker/Dockerfile.worker.dev
+    restart: always
+    ports:
+      - "9094:9091" # Prometheus metrics (mapped to 9094 on host to avoid conflicts)
+      - "2348:2345" # Delve debug port
+    volumes:
+      - ../backend:/app
+      - /app/bin
+      - /app/tmp
+    env_file: ../.env
+    environment:
+      # Service identification
+      - SERVICE_NAME=nexus-worker
+      - SERVICE_VERSION=dev
+      # Vault configuration (dev only)
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
+      # Air hot-reload configuration
+      - AIR_BUILD_DIR=/app/tmp
+      # Temporal configuration
+      - TEMPORAL_HOST=temporal:7233
+      - TEMPORAL_NAMESPACE=default
+      - TEMPORAL_TASK_QUEUE=nexus-task-queue
+      # Data API endpoint
+      - DATA_API_ENDPOINT=http://data:8081/graphql
+      # OpenTelemetry configuration
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+    depends_on:
+      temporal:
+        condition: service_started
+      vault:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.dev
+    restart: always
+    ports:
+      - "5173:3000" # Refine dev server
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    env_file: ../.env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`nexus.local`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+      - "traefik.http.routers.frontend.middlewares=oathkeeper-auth@file"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

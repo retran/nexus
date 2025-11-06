@@ -7,19 +7,23 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/retran/nexus/backend/internal/api/gateway"
 	"github.com/retran/nexus/backend/internal/config"
+	"github.com/retran/nexus/backend/internal/tracing"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Load secrets from Vault
+	// Load secrets from Vault (before defer to ensure it's created first)
 	vaultClient, err := config.NewVaultClient()
 	if err != nil {
 		log.Fatalf("Failed to create Vault client: %v", err)
@@ -29,6 +33,33 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load Redis password from Vault: %v", err)
 	}
+
+	// Initialize OpenTelemetry tracing
+	shutdown, err2 := tracing.InitTracerProvider(ctx)
+	if err2 != nil {
+		log.Printf("Warning: Failed to initialize tracing: %v", err2)
+	} else {
+		defer func() {
+			if err := shutdown(ctx); err != nil {
+				log.Printf("Error shutting down tracer: %v", err)
+			}
+		}()
+	}
+
+	// Start Prometheus metrics server on port 9091
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		metricsServer := &http.Server{
+			Addr:              ":9091",
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		log.Println("Metrics server listening on :9091")
+		if err := metricsServer.ListenAndServe(); err != nil {
+			log.Printf("Metrics server error: %v", err)
+		}
+	}()
 
 	cfg := gateway.Config{
 		Port:            config.GetEnvInt("SERVER_PORT", 8080),
@@ -49,13 +80,14 @@ func main() {
 
 	server, err := gateway.New(&cfg)
 	if err != nil {
-		log.Fatalf("Failed to create server: %v", err)
+		log.Printf("Failed to create server: %v", err)
+		return
 	}
 
 	go func() {
 		log.Println("Starting REST API Gateway...")
 		if err := server.Start(); err != nil {
-			log.Fatalf("Failed to start server: %v", err)
+			log.Printf("Failed to start server: %v", err)
 		}
 	}()
 

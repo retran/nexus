@@ -69,7 +69,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Starting Redis...\n"
-      - docker compose up -d redis redis-commander
+      - docker compose up -d redis
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Redis started\n"
 
