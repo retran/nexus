@@ -9,17 +9,37 @@ resource planning and physical smart home automation.
 
 ## Quick Start
 
+### Prerequisites
+
+- Docker & Docker Compose
+- Go 1.25.2+
+- Node.js 23+ & Yarn
+- Task (taskfile.dev)
+
 ### Bootstrap Development Environment
 
 ```bash
-# 1. Setup local domains (requires sudo)
-task hosts:setup
+# 1. Generate .env file from template
+./scripts/generate-env.sh
 
-# 2. Bootstrap all services
-task bootstrap:dev
+# 2. Bootstrap all services (one command does everything)
+task setup:bootstrap
 ```
 
-This will set up all infrastructure, databases, and services.
+This single command will:
+
+- Start Vault and seed all secrets
+- Initialize databases with migrations
+- Start all infrastructure services (Postgres, Redis, Temporal, Ory stack)
+- Install dependencies for backend and frontend
+- Start all application services
+
+**Note**: All secrets are managed by HashiCorp Vault. The bootstrap process
+automatically:
+
+1. Initializes Vault in dev mode
+2. Seeds secrets from .env into Vault KV storage
+3. Services load secrets from Vault at startup
 
 ### Development Services
 
@@ -92,31 +112,61 @@ Once the environment is running, the following services are available:
 ### Common Tasks
 
 ```bash
-# Setup local domains
-task hosts:setup      # Add *.nexus.local to /etc/hosts
-task hosts:remove     # Remove *.nexus.local from /etc/hosts
+# Development lifecycle
+task setup:bootstrap  # Complete setup from scratch (one-command)
+task dev:up           # Start all services
+task dev:stop         # Stop all services
+task dev:reset        # Fast reset: clear all data (keeps containers running)
+task destroy          # Destroy everything (containers + volumes)
 
-# Check health of all services
-task health
+# Health & monitoring
+task dev:health       # Check health of all services
+task dev:status       # Show service status
+task dev:logs         # Show logs from all services
+task dev:logs:backend # Backend services only
+task dev:logs:infra   # Infrastructure only
 
-# View logs
-task logs              # All services
-task logs:backend      # Backend services only
-task logs:infra        # Infrastructure only
+# Vault secret management
+task infra:vault:secrets:verify  # Verify all secrets exist in Vault
+task infra:vault:secrets:rotate  # Rotate shared secrets (webhook, oathkeeper)
 
-# Run tests
-task test
+# Code quality
+task check:all        # Run all pre-commit checks
+task check:lint       # Run linters
+task check:fmt        # Check formatting
+task check:test       # Run tests
 
-# Lint and format
-task lint
-task fmt
+# Auto-fix
+task fix:fmt          # Format all code
+task fix:lint         # Auto-fix lint issues
+task fix:gen          # Run code generators
+task fix:migrate      # Run database migrations
 
-# Stop all services
-task dev:stop
+# Clean build artifacts
+task clean            # Clean build artifacts (safe)
 
-# Destroy everything (clean slate)
-task destroy
+# Help
+task dev:help         # Show all available commands
 ```
+
+## Architecture
+
+### Secret Management
+
+Nexus uses **HashiCorp Vault** for centralized secret management:
+
+- **Dev Mode**: Vault runs with token authentication (token: `root`)
+- **Secret Structure**:
+  - `kv/shared/*` - Shared secrets with rotation support (postgres, redis,
+    webhook, oathkeeper)
+  - `kv/services/*` - Service-specific secrets (kratos/encryption, etc.)
+- **Rotation**: Shared secrets support versioned rotation with `current` and
+  `previous` values
+- **Access**: Go services load secrets at startup via Vault API, Kratos uses
+  init-container approach
+
+See [docs/vault-secrets-management.md](docs/vault-secrets-management.md) for
+detailed documentation.
 
 ## License
 

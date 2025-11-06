@@ -1,5 +1,3 @@
-- [ ] secrets in vault
-
 - [ ] observability stack
 - [ ] tooling stack (review)
 

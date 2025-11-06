@@ -67,15 +67,16 @@ generate:
       - Frontend: React 19+ with TypeScript, Refine.dev meta-framework, Radix UI primitives, Tailwind CSS
       - Database: PostgreSQL 18 with Atlas for schema migrations
       - Auth: Ory Kratos (authentication), Ory Keto (permissions), Ory Oathkeeper (API gateway)
-      - Secrets: HashiCorp Vault for credential management
+      - Secrets: HashiCorp Vault (KV v2 secrets engine, dev mode with token auth, production with AppRole)
       - Infrastructure: Docker Compose (dev), Traefik reverse proxy, Redis cache
       - Deployment: GitOps with GitHub Actions, self-hosted runners
 
       EXPECTATIONS:
       - Write production-grade, idiomatic code following language conventions
       - Respect schema-first: GraphQL schemas for APIs, SQL migrations for database
-      - Security: zero-trust patterns, Vault secrets, Ory authentication flow
+      - Security: zero-trust patterns, Vault for secret management, Ory authentication flow
       - Services: REST Gateway (BFF) → GraphQL Data API → Database (sqlc)
+      - Secrets: Load from Vault at startup (Go services), init-container for non-API services (Kratos)
       - Explicit: proper error handling, context propagation, structured logging
       - Maintainability: clear naming, minimal abstractions, self-documenting code
 
@@ -102,7 +103,8 @@ generate:
         - Temporal: Workflows vs Activities separation, proper error handling, retry policies
 
         **3. Security & Resilience**
-        - Zero-Trust: No hardcoded credentials, secrets from Vault/env vars, Ory authentication
+        - Zero-Trust: No hardcoded credentials, secrets loaded from Vault (dev: token auth, prod: AppRole)
+        - Vault Integration: Proper error handling for secret loading, fallback to dev mode token, context timeouts
         - Input Validation: Sanitize external inputs, validate GraphQL inputs, SQL injection prevention (sqlc handles this)
         - Error Handling: Don't leak sensitive info in errors, log security events, proper context timeouts
         - Graceful Degradation: Circuit breakers for external APIs, proper health checks, container restart policies

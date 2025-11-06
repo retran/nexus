@@ -10,6 +10,13 @@ tabWidth: 2
 useTabs: false
 printWidth: 80
 
+# SQL formatting rules (aligned with SQLFluff)
 keywordCase: upper
 dataTypeCase: upper
 functionCase: upper
+identifierCase: lower
+
+# Spacing and layout (match SQLFluff LT01 rule)
+# Ensure space between keywords and parentheses: "ENUM (" not "ENUM("
+expressionWidth: 50
+linesBetweenQueries: 2

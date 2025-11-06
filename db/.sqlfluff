@@ -20,6 +20,11 @@ indent_unit = space
 
 [sqlfluff:rules]
 
+[sqlfluff:rules:layout.spacing]
+# LT01: Require single space between keywords and brackets/parentheses
+# This ensures consistent spacing like "ENUM (" instead of "ENUM("
+touch_points = consistent
+
 [sqlfluff:rules:capitalisation.keywords]
 capitalisation_policy = upper
 extended_capitalisation_policy = upper
