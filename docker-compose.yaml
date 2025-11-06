@@ -232,7 +232,7 @@ services:
       dockerfile: docker/Dockerfile.system.dev
     restart: always
     ports:
-      - "8082:8082"
+      - "8082:8082" # System API (internal webhooks & admin endpoints)
       - "2347:2345" # Delve debug port
     volumes:
       - ./backend:/app
@@ -476,13 +476,43 @@ services:
       - "4456:4456" # Decision API for Traefik ForwardAuth
     volumes:
       - ./infra/oathkeeper:/etc/config/oathkeeper:ro
-    command: serve --config /etc/config/oathkeeper/oathkeeper.dev.yml
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # Load Redis password from Vault
+        export REDIS_PASSWORD=$(wget -qO- \
+          --header "X-Vault-Token: ${VAULT_TOKEN}" \
+          "${VAULT_ADDR}/v1/kv/data/shared/redis" | \
+          grep -o '"current":"[^"]*"' | cut -d'"' -f4)
+
+        # Export cache configuration via environment variables
+        # Uses Redis for distributed caching of auth/authz decisions
+        export CACHE_TYPE=redis
+        export CACHE_REDIS_URL="redis://:$${REDIS_PASSWORD}@redis:6379/1"
+        export CACHE_REDIS_MAX_RETRIES=3
+        export CACHE_REDIS_MIN_IDLE_CONNS=5
+        export CACHE_REDIS_POOL_SIZE=10
+        export CACHE_REDIS_DIAL_TIMEOUT=5s
+        export CACHE_REDIS_READ_TIMEOUT=3s
+        export CACHE_REDIS_WRITE_TIMEOUT=3s
+        export CACHE_TTL=60s
+
+        # Start Oathkeeper with loaded secrets
+        oathkeeper serve --config /etc/config/oathkeeper/oathkeeper.dev.yml
     env_file: .env
     environment:
       - LOG_LEVEL=debug
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=${VAULT_TOKEN:-root}
     depends_on:
       kratos:
         condition: service_started
+      keto:
+        condition: service_started
+      vault:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test:
         ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4456/health/ready"]
