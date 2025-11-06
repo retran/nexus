@@ -17,6 +17,19 @@ import (
 )
 
 func main() {
+	ctx := context.Background()
+
+	// Load secrets from Vault
+	vaultClient, err := config.NewVaultClient()
+	if err != nil {
+		log.Fatalf("Failed to create Vault client: %v", err)
+	}
+
+	redisPassword, err := vaultClient.GetRedisPassword(ctx)
+	if err != nil {
+		log.Fatalf("Failed to load Redis password from Vault: %v", err)
+	}
+
 	cfg := gateway.Config{
 		Port:            config.GetEnvInt("SERVER_PORT", 8080),
 		Host:            config.GetEnv("SERVER_HOST", "0.0.0.0"),
@@ -27,7 +40,7 @@ func main() {
 		AllowedOrigins:  config.MustGetEnvCSV("ALLOWED_ORIGINS"),
 		RedisHost:       config.MustGetEnv("REDIS_HOST"),
 		RedisPort:       config.MustGetEnvInt("REDIS_PORT"),
-		RedisPassword:   config.GetEnv("REDIS_PASSWORD", ""),
+		RedisPassword:   redisPassword,
 		RedisDB:         config.GetEnvInt("REDIS_DB", 0),
 		FrontendURL:     config.MustGetEnv("FRONTEND_URL"),
 		InternalAPIURL:  config.MustGetEnv("SYSTEM_API_ENDPOINT"),

@@ -25,11 +25,14 @@ if [ ! -f "${ENV_FILE}" ]; then
   exit 1
 fi
 
+# In dev mode, use the hardcoded root token
+# In production, use token from file
 if [ -f "${ROOT_TOKEN_FILE}" ]; then
   ROOT_TOKEN=$(<"${ROOT_TOKEN_FILE}")
 else
-  echo "[ERROR] Root token file not found at ${ROOT_TOKEN_FILE}. Run 'task vault:init' first." >&2
-  exit 1
+  # Dev mode: Vault uses token "root"
+  ROOT_TOKEN="root"
+  echo "[INFO] Using dev mode token: root"
 fi
 
 UNSEAL_KEY=""
@@ -178,24 +181,51 @@ seed_shared_secret() {
 ensure_vault_running
 import_env
 
+# Required variables for shared secrets
+require_var "POSTGRES_PASSWORD"
+require_var "REDIS_PASSWORD"
 require_var "KRATOS_WEBHOOK_SECRET"
 require_var "OATHKEEPER_SHARED_SECRET"
+require_var "KRATOS_COOKIE_SECRET"
+require_var "KRATOS_CIPHER_SECRET"
 
 ensure_vault_running
 
 echo "[INFO] Validating root token access..."
 vault_exec "${ROOT_TOKEN}" vault token lookup >/dev/null
 
-# Note: In dev mode, services read configuration from environment variables,
-# NOT from Vault. Vault is used ONLY for shared secrets that need rotation.
+# Vault structure for dev:
+# - shared/*: Secrets shared across multiple services
+# - services/*/: Service-specific secrets
 #
-# Shared secrets stored in Vault (used across multiple services):
-# - shared/webhook: Kratos → Gateway/System webhook authentication
-# - shared/oathkeeper: Oathkeeper → downstream services authentication
+# Note: In dev mode with Vault integration, services read secrets from Vault.
+# This replaces passing secrets via environment variables for better security.
 
 echo "[INFO] Seeding shared secrets..."
 
+# Core infrastructure passwords
+seed_shared_secret "shared/postgres" "${POSTGRES_PASSWORD}"
+seed_shared_secret "shared/redis" "${REDIS_PASSWORD}"
+
+# Cross-service authentication secrets
 seed_shared_secret "shared/webhook" "${KRATOS_WEBHOOK_SECRET}"
 seed_shared_secret "shared/oathkeeper" "${OATHKEEPER_SHARED_SECRET}"
+
+echo "[INFO] Seeding service-specific secrets..."
+
+# Kratos encryption secrets (must be exactly 32 characters)
+put_secret "services/kratos/encryption" \
+  cookie="${KRATOS_COOKIE_SECRET}" \
+  cipher="${KRATOS_CIPHER_SECRET}"
+
+# Kratos Google OAuth (optional, may be empty)
+if [ -n "${KRATOS_GOOGLE_CLIENT_ID:-}" ] && [ -n "${KRATOS_GOOGLE_CLIENT_SECRET:-}" ]; then
+  put_secret "services/kratos/google-oidc" \
+    client_id="${KRATOS_GOOGLE_CLIENT_ID}" \
+    client_secret="${KRATOS_GOOGLE_CLIENT_SECRET}"
+  echo "[INFO] Seeded kv/services/kratos/google-oidc"
+else
+  echo "[INFO] Skipping Google OIDC (credentials not provided)"
+fi
 
 echo "[SUCCESS] Vault dev secrets seeded from ${ENV_FILE}"

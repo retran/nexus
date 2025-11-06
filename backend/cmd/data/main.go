@@ -32,6 +32,17 @@ func main() {
 func run() error {
 	ctx := context.Background()
 
+	// Load secrets from Vault
+	vaultClient, err := config.NewVaultClient()
+	if err != nil {
+		return fmt.Errorf("failed to create Vault client: %w", err)
+	}
+
+	postgresPassword, err := vaultClient.GetPostgresPassword(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load Postgres password from Vault: %w", err)
+	}
+
 	maxConns := config.MustGetEnvInt("POSTGRES_MAX_CONNS")
 	if maxConns < 1 || maxConns > 2147483647 {
 		return fmt.Errorf("POSTGRES_MAX_CONNS must be between 1 and 2147483647, got: %d", maxConns)
@@ -47,7 +58,7 @@ func run() error {
 		Port:            config.MustGetEnvInt("POSTGRES_PORT"),
 		Database:        config.MustGetEnv("POSTGRES_DB"),
 		User:            config.MustGetEnv("POSTGRES_USER"),
-		Password:        config.MustGetEnv("POSTGRES_PASSWORD"),
+		Password:        postgresPassword,
 		SSLMode:         config.MustGetEnv("POSTGRES_SSLMODE"),
 		MaxConns:        int32(maxConns), //nolint:gosec // G115: bounds checked above
 		MinConns:        int32(minConns),

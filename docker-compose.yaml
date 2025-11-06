@@ -156,11 +156,10 @@ services:
       # Air hot-reload configuration
       - AIR_PROXY_PORT=8081
       - AIR_BUILD_DIR=/app/tmp
-      # PostgreSQL connection
+      # PostgreSQL connection (password loaded from Vault)
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=nexus_db
       - POSTGRES_SSLMODE=disable
       - POSTGRES_MAX_CONNS=25
@@ -205,10 +204,9 @@ services:
       - FRONTEND_URL=http://nexus.local
       # Kratos Admin URL
       - KRATOS_ADMIN_URL=http://kratos:4434
-      # Redis connection
+      # Redis connection (password loaded from Vault)
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_DB=0
       # Gateway CORS configuration
       - ALLOWED_ORIGINS=http://nexus.local,https://nexus.local
@@ -249,9 +247,8 @@ services:
       - SERVER_PORT=8082
       - AIR_PROXY_PORT=8082
       - AIR_BUILD_DIR=/app/tmp
-      # Kratos configuration
+      # Kratos configuration (webhook secret loaded from Vault)
       - KRATOS_ADMIN_URL=http://kratos:4434
-      - KRATOS_WEBHOOK_SECRET=${KRATOS_WEBHOOK_SECRET}
       # Temporal configuration
       - TEMPORAL_HOST=temporal:7233
       - TEMPORAL_NAMESPACE=default
@@ -331,17 +328,38 @@ services:
       retries: 3
       start_period: 30s
 
+  kratos-secrets:
+    image: hashicorp/vault:1.21.0
+    volumes:
+      - ./infra/kratos:/scripts:ro
+      - kratos_secrets:/secrets
+    environment:
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
+    command: ["/scripts/load-secrets-from-vault.sh", "/secrets/kratos.env"]
+    depends_on:
+      vault:
+        condition: service_healthy
+
   kratos-migrate:
     image: oryd/kratos:v1.3.1
-    env_file: .env
     volumes:
       - ./infra/kratos:/etc/config/kratos:ro
-    environment:
-      - DSN=postgres://admin:${POSTGRES_PASSWORD}@postgres:5432/kratos_db?sslmode=disable&max_conns=20&max_idle_conns=4
-    command: migrate sql -c /etc/config/kratos/kratos.dev.yml -e --yes
+      - kratos_secrets:/secrets
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -f /secrets/kratos.env ]; then
+          set -a
+          . /secrets/kratos.env
+          set +a
+        fi
+        kratos migrate sql -c /etc/config/kratos/kratos.dev.yml -e --yes
     depends_on:
       postgres:
         condition: service_healthy
+      kratos-secrets:
+        condition: service_completed_successfully
 
   kratos:
     image: oryd/kratos:v1.3.1
@@ -351,21 +369,16 @@ services:
       - "4434:4434" # Admin API
     volumes:
       - ./infra/kratos:/etc/config/kratos:ro
-    env_file: .env
-    environment:
-      # Database connection (secret)
-      - DSN=postgres://admin:${POSTGRES_PASSWORD}@postgres:5432/kratos_db?sslmode=disable&max_conns=20&max_idle_conns=4
-      # Secrets for encryption and cookies
-      - SECRETS_COOKIE=${KRATOS_COOKIE_SECRET}
-      - SECRETS_CIPHER=${KRATOS_CIPHER_SECRET}
-      # Google OIDC credentials (secrets)
-      - SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_ID=${KRATOS_GOOGLE_CLIENT_ID}
-      - SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_SECRET=${KRATOS_GOOGLE_CLIENT_SECRET}
-      # Webhook secret (secret)
-      - SELFSERVICE_FLOWS_LOGIN_AFTER_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE=${KRATOS_WEBHOOK_SECRET}
-      - SELFSERVICE_FLOWS_LOGIN_AFTER_OIDC_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE=${KRATOS_WEBHOOK_SECRET}
-      - SELFSERVICE_FLOWS_REGISTRATION_AFTER_PASSWORD_HOOKS_0_CONFIG_AUTH_CONFIG_VALUE=${KRATOS_WEBHOOK_SECRET}
-    command: serve -c /etc/config/kratos/kratos.dev.yml --watch-courier --dev
+      - kratos_secrets:/secrets
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -f /secrets/kratos.env ]; then
+          set -a
+          . /secrets/kratos.env
+          set +a
+        fi
+        kratos serve -c /etc/config/kratos/kratos.dev.yml --watch-courier --dev
     labels:
       - "traefik.enable=true"
       # Kratos public API (self-service endpoints)
@@ -375,6 +388,8 @@ services:
       - "traefik.http.routers.kratos-api.priority=200"
     depends_on:
       kratos-migrate:
+        condition: service_completed_successfully
+      kratos-secrets:
         condition: service_completed_successfully
     healthcheck:
       test:
@@ -554,3 +569,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  kratos_secrets:

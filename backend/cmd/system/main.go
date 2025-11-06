@@ -31,12 +31,24 @@ func main() {
 }
 
 func run() error {
+	ctx := context.Background()
+
+	// Load secrets from Vault
+	vaultClient, err := config.NewVaultClient()
+	if err != nil {
+		return fmt.Errorf("failed to create Vault client: %w", err)
+	}
+
+	webhookSecret, err := vaultClient.GetWebhookSecret(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load webhook secret from Vault: %w", err)
+	}
+
 	port := config.GetEnv("SERVER_PORT", "8083")
 	kratosAdminURL := config.MustGetEnv("KRATOS_ADMIN_URL")
 	temporalHost := config.MustGetEnv("TEMPORAL_HOST")
 	temporalNamespace := config.GetEnv("TEMPORAL_NAMESPACE", "default")
 	taskQueue := config.MustGetEnv("TEMPORAL_TASK_QUEUE")
-	webhookSecret := config.MustGetEnv("KRATOS_WEBHOOK_SECRET")
 
 	temporalClient, err := newTemporalClient(temporalHost, temporalNamespace)
 	if err != nil {

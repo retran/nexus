@@ -20,11 +20,14 @@ for bin in "${REQUIRED_BINARIES[@]}"; do
   fi
 done
 
+# In dev mode, use the hardcoded root token
+# In production, use token from file
 if [ -f "${ROOT_TOKEN_FILE}" ]; then
   ROOT_TOKEN=$(<"${ROOT_TOKEN_FILE}")
 else
-  echo "[ERROR] Root token file not found at ${ROOT_TOKEN_FILE}. Run 'task vault:init' first." >&2
-  exit 1
+  # Dev mode: Vault uses token "root"
+  ROOT_TOKEN="root"
+  echo "[INFO] Using dev mode token: root"
 fi
 
 if [ -f "${UNSEAL_KEY_FILE}" ]; then
@@ -165,14 +168,27 @@ ensure_vault_running
 echo "[INFO] Validating root token access..."
 vault_exec "${ROOT_TOKEN}" vault token lookup >/dev/null
 
+echo "[WARN] Secret rotation will require service restart to pick up new values!"
+echo "[WARN] For postgres/redis, you need to update passwords in those services manually."
+
 SECRETS_TO_ROTATE=(
   "shared/webhook:Kratos webhook shared secret:32"
   "shared/oathkeeper:Oathkeeper shared secret:32"
 )
 
+echo "[INFO] Rotating only webhook and oathkeeper secrets (safe to rotate)..."
+
 for spec in "${SECRETS_TO_ROTATE[@]}"; do
   IFS=":" read -r path description size <<<"${spec}"
   rotate_secret "${path}" "${description}" "${size}"
 done
+
+echo ""
+echo "[INFO] Not rotating postgres/redis passwords (requires manual coordination)."
+echo "[INFO] To rotate postgres/redis:"
+echo "  1. Generate new password: openssl rand -hex 32"
+echo "  2. Update Vault: task vault:secrets:seed"
+echo "  3. Update postgres/redis services"
+echo "  4. Restart all dependent services"
 
 echo "[SUCCESS] Shared secret rotation complete."

@@ -32,6 +32,11 @@ tasks:
       - task: redis:up
       - task: temporal:up
       - task: vault:bootstrap:dev
+      - task: vault:secrets:seed
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Loading Kratos secrets from Vault...\n"
+      - docker compose up -d kratos-secrets
+      - docker compose wait kratos-secrets
       - task: kratos:migrate
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Starting Kratos, Keto, Oathkeeper...\n"
@@ -381,9 +386,12 @@ tasks:
       - ./rotate-shared-secrets.sh
 
   vault:policies:init:
-    desc: "Initialize Vault policies"
+    desc: "Initialize Vault policies (production only)"
     silent: true
     dir: "{{.ROOT_DIR}}/infra/vault"
+    env:
+      VAULT_TOKEN: root
+      VAULT_ADDR: http://vault:8200
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Initializing Vault policies...\n"
@@ -413,10 +421,11 @@ tasks:
       - |
         printf "{{.RED}}[WARN]{{.NC}} Removing Vault will permanently delete ALL secrets!\n"
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Removing Vault container...\n"
-      - docker compose stop vault 2>/dev/null || true
-      - docker compose rm -f -v vault 2>/dev/null || true
-      - rm -rf infra/vault/.dev 2>/dev/null || true
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing Vault and secrets containers...\n"
+      - docker compose stop vault kratos-secrets 2>/dev/null || true
+      - docker compose rm -f -v vault kratos-secrets 2>/dev/null || true
+      - docker volume rm nexus_kratos_secrets 2>/dev/null || true
+      - rm -rf vault/.dev 2>/dev/null || true
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Vault cleanup complete\n"
 
@@ -536,8 +545,9 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Removing all infrastructure containers...\n"
-      - docker compose stop redis temporal vault kratos keto oathkeeper traefik redis-commander temporal-ui mailhog kratos-ui adminer 2>/dev/null || true
-      - docker compose rm -f -v redis temporal vault kratos keto oathkeeper traefik redis-commander temporal-ui mailhog kratos-ui adminer 2>/dev/null || true
-      - rm -rf infra/vault/.dev 2>/dev/null || true
+      - docker compose stop redis temporal vault kratos keto oathkeeper traefik redis-commander temporal-ui mailhog kratos-ui adminer kratos-secrets kratos-migrate 2>/dev/null || true
+      - docker compose rm -f -v redis temporal vault kratos keto oathkeeper traefik redis-commander temporal-ui mailhog kratos-ui adminer kratos-secrets kratos-migrate 2>/dev/null || true
+      - docker volume rm nexus_kratos_secrets 2>/dev/null || true
+      - rm -rf vault/.dev 2>/dev/null || true
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Infrastructure cleanup complete\n"

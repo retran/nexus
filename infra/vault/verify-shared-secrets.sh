@@ -14,11 +14,14 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
+# In dev mode, use the hardcoded root token
+# In production, use token from file
 if [ -f "${ROOT_TOKEN_FILE}" ]; then
   ROOT_TOKEN=$(<"${ROOT_TOKEN_FILE}")
 else
-  echo "[ERROR] Root token file not found at ${ROOT_TOKEN_FILE}. Run 'task vault:init' first." >&2
-  exit 1
+  # Dev mode: Vault uses token "root"
+  ROOT_TOKEN="root"
+  echo "[INFO] Using dev mode token: root"
 fi
 
 if command -v docker-compose >/dev/null 2>&1; then
@@ -55,8 +58,11 @@ ensure_vault_running
 echo "[INFO] Verifying shared secrets..."
 
 SECRETS_TO_CHECK=(
+  "shared/postgres:PostgreSQL database password"
+  "shared/redis:Redis password"
   "shared/webhook:Kratos webhook shared secret"
   "shared/oathkeeper:Oathkeeper shared secret"
+  "services/kratos/encryption:Kratos encryption secrets"
 )
 
 failures=0
@@ -76,20 +82,35 @@ for spec in "${SECRETS_TO_CHECK[@]}"; do
     continue
   fi
 
-  current=$(echo "${secret_json}" | jq -r '.data.data.current // ""')
-  rotated_at=$(echo "${secret_json}" | jq -r '.data.data.rotated_at // ""')
+  # Check if it's a shared secret (has 'current' field) or service secret (any data)
+  data_keys=$(echo "${secret_json}" | jq -r '.data.data | keys[]' 2>/dev/null)
 
-  if [ -z "${current}" ]; then
-    echo "[ERROR] Missing 'current' value for kv/${path}"
+  if [ -z "${data_keys}" ]; then
+    echo "[ERROR] No data found in kv/${path}"
     failures=$((failures + 1))
     continue
   fi
 
-  if [ -z "${rotated_at}" ]; then
-    echo "[WARN] No rotation timestamp recorded for kv/${path}"
-  fi
+  # For shared secrets, check 'current' field
+  if [[ "${path}" == shared/* ]]; then
+    current=$(echo "${secret_json}" | jq -r '.data.data.current // ""')
+    rotated_at=$(echo "${secret_json}" | jq -r '.data.data.rotated_at // ""')
 
-  echo "[OK] Secret kv/${path} is present (rotated_at=${rotated_at})"
+    if [ -z "${current}" ]; then
+      echo "[ERROR] Missing 'current' value for kv/${path}"
+      failures=$((failures + 1))
+      continue
+    fi
+
+    if [ -z "${rotated_at}" ]; then
+      echo "[WARN] No rotation timestamp recorded for kv/${path}"
+    fi
+
+    echo "[OK] Secret kv/${path} is present (rotated_at=${rotated_at})"
+  else
+    # For service secrets, just check that data exists
+    echo "[OK] Secret kv/${path} is present with fields: ${data_keys}"
+  fi
 done
 
 if [ "${failures}" -gt 0 ]; then

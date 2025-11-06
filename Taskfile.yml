@@ -88,22 +88,22 @@ tasks:
           ./scripts/generate-env.sh
         fi
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 1/7: Infrastructure services (Redis, Temporal, Traefik)...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 1/6: Infrastructure services (Vault, Redis, Temporal, Ory)...\n"
       - task: infra:bootstrap:dev
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 2/7: PostgreSQL (migrations + seeds)...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 2/6: PostgreSQL (migrations + seeds)...\n"
       - task: db:bootstrap:dev
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 5/7: Infrastructure tooling dependencies...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 3/6: Infrastructure tooling dependencies...\n"
       - task: infra:deps:install
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 6/7: Backend dependencies...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 4/6: Backend dependencies...\n"
       - task: backend:deps:install
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 7/7: Frontend dependencies...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 5/6: Frontend dependencies...\n"
       - task: frontend:deps:install
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 8/8: Starting all application services...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 6/6: Starting all application services...\n"
       - docker compose up -d
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Nexus development environment ready!\n"
