@@ -120,7 +120,7 @@ tasks:
     dir: "{{.ROOT_DIR}}/backend"
     sources:
       - "graphql/**/*.graphql"
-      - "gqlgen.yml"
+      - "tools/gqlgen.yml"
     generates:
       - "internal/api/data/generated.go"
     cmds:
@@ -136,13 +136,13 @@ tasks:
     dir: "{{.ROOT_DIR}}/backend"
     sources:
       - "graphql/**/*.graphql"
-      - "genqlient.yml"
+      - "tools/genqlient.yml"
     generates:
       - "internal/client/graphql/generated.go"
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Generating GraphQL client code (genqlient)...\n"
-      - go run github.com/Khan/genqlient
+      - go run github.com/Khan/genqlient tools/genqlient.yml
       - |
         printf "{{.GREEN}}[OK]{{.NC}} GraphQL client code generated\n"
 
@@ -152,7 +152,7 @@ tasks:
     dir: "{{.ROOT_DIR}}/backend"
     sources:
       - "../db/queries/**/*.sql"
-      - "sqlc.yml"
+      - "tools/sqlc.yml"
     generates:
       - "internal/repository/models.go"
       - "internal/repository/queries.go"

@@ -22,33 +22,18 @@ import (
 
 // InitTracerProvider initializes the OpenTelemetry tracer provider
 // and returns a shutdown function that should be called with defer.
-//
-// Environment variables:
-//   - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP collector endpoint (e.g., "alloy:4317")
-//   - SERVICE_NAME: Name of the service (required)
-//
-// Example:
-//
-//	shutdown, err := tracing.InitTracerProvider(ctx)
-//	if err != nil {
-//	    log.Fatalf("Failed to initialize tracer: %v", err)
-//	}
-//	defer shutdown(ctx)
 func InitTracerProvider(ctx context.Context) (func(context.Context) error, error) {
-	// Get OTLP endpoint from environment
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 	if endpoint == "" {
 		log.Println("OTEL_EXPORTER_OTLP_ENDPOINT not set, tracing disabled")
 		return func(context.Context) error { return nil }, nil
 	}
 
-	// Get service name from environment
 	serviceName := os.Getenv("SERVICE_NAME")
 	if serviceName == "" {
 		serviceName = "nexus-service"
 	}
 
-	// Create OTLP trace exporter
 	traceExporter, err := otlptracegrpc.New(
 		ctx,
 		otlptracegrpc.WithEndpoint(endpoint),
@@ -59,7 +44,6 @@ func InitTracerProvider(ctx context.Context) (func(context.Context) error, error
 		return nil, fmt.Errorf("failed to create OTLP trace exporter: %w", err)
 	}
 
-	// Create resource with service information
 	res, err := resource.New(
 		ctx,
 		resource.WithAttributes(
@@ -72,17 +56,14 @@ func InitTracerProvider(ctx context.Context) (func(context.Context) error, error
 		return nil, fmt.Errorf("failed to create resource: %w", err)
 	}
 
-	// Create tracer provider
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(traceExporter),
 		sdktrace.WithResource(res),
 		sdktrace.WithSampler(sdktrace.AlwaysSample()), // Sample all traces in dev
 	)
 
-	// Set global tracer provider
 	otel.SetTracerProvider(tp)
 
-	// Set global propagator for trace context propagation
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{},
 		propagation.Baggage{},
@@ -90,6 +71,5 @@ func InitTracerProvider(ctx context.Context) (func(context.Context) error, error
 
 	log.Printf("OpenTelemetry tracer initialized for service '%s' (endpoint: %s)", serviceName, endpoint)
 
-	// Return shutdown function
 	return tp.Shutdown, nil
 }

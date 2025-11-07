@@ -10,6 +10,7 @@ query GetUser($id: UUID!) {
     email
     name
     picture
+    role
     createdAt
     updatedAt
   }
@@ -22,6 +23,7 @@ query GetUserByEmail($email: String!) {
     email
     name
     picture
+    role
     createdAt
     updatedAt
   }
@@ -34,6 +36,7 @@ query GetUserByKratosId($kratosIdentityId: UUID!) {
     email
     name
     picture
+    role
     createdAt
     updatedAt
   }
@@ -46,6 +49,7 @@ query ListUsers($limit: Int, $offset: Int) {
     email
     name
     picture
+    role
     createdAt
     updatedAt
   }
@@ -64,6 +68,7 @@ mutation CreateUser($input: CreateUserInput!) {
     email
     name
     picture
+    role
     createdAt
     updatedAt
   }
@@ -76,6 +81,7 @@ mutation UpdateUser($id: UUID!, $input: UpdateUserInput!) {
     email
     name
     picture
+    role
     createdAt
     updatedAt
   }

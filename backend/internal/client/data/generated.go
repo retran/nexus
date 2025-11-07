@@ -114,6 +114,7 @@ type CreateUserCreateUser struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
+	Role             UserRole  `json:"role"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -133,6 +134,9 @@ func (v *CreateUserCreateUser) GetName() *string { return v.Name }
 // GetPicture returns CreateUserCreateUser.Picture, and is useful for accessing the field via an interface.
 func (v *CreateUserCreateUser) GetPicture() *string { return v.Picture }
 
+// GetRole returns CreateUserCreateUser.Role, and is useful for accessing the field via an interface.
+func (v *CreateUserCreateUser) GetRole() UserRole { return v.Role }
+
 // GetCreatedAt returns CreateUserCreateUser.CreatedAt, and is useful for accessing the field via an interface.
 func (v *CreateUserCreateUser) GetCreatedAt() time.Time { return v.CreatedAt }
 
@@ -144,6 +148,7 @@ type CreateUserInput struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
+	Role             *UserRole `json:"role"`
 }
 
 // GetKratosIdentityId returns CreateUserInput.KratosIdentityId, and is useful for accessing the field via an interface.
@@ -157,6 +162,9 @@ func (v *CreateUserInput) GetName() *string { return v.Name }
 
 // GetPicture returns CreateUserInput.Picture, and is useful for accessing the field via an interface.
 func (v *CreateUserInput) GetPicture() *string { return v.Picture }
+
+// GetRole returns CreateUserInput.Role, and is useful for accessing the field via an interface.
+func (v *CreateUserInput) GetRole() *UserRole { return v.Role }
 
 // CreateUserResponse is returned by CreateUser on success.
 type CreateUserResponse struct {
@@ -231,6 +239,7 @@ type GetUserByEmailUserByEmailUser struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
+	Role             UserRole  `json:"role"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -249,6 +258,9 @@ func (v *GetUserByEmailUserByEmailUser) GetName() *string { return v.Name }
 
 // GetPicture returns GetUserByEmailUserByEmailUser.Picture, and is useful for accessing the field via an interface.
 func (v *GetUserByEmailUserByEmailUser) GetPicture() *string { return v.Picture }
+
+// GetRole returns GetUserByEmailUserByEmailUser.Role, and is useful for accessing the field via an interface.
+func (v *GetUserByEmailUserByEmailUser) GetRole() UserRole { return v.Role }
 
 // GetCreatedAt returns GetUserByEmailUserByEmailUser.CreatedAt, and is useful for accessing the field via an interface.
 func (v *GetUserByEmailUserByEmailUser) GetCreatedAt() time.Time { return v.CreatedAt }
@@ -273,6 +285,7 @@ type GetUserByKratosIdUserByKratosIdUser struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
+	Role             UserRole  `json:"role"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -293,6 +306,9 @@ func (v *GetUserByKratosIdUserByKratosIdUser) GetName() *string { return v.Name 
 
 // GetPicture returns GetUserByKratosIdUserByKratosIdUser.Picture, and is useful for accessing the field via an interface.
 func (v *GetUserByKratosIdUserByKratosIdUser) GetPicture() *string { return v.Picture }
+
+// GetRole returns GetUserByKratosIdUserByKratosIdUser.Role, and is useful for accessing the field via an interface.
+func (v *GetUserByKratosIdUserByKratosIdUser) GetRole() UserRole { return v.Role }
 
 // GetCreatedAt returns GetUserByKratosIdUserByKratosIdUser.CreatedAt, and is useful for accessing the field via an interface.
 func (v *GetUserByKratosIdUserByKratosIdUser) GetCreatedAt() time.Time { return v.CreatedAt }
@@ -315,6 +331,7 @@ type GetUserUser struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
+	Role             UserRole  `json:"role"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -333,6 +350,9 @@ func (v *GetUserUser) GetName() *string { return v.Name }
 
 // GetPicture returns GetUserUser.Picture, and is useful for accessing the field via an interface.
 func (v *GetUserUser) GetPicture() *string { return v.Picture }
+
+// GetRole returns GetUserUser.Role, and is useful for accessing the field via an interface.
+func (v *GetUserUser) GetRole() UserRole { return v.Role }
 
 // GetCreatedAt returns GetUserUser.CreatedAt, and is useful for accessing the field via an interface.
 func (v *GetUserUser) GetCreatedAt() time.Time { return v.CreatedAt }
@@ -395,6 +415,7 @@ type ListUsersUsersUser struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
+	Role             UserRole  `json:"role"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -414,6 +435,9 @@ func (v *ListUsersUsersUser) GetName() *string { return v.Name }
 // GetPicture returns ListUsersUsersUser.Picture, and is useful for accessing the field via an interface.
 func (v *ListUsersUsersUser) GetPicture() *string { return v.Picture }
 
+// GetRole returns ListUsersUsersUser.Role, and is useful for accessing the field via an interface.
+func (v *ListUsersUsersUser) GetRole() UserRole { return v.Role }
+
 // GetCreatedAt returns ListUsersUsersUser.CreatedAt, and is useful for accessing the field via an interface.
 func (v *ListUsersUsersUser) GetCreatedAt() time.Time { return v.CreatedAt }
 
@@ -421,8 +445,9 @@ func (v *ListUsersUsersUser) GetCreatedAt() time.Time { return v.CreatedAt }
 func (v *ListUsersUsersUser) GetUpdatedAt() time.Time { return v.UpdatedAt }
 
 type UpdateUserInput struct {
-	Name    *string `json:"name"`
-	Picture *string `json:"picture"`
+	Name    *string   `json:"name"`
+	Picture *string   `json:"picture"`
+	Role    *UserRole `json:"role"`
 }
 
 // GetName returns UpdateUserInput.Name, and is useful for accessing the field via an interface.
@@ -430,6 +455,9 @@ func (v *UpdateUserInput) GetName() *string { return v.Name }
 
 // GetPicture returns UpdateUserInput.Picture, and is useful for accessing the field via an interface.
 func (v *UpdateUserInput) GetPicture() *string { return v.Picture }
+
+// GetRole returns UpdateUserInput.Role, and is useful for accessing the field via an interface.
+func (v *UpdateUserInput) GetRole() *UserRole { return v.Role }
 
 // UpdateUserResponse is returned by UpdateUser on success.
 type UpdateUserResponse struct {
@@ -446,6 +474,7 @@ type UpdateUserUpdateUser struct {
 	Email            string    `json:"email"`
 	Name             *string   `json:"name"`
 	Picture          *string   `json:"picture"`
+	Role             UserRole  `json:"role"`
 	CreatedAt        time.Time `json:"createdAt"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
@@ -465,11 +494,28 @@ func (v *UpdateUserUpdateUser) GetName() *string { return v.Name }
 // GetPicture returns UpdateUserUpdateUser.Picture, and is useful for accessing the field via an interface.
 func (v *UpdateUserUpdateUser) GetPicture() *string { return v.Picture }
 
+// GetRole returns UpdateUserUpdateUser.Role, and is useful for accessing the field via an interface.
+func (v *UpdateUserUpdateUser) GetRole() UserRole { return v.Role }
+
 // GetCreatedAt returns UpdateUserUpdateUser.CreatedAt, and is useful for accessing the field via an interface.
 func (v *UpdateUserUpdateUser) GetCreatedAt() time.Time { return v.CreatedAt }
 
 // GetUpdatedAt returns UpdateUserUpdateUser.UpdatedAt, and is useful for accessing the field via an interface.
 func (v *UpdateUserUpdateUser) GetUpdatedAt() time.Time { return v.UpdatedAt }
+
+type UserRole string
+
+const (
+	UserRoleNone   UserRole = "NONE"
+	UserRoleMember UserRole = "MEMBER"
+	UserRoleAdmin  UserRole = "ADMIN"
+)
+
+var AllUserRole = []UserRole{
+	UserRoleNone,
+	UserRoleMember,
+	UserRoleAdmin,
+}
 
 // __CreateAuditLogInput is used internally by genqlient
 type __CreateAuditLogInput struct {
@@ -648,6 +694,7 @@ mutation CreateUser ($input: CreateUserInput!) {
 		email
 		name
 		picture
+		role
 		createdAt
 		updatedAt
 	}
@@ -760,6 +807,7 @@ query GetUser ($id: UUID!) {
 		email
 		name
 		picture
+		role
 		createdAt
 		updatedAt
 	}
@@ -800,6 +848,7 @@ query GetUserByEmail ($email: String!) {
 		email
 		name
 		picture
+		role
 		createdAt
 		updatedAt
 	}
@@ -840,6 +889,7 @@ query GetUserByKratosId ($kratosIdentityId: UUID!) {
 		email
 		name
 		picture
+		role
 		createdAt
 		updatedAt
 	}
@@ -926,6 +976,7 @@ query ListUsers ($limit: Int, $offset: Int) {
 		email
 		name
 		picture
+		role
 		createdAt
 		updatedAt
 	}
@@ -968,6 +1019,7 @@ mutation UpdateUser ($id: UUID!, $input: UpdateUserInput!) {
 		email
 		name
 		picture
+		role
 		createdAt
 		updatedAt
 	}

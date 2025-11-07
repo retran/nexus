@@ -7,7 +7,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -23,6 +22,7 @@ import (
 	temporalclient "go.temporal.io/sdk/client"
 
 	"github.com/retran/nexus/backend/internal/api/system/handlers"
+	"github.com/retran/nexus/backend/internal/audit"
 	"github.com/retran/nexus/backend/internal/config"
 	"github.com/retran/nexus/backend/internal/tracing"
 )
@@ -36,7 +36,6 @@ func main() {
 func run() error {
 	ctx := context.Background()
 
-	// Initialize OpenTelemetry tracing
 	shutdown, err := tracing.InitTracerProvider(ctx)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize tracing: %v", err)
@@ -48,22 +47,20 @@ func run() error {
 		}()
 	}
 
-	// Start Prometheus metrics server on port 9091
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())
 		metricsServer := &http.Server{
-			Addr:              ":9091",
+			Addr:              ":9093",
 			Handler:           mux,
 			ReadHeaderTimeout: 10 * time.Second,
 		}
-		log.Println("Metrics server listening on :9091")
+		log.Println("Metrics server listening on :9093")
 		if err := metricsServer.ListenAndServe(); err != nil {
 			log.Printf("Metrics server error: %v", err)
 		}
 	}()
 
-	// Load secrets from Vault
 	vaultClient, err := config.NewVaultClient()
 	if err != nil {
 		return fmt.Errorf("failed to create Vault client: %w", err)
@@ -75,7 +72,6 @@ func run() error {
 	}
 
 	port := config.GetEnv("SERVER_PORT", "8083")
-	kratosAdminURL := config.MustGetEnv("KRATOS_ADMIN_URL")
 	temporalHost := config.MustGetEnv("TEMPORAL_HOST")
 	temporalNamespace := config.GetEnv("TEMPORAL_NAMESPACE", "default")
 	taskQueue := config.MustGetEnv("TEMPORAL_TASK_QUEUE")
@@ -90,13 +86,10 @@ func run() error {
 		}
 	}()
 
-	roleHandler, auditHandler, kratosWebhookHandler, err := initServices(kratosAdminURL, temporalClient, taskQueue, webhookSecret)
-	if err != nil {
-		return err
-	}
+	auditHandler, kratosWebhookHandler := initServices(temporalClient, taskQueue, webhookSecret)
 
 	mux := http.NewServeMux()
-	configureMux(mux, roleHandler, auditHandler, kratosWebhookHandler)
+	configureMux(mux, auditHandler, kratosWebhookHandler)
 
 	server := newHTTPServer(port, mux)
 	log.Printf("Starting internal API on port %s", port)
@@ -118,10 +111,9 @@ func internalHealthHandler(w http.ResponseWriter, _ *http.Request) {
 	}
 }
 
-func configureMux(mux *http.ServeMux, roleHandler *handlers.AdminHandler, auditHandler *handlers.AuditHandler, kratosWebhookHandler *handlers.KratosWebhookHandler) {
+func configureMux(mux *http.ServeMux, auditHandler *handlers.AuditHandler, kratosWebhookHandler *handlers.KratosWebhookHandler) {
 	mux.HandleFunc("GET /health", healthHandler)
 	mux.HandleFunc("GET /internal/healthz", internalHealthHandler)
-	mux.Handle("POST /admin/users/{id}/role", adminRoleHandler(roleHandler))
 
 	if auditHandler != nil {
 		mux.HandleFunc("POST /internal/audit/events", auditHandler.HandleAuditEvent)
@@ -134,39 +126,14 @@ func configureMux(mux *http.ServeMux, roleHandler *handlers.AdminHandler, auditH
 	}
 }
 
-func initServices(kratosAdminURL string, temporalClient temporalclient.Client, taskQueue, webhookSecret string) (*handlers.AdminHandler, *handlers.AuditHandler, *handlers.KratosWebhookHandler, error) {
-	roleHandler, err := handlers.NewAdminHandler(kratosAdminURL)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create admin handler: %w", err)
-	}
+func initServices(temporalClient temporalclient.Client, taskQueue, webhookSecret string) (*handlers.AuditHandler, *handlers.KratosWebhookHandler) {
+	// Create audit service that uses Temporal
+	auditService := audit.NewTemporalService(temporalClient, taskQueue)
 
-	auditHandler := handlers.NewAuditHandler(temporalClient, taskQueue)
-	kratosWebhookHandler := handlers.NewKratosWebhookHandler(temporalClient, taskQueue, webhookSecret)
+	auditHandler := handlers.NewAuditHandler(auditService)
+	kratosWebhookHandler := handlers.NewKratosWebhookHandler(auditService, webhookSecret)
 
-	return roleHandler, auditHandler, kratosWebhookHandler, nil
-}
-
-func adminRoleHandler(roleHandler *handlers.AdminHandler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		identityID := strings.TrimSpace(r.PathValue("id"))
-		if identityID == "" {
-			http.Error(w, "Bad Request: missing identity id", http.StatusBadRequest)
-			return
-		}
-
-		var payload handlers.UpdateRoleRequest
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			http.Error(w, "Bad Request: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		if err := roleHandler.UpdateUserRole(r.Context(), identityID, payload); err != nil {
-			http.Error(w, "Failed to update role: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusNoContent)
-	}
+	return auditHandler, kratosWebhookHandler
 }
 
 func newTemporalClient(host, namespace string) (temporalclient.Client, error) {

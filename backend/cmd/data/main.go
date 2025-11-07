@@ -36,7 +36,6 @@ func main() {
 func run() error {
 	ctx := context.Background()
 
-	// Initialize OpenTelemetry tracing
 	shutdown, err := tracing.InitTracerProvider(ctx)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize tracing: %v", err)
@@ -48,7 +47,6 @@ func run() error {
 		}()
 	}
 
-	// Start Prometheus metrics server on port 9091
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())
@@ -63,7 +61,6 @@ func run() error {
 		}
 	}()
 
-	// Load secrets from Vault
 	vaultClient, err := config.NewVaultClient()
 	if err != nil {
 		return fmt.Errorf("failed to create Vault client: %w", err)
@@ -128,7 +125,6 @@ func run() error {
 
 	port := config.GetEnv("SERVER_PORT", "8081")
 
-	// Wrap handler with OpenTelemetry middleware for distributed tracing
 	var wrappedHandler http.Handler = mux
 	wrappedHandler = otelhttp.NewHandler(wrappedHandler, "nexus-data")
 

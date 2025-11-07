@@ -119,3 +119,8 @@ mutators:
         X-User-ID: "{{ print .Subject }}"
         X-User-Email: "{{ print .Extra.identity.traits.email }}"
         X-User-Role: "{{ print .Extra.identity.traits.role }}"
+        # Make sure Oathkeeper forwards session and user name to backend
+        # Kratos whoami returns session info under .session; template may vary by authenticator
+        X-Session-ID: "{{ print .Extra.session.id }}"
+        # Common trait names: 'name' or 'full_name' depending on identity traits shape
+        X-User-Name: "{{ print .Extra.identity.traits.name }}"

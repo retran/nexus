@@ -136,6 +136,9 @@ tasks:
         printf "{{.GREEN}}[OK]{{.NC}} Generated migration from schema.hcl\n"
       - |
         printf "{{.YELLOW}}[TIP]{{.NC}} Review db/migrations/XXX_{{.NAME}}.sql and commit\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Regenerating migration hashes (atlas.sum) to keep hashes in sync...\n"
+      - task: migrate:hash
     requires:
       vars:
         - NAME

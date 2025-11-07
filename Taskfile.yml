@@ -254,16 +254,16 @@ tasks:
         printf "\n"
 
         printf "{{.BLUE}}Infra:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(traefik|postgres-[0-9]|redis-[0-9]|vault|temporal-[0-9]|kratos-[0-9]|keto|oathkeeper|alloy|tempo|mimir|grafana|mailhog|dozzle)" | grep -v -E "(commander|adminer|ui)" || true
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(nexus-traefik|nexus-postgres-[0-9]|nexus-redis-[0-9]|nexus-vault|nexus-temporal-[0-9]|nexus-kratos-[0-9]|nexus-keto|nexus-oathkeeper|nexus-alloy|nexus-tempo|nexus-mimir|nexus-grafana|nexus-mailhog|nexus-dozzle)" | grep -v -E "(commander|adminer|ui)" || true
 
         printf "\n{{.BLUE}}Backend:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(data-[0-9]|gateway-[0-9]|system-[0-9]|worker-[0-9])" || true
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(nexus-data-[0-9]|nexus-gateway-[0-9]|nexus-system-[0-9]|nexus-worker-[0-9])" || true
 
         printf "\n{{.BLUE}}Frontend:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep "frontend-[0-9]" || true
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep "nexus-frontend-[0-9]" || true
 
         printf "\n{{.BLUE}}Tools:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(adminer|redis-commander|kratos-ui|temporal-ui)" || true
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(nexus-adminer|nexus-redis-commander|nexus-kratos-ui|nexus-temporal-ui)" || true
 
         printf "\n{{.GREEN}}[OK]{{.NC}} Health check complete\n"
 
@@ -330,14 +330,13 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Step 1/3: Resetting PostgreSQL database...\n"
       - task: db:reset:data
       - |
-        printf "\n{{.BLUE}}[INFO]{{.NC}} Step 2/3: Clearing Kratos identities...\n"
-      - task: infra:kratos:identities:clear
+        printf "\n{{.BLUE}}[INFO]{{.NC}} Step 2/3: Restoring Kratos identities (seeds)...\n"
+      - task: infra:kratos:seed
       - |
-        printf "\n{{.BLUE}}[INFO]{{.NC}} Step 3/3: Clearing Keto permissions...\n"
-      - task: infra:keto:tuples:clear
+        printf "\n{{.BLUE}}[INFO]{{.NC}} Step 3/3: Restoring Keto tuples (seeds)...\n"
+      - task: infra:keto:seed
       - |
-        printf "\n{{.GREEN}}[OK]{{.NC}} Fast reset complete! Application is in fresh state.\n"
-        printf "{{.YELLOW}}[TIP]{{.NC}} Run 'task db:seed:dev' and 'task infra:kratos:seed' to restore test data\n"
+        printf "\n{{.GREEN}}[OK]{{.NC}} Fast reset complete! Application is in fresh state with seeds restored.\n"
 
   dev:help:
     desc: "Show available commands"

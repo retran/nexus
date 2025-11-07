@@ -34,7 +34,6 @@ func main() {
 func run() error {
 	ctx := context.Background()
 
-	// Initialize OpenTelemetry tracing
 	shutdown, err := tracing.InitTracerProvider(ctx)
 	if err != nil {
 		log.Printf("Warning: Failed to initialize tracing: %v", err)
@@ -46,16 +45,15 @@ func run() error {
 		}()
 	}
 
-	// Start Prometheus metrics server on port 9091
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())
 		metricsServer := &http.Server{
-			Addr:              ":9091",
+			Addr:              ":9094",
 			Handler:           mux,
 			ReadHeaderTimeout: 10 * time.Second,
 		}
-		log.Println("Metrics server listening on :9091")
+		log.Println("Metrics server listening on :9094")
 		if err := metricsServer.ListenAndServe(); err != nil {
 			log.Printf("Metrics server error: %v", err)
 		}

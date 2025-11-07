@@ -40,6 +40,10 @@ services:
       - POSTGRES_MIN_CONNS=5
       # OpenTelemetry configuration
       - OTEL_EXPORTER_OTLP_ENDPOINT=alloy:4317
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9091"
+      - "prometheus.io/path=/metrics"
     depends_on:
       postgres:
         condition: service_healthy
@@ -93,6 +97,9 @@ services:
       # OpenTelemetry configuration
       - OTEL_EXPORTER_OTLP_ENDPOINT=alloy:4317
     labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9091"
+      - "prometheus.io/path=/metrics"
       - "traefik.enable=true"
       - "traefik.http.routers.gateway.rule=Host(`api.nexus.local`)"
       - "traefik.http.routers.gateway.entrypoints=web"
@@ -150,6 +157,10 @@ services:
       - POSTGRES_MIN_CONNS=5
       # OpenTelemetry configuration
       - OTEL_EXPORTER_OTLP_ENDPOINT=alloy:4317
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9091"
+      - "prometheus.io/path=/metrics"
     depends_on:
       postgres:
         condition: service_healthy
@@ -192,6 +203,10 @@ services:
       - DATA_API_ENDPOINT=http://data:8081/graphql
       # OpenTelemetry configuration
       - OTEL_EXPORTER_OTLP_ENDPOINT=alloy:4317
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9091"
+      - "prometheus.io/path=/metrics"
     depends_on:
       temporal:
         condition: service_started

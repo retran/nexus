@@ -88,6 +88,42 @@ prometheus.scrape "docker_metrics" {
 
   scrape_interval = "15s"
   scrape_timeout  = "10s"
+
+  // Filter: only scrape containers with prometheus.io/scrape=true label
+  // Docker labels with dots and slashes are converted to underscores by Docker
+  relabel {
+    source_labels = ["__meta_docker_container_label_prometheus_io_scrape"]
+    regex         = "true"
+    action        = "keep"
+  }
+
+  // Use prometheus.io/port label if present
+  relabel {
+    source_labels = ["__address__", "__meta_docker_container_label_prometheus_io_port"]
+    regex         = "([^:]+)(?::\\d+)?;(\\d+)"
+    target_label  = "__address__"
+    replacement   = "${1}:${2}"
+  }
+
+  // Use prometheus.io/path label if present
+  relabel {
+    source_labels = ["__meta_docker_container_label_prometheus_io_path"]
+    regex         = "(.+)"
+    target_label  = "__metrics_path__"
+  }
+
+  // Add container name as job label (strip leading slash)
+  relabel {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/?(.+)"
+    target_label  = "job"
+  }
+
+  // Add service name from Docker Compose service label
+  relabel {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
 }
 
 // =============================================================================

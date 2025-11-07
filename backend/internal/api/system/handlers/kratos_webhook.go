@@ -7,32 +7,28 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
-	temporalclient "go.temporal.io/sdk/client"
 
+	"github.com/retran/nexus/backend/internal/audit"
 	"github.com/retran/nexus/backend/internal/domain"
 )
 
 // KratosWebhookHandler handles webhook events from Ory Kratos.
 type KratosWebhookHandler struct {
-	temporalClient temporalclient.Client
-	taskQueue      string
-	webhookSecret  string
+	auditService  audit.Service
+	webhookSecret string
 }
 
 // NewKratosWebhookHandler creates a new Kratos webhook handler.
-func NewKratosWebhookHandler(temporalClient temporalclient.Client, taskQueue, webhookSecret string) *KratosWebhookHandler {
+func NewKratosWebhookHandler(auditService audit.Service, webhookSecret string) *KratosWebhookHandler {
 	return &KratosWebhookHandler{
-		temporalClient: temporalClient,
-		taskQueue:      taskQueue,
-		webhookSecret:  webhookSecret,
+		auditService:  auditService,
+		webhookSecret: webhookSecret,
 	}
 }
 
@@ -107,24 +103,15 @@ func (h *KratosWebhookHandler) validateWebhookSecret(r *http.Request) bool {
 }
 
 func (h *KratosWebhookHandler) logAuditEvent(ctx context.Context, eventType string, payload *KratosWebhookPayload) error {
-	if h.temporalClient == nil {
-		return errors.New("temporal client not configured")
+	if h.auditService == nil {
+		return fmt.Errorf("audit service not configured")
 	}
 
-	workflowID := fmt.Sprintf("audit-%s-%s-%d", eventType, payload.IdentityID, time.Now().Unix())
-
-	workflowOptions := temporalclient.StartWorkflowOptions{
-		ID:        workflowID,
-		TaskQueue: h.taskQueue,
-	}
-
-	// Parse Kratos identity ID to UUID
 	identityID, err := uuid.Parse(payload.IdentityID)
 	if err != nil {
 		return fmt.Errorf("parse identity ID: %w", err)
 	}
 
-	// Create domain.AuditEvent to match the workflow signature
 	event := domain.AuditEvent{
 		UserID:    &identityID,
 		EventType: eventType,
@@ -139,10 +126,8 @@ func (h *KratosWebhookHandler) logAuditEvent(ctx context.Context, eventType stri
 		},
 	}
 
-	// Use the correct workflow name and type
-	_, err = h.temporalClient.ExecuteWorkflow(ctx, workflowOptions, "AuditLogWorkflow", event)
-	if err != nil {
-		return fmt.Errorf("execute audit workflow: %w", err)
+	if err := h.auditService.LogEvent(ctx, &event); err != nil {
+		return fmt.Errorf("log audit event: %w", err)
 	}
 
 	return nil

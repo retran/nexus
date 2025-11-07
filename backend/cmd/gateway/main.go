@@ -23,7 +23,6 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// Load secrets from Vault (before defer to ensure it's created first)
 	vaultClient, err := config.NewVaultClient()
 	if err != nil {
 		log.Fatalf("Failed to create Vault client: %v", err)
@@ -34,7 +33,6 @@ func main() {
 		log.Fatalf("Failed to load Redis password from Vault: %v", err)
 	}
 
-	// Initialize OpenTelemetry tracing
 	shutdown, err2 := tracing.InitTracerProvider(ctx)
 	if err2 != nil {
 		log.Printf("Warning: Failed to initialize tracing: %v", err2)
@@ -46,16 +44,15 @@ func main() {
 		}()
 	}
 
-	// Start Prometheus metrics server on port 9091
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())
 		metricsServer := &http.Server{
-			Addr:              ":9091",
+			Addr:              ":9092",
 			Handler:           mux,
 			ReadHeaderTimeout: 10 * time.Second,
 		}
-		log.Println("Metrics server listening on :9091")
+		log.Println("Metrics server listening on :9092")
 		if err := metricsServer.ListenAndServe(); err != nil {
 			log.Printf("Metrics server error: %v", err)
 		}

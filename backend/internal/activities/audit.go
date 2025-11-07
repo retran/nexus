@@ -84,7 +84,6 @@ func (a *AuditActivities) RecordAuditLog(ctx context.Context, event *domain.Audi
 
 // RecordAuditLogBatch records multiple audit events in a single transaction.
 func (a *AuditActivities) RecordAuditLogBatch(ctx context.Context, events []domain.AuditEvent) error {
-	// For now, insert one by one
 	// TODO: Implement batch insert for better performance
 	for i := range events {
 		if err := a.RecordAuditLog(ctx, &events[i]); err != nil {

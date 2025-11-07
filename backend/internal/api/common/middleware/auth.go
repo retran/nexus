@@ -38,7 +38,7 @@ func NewAuthMiddleware() *AuthMiddleware {
 	return &AuthMiddleware{}
 }
 
-// RequireAuth rejects requests that do not include a valid Bearer token issued by Oathkeeper.
+// RequireAuth rejects requests that do not include valid authentication headers set by Oathkeeper.
 func (m *AuthMiddleware) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		info, err := m.authenticateRequest(r)
@@ -74,8 +74,6 @@ var (
 )
 
 func (m *AuthMiddleware) authenticateRequest(r *http.Request) (*AuthInfo, error) {
-	// Read user info from Oathkeeper headers (Trusted Subsystem pattern)
-	// Oathkeeper validates the user session and adds these headers
 	info, err := buildAuthInfoFromHeaders(r)
 	if err != nil {
 		return nil, err
@@ -85,34 +83,35 @@ func (m *AuthMiddleware) authenticateRequest(r *http.Request) (*AuthInfo, error)
 }
 
 func buildAuthInfoFromHeaders(r *http.Request) (*AuthInfo, error) {
-	// Read X-User-ID header
 	userIDHeader, err := readAndValidateHeader(r, "X-User-ID")
 	if err != nil {
 		return nil, err
 	}
+
 	userID, err := uuid.Parse(userIDHeader)
 	if err != nil {
 		return nil, fmt.Errorf("%w: invalid user id", errInvalidHeaders)
 	}
 
-	// Read X-User-Email header
 	email, err := readAndValidateHeader(r, "X-User-Email")
 	if err != nil {
 		return nil, err
 	}
 
-	// Read X-User-Role header
 	role, err := readAndValidateHeader(r, "X-User-Role")
 	if err != nil {
 		return nil, err
 	}
-	role = strings.ToLower(strings.TrimSpace(role))
 
-	// Read X-Session-ID header (optional for now)
-	sessionID := strings.TrimSpace(r.Header.Get("X-Session-ID"))
+	sessionID, err := readAndValidateHeader(r, "X-Session-ID")
+	if err != nil {
+		return nil, err
+	}
 
-	// Read X-User-Name header (optional)
-	fullName := strings.TrimSpace(r.Header.Get("X-User-Name"))
+	fullName, err := readAndValidateHeader(r, "X-User-Name")
+	if err != nil {
+		return nil, err
+	}
 
 	return &AuthInfo{
 		UserID:    userID,

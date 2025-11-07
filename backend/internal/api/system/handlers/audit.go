@@ -2,7 +2,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,26 +10,24 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"go.temporal.io/sdk/client"
 
+	"github.com/retran/nexus/backend/internal/audit"
 	"github.com/retran/nexus/backend/internal/domain"
 )
 
-// AuditHandler accepts audit events and forwards them to Temporal workflows.
+// AuditHandler accepts audit events and forwards them to audit service.
 type AuditHandler struct {
-	client    client.Client
-	taskQueue string
+	service audit.Service
 }
 
 // NewAuditHandler constructs a handler for audit events.
-func NewAuditHandler(temporalClient client.Client, taskQueue string) *AuditHandler {
-	if temporalClient == nil {
+func NewAuditHandler(auditService audit.Service) *AuditHandler {
+	if auditService == nil {
 		return nil
 	}
 
 	return &AuditHandler{
-		client:    temporalClient,
-		taskQueue: taskQueue,
+		service: auditService,
 	}
 }
 
@@ -47,29 +44,12 @@ func (h *AuditHandler) HandleAuditEvent(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := h.dispatchWorkflow(r.Context(), event); err != nil {
+	if err := h.service.LogEvent(r.Context(), event); err != nil {
 		http.Error(w, "Failed to record audit event: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusAccepted)
-}
-
-func (h *AuditHandler) dispatchWorkflow(ctx context.Context, event *domain.AuditEvent) error {
-	if event == nil {
-		return errors.New("audit event is required")
-	}
-
-	opts := client.StartWorkflowOptions{
-		ID:        fmt.Sprintf("audit-%s-%s", sanitizeID(event.EventType), uuid.NewString()),
-		TaskQueue: h.taskQueue,
-	}
-
-	_, err := h.client.ExecuteWorkflow(ctx, opts, "AuditLogWorkflow", *event)
-	if err != nil {
-		return fmt.Errorf("start audit workflow: %w", err)
-	}
-	return nil
 }
 
 func decodeAuditEvent(r *http.Request) (*domain.AuditEvent, error) {
@@ -91,7 +71,7 @@ func decodeAuditEvent(r *http.Request) (*domain.AuditEvent, error) {
 	event := domain.AuditEvent{
 		EventType: payload.EventType,
 		Metadata:  payload.Metadata,
-		Source:    defaultString(payload.Source, "system"),
+		Source:    audit.DefaultString(payload.Source, "system"),
 		IPAddress: payload.IPAddress,
 		UserAgent: payload.UserAgent,
 	}
@@ -109,10 +89,7 @@ func decodeAuditEvent(r *http.Request) (*domain.AuditEvent, error) {
 	}
 
 	if event.IPAddress == "" {
-		event.IPAddress = r.Header.Get("X-Forwarded-For")
-		if event.IPAddress == "" {
-			event.IPAddress = r.RemoteAddr
-		}
+		event.IPAddress = audit.ExtractIPAddress(r)
 	}
 
 	if event.UserAgent == "" {
@@ -130,23 +107,4 @@ type auditEventRequest struct {
 	IPAddress  string                 `json:"ip_address"`
 	UserAgent  string                 `json:"user_agent"`
 	Source     string                 `json:"source"`
-}
-
-func defaultString(value, fallback string) string {
-	if trimmed := strings.TrimSpace(value); trimmed != "" {
-		return trimmed
-	}
-	return fallback
-}
-
-func sanitizeID(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return "event"
-	}
-	const maxLen = 32
-	if len(value) > maxLen {
-		value = value[:maxLen]
-	}
-	return strings.ReplaceAll(strings.ToLower(value), " ", "-")
 }
