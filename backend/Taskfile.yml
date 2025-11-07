@@ -126,7 +126,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Generating GraphQL server code (gqlgen)...\n"
-      - go run github.com/99designs/gqlgen generate
+      - go run github.com/99designs/gqlgen generate --config tools/gqlgen.yml
       - |
         printf "{{.GREEN}}[OK]{{.NC}} GraphQL server code generated\n"
 
@@ -159,7 +159,7 @@ tasks:
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Generating type-safe SQL code (sqlc)...\n"
-      - sqlc generate
+      - sqlc generate -f tools/sqlc.yml
       - |
         printf "{{.GREEN}}[OK]{{.NC}} SQL code generated\n"
 
