@@ -8,6 +8,7 @@ out
 coverage
 .vite
 .next
+src/components/ui/**/*
 .nuxt
 .cache
 .eslintcache
