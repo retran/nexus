@@ -32,7 +32,7 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Setting up /etc/hosts entries...\n"
 
-        HOSTS_ENTRY="127.0.0.1 nexus.local api.nexus.local auth.nexus.local adminer.nexus.local redis.nexus.local mail.nexus.local temporal.nexus.local traefik.nexus.local grafana.nexus.local prometheus.nexus.local jaeger.nexus.local dozzle.nexus.local"
+        HOSTS_ENTRY="127.0.0.1 nexus.local api.nexus.local auth.nexus.local adminer.nexus.local redis.nexus.local mail.nexus.local temporal.nexus.local traefik.nexus.local grafana.nexus.local mimir.nexus.local dozzle.nexus.local"
 
         if grep -q "nexus.local" /etc/hosts; then
           printf "{{.WARN}}[WARN]{{.NC}} nexus.local entries already exist in /etc/hosts\n"
@@ -172,11 +172,11 @@ tasks:
       - docker compose --profile tools logs -f
 
   # ============================================================================
-  # O11Y - Observability Stack (Prometheus, Grafana, Jaeger, Dozzle)
+  # O11Y - Observability Stack (LGTM: Loki, Grafana, Tempo, Mimir + Alloy)
   # ============================================================================
 
   o11y:up:
-    desc: "Start observability stack (Prometheus, Grafana, Jaeger, Dozzle)"
+    desc: "Start observability stack (Grafana, Tempo, Mimir, Alloy, Dozzle)"
     aliases: [o11y]
     silent: true
     cmds:
@@ -186,10 +186,10 @@ tasks:
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Observability stack started\n"
         printf "\n{{.BLUE}}Available at:{{.NC}}\n"
-        printf "  • Grafana:    http://grafana.nexus.local    (Dashboards)\n"
-        printf "  • Prometheus: http://prometheus.nexus.local (Metrics)\n"
-        printf "  • Jaeger:     http://jaeger.nexus.local     (Traces)\n"
-        printf "  • Dozzle:     http://dozzle.nexus.local     (Logs)\n"
+        printf "  • Grafana:     http://grafana.nexus.local (Unified observability UI)\n"
+        printf "  • Alloy UI:    http://localhost:12345 (Telemetry collector)\n"
+        printf "  • Mimir:       http://mimir.nexus.local (Metrics backend)\n"
+        printf "  • Dozzle:      http://dozzle.nexus.local (Container logs)\n"
 
   o11y:down:
     desc: "Stop observability stack"
@@ -254,7 +254,7 @@ tasks:
         printf "\n"
 
         printf "{{.BLUE}}Infra:{{.NC}}\n"
-        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(traefik|postgres-[0-9]|redis-[0-9]|vault|temporal-[0-9]|kratos-[0-9]|keto|oathkeeper|exporter|jaeger|mailhog|dozzle)" | grep -v -E "(commander|adminer|ui)" || true
+        docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(traefik|postgres-[0-9]|redis-[0-9]|vault|temporal-[0-9]|kratos-[0-9]|keto|oathkeeper|alloy|tempo|mimir|grafana|mailhog|dozzle)" | grep -v -E "(commander|adminer|ui)" || true
 
         printf "\n{{.BLUE}}Backend:{{.NC}}\n"
         docker compose ps --format "table {{`{{.Name}}`}}\t{{`{{.Status}}`}}\t{{`{{.Health}}`}}" | grep -E "(data-[0-9]|gateway-[0-9]|system-[0-9]|worker-[0-9])" || true

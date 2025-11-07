@@ -54,7 +54,7 @@ metrics:
 tracing:
   otlp:
     http:
-      endpoint: "http://jaeger:4318"
+      endpoint: "http://alloy:4318"
     grpc:
-      endpoint: "jaeger:4317"
+      endpoint: "alloy:4317"
       insecure: true

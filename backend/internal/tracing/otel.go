@@ -18,15 +18,13 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 // InitTracerProvider initializes the OpenTelemetry tracer provider
 // and returns a shutdown function that should be called with defer.
 //
 // Environment variables:
-//   - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP collector endpoint (e.g., "jaeger:4317")
+//   - OTEL_EXPORTER_OTLP_ENDPOINT: OTLP collector endpoint (e.g., "alloy:4317")
 //   - SERVICE_NAME: Name of the service (required)
 //
 // Example:
@@ -54,7 +52,7 @@ func InitTracerProvider(ctx context.Context) (func(context.Context) error, error
 	traceExporter, err := otlptracegrpc.New(
 		ctx,
 		otlptracegrpc.WithEndpoint(endpoint),
-		otlptracegrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		otlptracegrpc.WithInsecure(),
 		otlptracegrpc.WithTimeout(5*time.Second),
 	)
 	if err != nil {

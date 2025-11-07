@@ -1,0 +1,67 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Grafana Tempo Configuration - DEVELOPMENT
+# Lightweight, cost-effective trace storage
+
+server:
+  http_listen_port: 3200
+  grpc_listen_port: 9096
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"
+
+ingester:
+  max_block_duration: 5m
+
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      cluster: dev
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://mimir:9009/api/v1/push
+        send_exemplars: true
+  processor:
+    service_graphs:
+      max_items: 10000
+      wait: 10s
+    span_metrics:
+      dimensions:
+        - http.method
+        - http.status_code
+      enable_target_info: true
+
+compactor:
+  compaction:
+    block_retention: 48h
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/traces
+    wal:
+      path: /var/tempo/wal
+    pool:
+      max_workers: 100
+      queue_depth: 10000
+
+query_frontend:
+  search:
+    max_duration: 0
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors:
+        - service-graphs
+        - span-metrics

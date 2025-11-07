@@ -38,7 +38,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=nexus_db
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d nexus_db"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -113,8 +113,12 @@ services:
       - POSTGRES_USER=admin
       - POSTGRES_PWD=${POSTGRES_PASSWORD}
       - POSTGRES_SEEDS=postgres
+      - TEMPORAL_TRACING_PROVIDER=otel
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
     depends_on:
       postgres:
+        condition: service_healthy
+      alloy:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "tctl", "--address", "temporal:7233", "cluster", "health"]
@@ -165,6 +169,10 @@ services:
     volumes:
       - ../infra/kratos:/etc/config/kratos:ro
       - kratos_secrets:/secrets
+    environment:
+      - TRACING_PROVIDER=jaeger
+      - TRACING_PROVIDERS_JAEGER_SAMPLING_SERVER_URL=http://alloy:5778/sampling
+      - TRACING_PROVIDERS_JAEGER_LOCAL_AGENT_ADDRESS=alloy:6831
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -186,6 +194,8 @@ services:
         condition: service_completed_successfully
       kratos-secrets:
         condition: service_completed_successfully
+      alloy:
+        condition: service_healthy
     healthcheck:
       test:
         ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4433/health/ready"]
@@ -217,10 +227,15 @@ services:
     env_file: ../.env
     environment:
       - DSN=postgres://admin:${POSTGRES_PASSWORD}@postgres:5432/keto_db?sslmode=disable&max_conns=20&max_idle_conns=4
+      - TRACING_PROVIDER=jaeger
+      - TRACING_PROVIDERS_JAEGER_SAMPLING_SERVER_URL=http://alloy:5778/sampling
+      - TRACING_PROVIDERS_JAEGER_LOCAL_AGENT_ADDRESS=alloy:6831
     command: serve --config /etc/config/keto/keto.dev.yml
     depends_on:
       keto-migrate:
         condition: service_completed_successfully
+      alloy:
+        condition: service_healthy
     healthcheck:
       test:
         ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4467/health/ready"]
@@ -265,6 +280,9 @@ services:
       - LOG_LEVEL=debug
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
+      - TRACING_PROVIDER=jaeger
+      - TRACING_PROVIDERS_JAEGER_SAMPLING_SERVER_URL=http://alloy:5778/sampling
+      - TRACING_PROVIDERS_JAEGER_LOCAL_AGENT_ADDRESS=alloy:6831
     depends_on:
       kratos:
         condition: service_started
@@ -273,6 +291,8 @@ services:
       vault:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      alloy:
         condition: service_healthy
     healthcheck:
       test:
@@ -294,7 +314,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - DOZZLE_LEVEL=info
-      - DOZZLE_TAILSIZE=300
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.dozzle.rule=Host(`dozzle.nexus.local`)"
@@ -308,54 +327,76 @@ services:
       retries: 3
       start_period: 5s
 
-  jaeger:
-    image: jaegertracing/all-in-one:latest
+  tempo:
+    image: grafana/tempo:latest
     restart: always
-    ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "16686:16686"
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-      - SPAN_STORAGE_TYPE=memory
-      - MEMORY_MAX_TRACES=10000
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.jaeger.rule=Host(`jaeger.nexus.local`)"
-      - "traefik.http.routers.jaeger.entrypoints=web"
-      - "traefik.http.services.jaeger.loadbalancer.server.port=16686"
-      - "traefik.http.routers.jaeger.middlewares=oathkeeper-auth@file"
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:14269"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  prometheus:
-    image: prom/prometheus:latest
-    restart: always
-    ports:
-      - "9090:9090"
+    command: ["-config.file=/etc/tempo.yaml"]
     volumes:
-      - ../infra/prometheus/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=24h"
-      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
-      - "--web.console.templates=/usr/share/prometheus/consoles"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.nexus.local`)"
-      - "traefik.http.routers.prometheus.entrypoints=web"
-      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
-      - "traefik.http.routers.prometheus.middlewares=oathkeeper-auth@file"
+      - ../infra/tempo/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200" # Tempo HTTP API (for Grafana datasource only)
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9090/-/healthy"]
+      test: ["CMD", "/tempo", "-version"]
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 10s
+
+  alloy:
+    image: grafana/alloy:latest
+    restart: always
+    command:
+      [
+        "run",
+        "--server.http.listen-addr=0.0.0.0:12345",
+        "/etc/alloy/config.alloy",
+      ]
+    volumes:
+      - ../infra/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro # For service discovery
+    ports:
+      - "12345:12345" # Alloy HTTP API
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+      - "6831:6831/udp" # Jaeger thrift compact (legacy)
+      - "6832:6832/udp" # Jaeger thrift binary (legacy)
+      - "14250:14250" # Jaeger gRPC (legacy)
+      - "14268:14268" # Jaeger thrift HTTP (legacy)
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f alloy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      tempo:
+        condition: service_healthy
+      mimir:
+        condition: service_healthy
+
+  mimir:
+    image: grafana/mimir:latest
+    restart: always
+    command: ["-config.file=/etc/mimir.yaml"]
+    volumes:
+      - ../infra/mimir/mimir.yaml:/etc/mimir.yaml:ro
+      - mimir_data:/data
+    ports:
+      - "9009:9009" # Mimir HTTP (for Grafana datasource)
+      - "9095:9095" # gRPC (internal)
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mimir.rule=Host(`mimir.nexus.local`)"
+      - "traefik.http.routers.mimir.entrypoints=web"
+      - "traefik.http.services.mimir.loadbalancer.server.port=9009"
+      - "traefik.http.routers.mimir.middlewares=oathkeeper-auth@file"
+    healthcheck:
+      test: ["CMD", "/bin/mimir", "-version"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   grafana:
     image: grafana/grafana:latest
@@ -384,66 +425,10 @@ services:
       timeout: 5s
       retries: 3
 
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    restart: always
-    ports:
-      - "8085:8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    command:
-      - "--docker_only=true"
-      - "--housekeeping_interval=10s"
-      - "--storage_duration=1m"
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/healthz"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  postgres-exporter:
-    image: prometheuscommunity/postgres-exporter:latest
-    restart: always
-    ports:
-      - "9187:9187"
-    environment:
-      - DATA_SOURCE_NAME=postgresql://admin:${POSTGRES_PASSWORD}@postgres:5432/nexus_db?sslmode=disable
-    env_file: ../.env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9187/metrics"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  redis-exporter:
-    image: oliver006/redis_exporter:latest
-    restart: always
-    ports:
-      - "9121:9121"
-    environment:
-      - REDIS_ADDR=redis://redis:6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    env_file: ../.env
-    depends_on:
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "/redis_exporter", "--version"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-
 volumes:
   postgres_data:
   redis_data:
   kratos_secrets:
-  prometheus_data:
+  tempo_data:
+  mimir_data:
   grafana_data:

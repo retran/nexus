@@ -273,44 +273,9 @@
                 accept:
                   - text/html
 
-- id: "protected:prometheus"
+- id: "protected:mimir"
   match:
-    url: "<http|https>://prometheus.nexus.local<.*>"
-    methods:
-      - GET
-      - POST
-      - HEAD
-  authenticators:
-    - handler: cookie_session
-  authorizer:
-    handler: remote_json
-    config:
-      remote: "http://keto:4466/relation-tuples/check"
-      payload: |
-        {
-          "namespace": "Role",
-          "object": "admin",
-          "relation": "members",
-          "subject_id": "{{ print .Subject }}"
-        }
-  mutators:
-    - handler: noop
-  errors:
-    - handler: redirect
-      config:
-        to: http://auth.nexus.local/login
-        when:
-          - error:
-              - unauthorized
-              - forbidden
-            request:
-              header:
-                accept:
-                  - text/html
-
-- id: "protected:jaeger"
-  match:
-    url: "<http|https>://jaeger.nexus.local<.*>"
+    url: "<http|https>://mimir.nexus.local<.*>"
     methods:
       - GET
       - POST

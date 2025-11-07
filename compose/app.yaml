@@ -39,7 +39,7 @@ services:
       - POSTGRES_MAX_CONNS=25
       - POSTGRES_MIN_CONNS=5
       # OpenTelemetry configuration
-      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=alloy:4317
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,7 +91,7 @@ services:
       # Gateway CORS configuration
       - ALLOWED_ORIGINS=http://nexus.local,https://nexus.local
       # OpenTelemetry configuration
-      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=alloy:4317
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.gateway.rule=Host(`api.nexus.local`)"
@@ -149,7 +149,7 @@ services:
       - POSTGRES_MAX_CONNS=25
       - POSTGRES_MIN_CONNS=5
       # OpenTelemetry configuration
-      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=alloy:4317
     depends_on:
       postgres:
         condition: service_healthy
@@ -191,12 +191,18 @@ services:
       # Data API endpoint
       - DATA_API_ENDPOINT=http://data:8081/graphql
       # OpenTelemetry configuration
-      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=alloy:4317
     depends_on:
       temporal:
         condition: service_started
       vault:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:9091/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   frontend:
     build:

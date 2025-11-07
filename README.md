@@ -49,7 +49,7 @@ Once the environment is running, the following services are available:
 > `task setup:hosts` to automatically configure:
 >
 > ```text
-> 127.0.0.1 nexus.local api.nexus.local auth.nexus.local adminer.nexus.local redis.nexus.local mail.nexus.local temporal.nexus.local traefik.nexus.local grafana.nexus.local prometheus.nexus.local jaeger.nexus.local dozzle.nexus.local
+> 127.0.0.1 nexus.local api.nexus.local auth.nexus.local adminer.nexus.local redis.nexus.local mail.nexus.local temporal.nexus.local traefik.nexus.local grafana.nexus.local mimir.nexus.local dozzle.nexus.local
 > ```
 
 ### Production-like URLs (via Traefik + Oathkeeper)
@@ -73,10 +73,18 @@ Once the environment is running, the following services are available:
 - **Email Testing (MailHog)**: <http://mail.nexus.local>
 - **Workflows (Temporal UI)**: <http://temporal.nexus.local>
 - **Reverse Proxy (Traefik)**: <http://traefik.nexus.local>
-- **Grafana**: <http://grafana.nexus.local> - Dashboards and visualization
-- **Prometheus**: <http://prometheus.nexus.local> - Metrics time-series database
-- **Jaeger**: <http://jaeger.nexus.local> - Distributed tracing UI
+- **Grafana**: <http://grafana.nexus.local> - Unified observability UI
+  (dashboards, traces, metrics)
+- **Mimir**: <http://mimir.nexus.local> - Scalable metrics backend
+  (Prometheus-compatible)
 - **Dozzle**: <http://dozzle.nexus.local> - Real-time Docker logs viewer
+
+> **Note**: Observability Stack (LGTM):
+>
+> - **Grafana Alloy** - Unified telemetry collector (traces, metrics)
+> - **Tempo** - Distributed tracing backend (view traces in Grafana)
+> - **Mimir** - Long-term metrics storage (Prometheus-compatible)
+> - **Grafana** - Visualization and dashboards for all observability data
 
 ### Development/Debug URLs (Direct Access)
 
@@ -95,9 +103,9 @@ Once the environment is running, the following services are available:
 - **Redis Commander**: <http://localhost:8087>
 - **MailHog**: <http://localhost:8025>
 - **Temporal UI**: <http://localhost:8088>
-- **Grafana**: <http://localhost:3001>
-- **Prometheus**: <http://localhost:9090>
-- **Jaeger**: <http://localhost:16686>
+- **Grafana**: <http://localhost:3001> - Access all observability data
+- **Mimir**: <http://localhost:9009> - Metrics storage API
+- **Grafana Alloy UI**: <http://localhost:12345> - Telemetry collector debug UI
 - **Dozzle**: <http://localhost:8086>
 - **Traefik Dashboard**: <http://localhost:8888>
 

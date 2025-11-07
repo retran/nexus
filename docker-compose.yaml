@@ -6,7 +6,7 @@
 # This file orchestrates the entire Nexus development stack using a modular architecture:
 #
 # Architecture:
-# ├── compose/infra.yaml  - Core infrastructure + Observability (Traefik, Postgres, Redis, Vault, Temporal, Ory, Prometheus, Grafana, Jaeger, exporters)
+# ├── compose/infra.yaml  - Core infrastructure + Observability (Traefik, Postgres, Redis, Vault, Temporal, Ory, Grafana, Tempo, Mimir, Alloy)
 # ├── compose/app.yaml    - Application services (data, gateway, system, worker, frontend)
 # └── compose/tools.yaml  - Admin tools & UIs (profile: 'tools')
 #
@@ -28,7 +28,8 @@ volumes:
   postgres_data:
   redis_data:
   kratos_secrets:
-  prometheus_data:
+  mimir_data:
+  tempo_data:
   grafana_data:
 
 # Default network for all services
