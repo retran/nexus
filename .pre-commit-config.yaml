@@ -66,21 +66,21 @@ repos:
     hooks:
       - id: frontend-lint
         name: ESLint (frontend)
-        entry: bash -c 'cd frontend && yarn lint:fix'
+        entry: bash -c 'cd frontend && npm run lint:fix'
         language: system
         files: ^frontend/.*\.(ts|tsx|js|jsx)$
         pass_filenames: false
 
       - id: frontend-prettier
         name: Prettier (frontend)
-        entry: bash -c 'cd frontend && yarn format'
+        entry: bash -c 'cd frontend && npm run format'
         language: system
         files: ^frontend/.*\.(ts|tsx|js|jsx|json|css|md)$
         pass_filenames: false
 
       - id: frontend-type-check
         name: TypeScript check (frontend)
-        entry: bash -c 'cd frontend && yarn type-check'
+        entry: bash -c 'cd frontend && npm run typecheck'
         language: system
         files: ^frontend/.*\.(ts|tsx)$
         pass_filenames: false

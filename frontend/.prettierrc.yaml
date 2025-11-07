@@ -42,10 +42,10 @@ htmlWhitespaceSensitivity: css
 embeddedLanguageFormatting: auto
 
 overrides:
-  - files: "*.test.{js,ts,jsx,tsx}"
+  - files: '*.test.{js,ts,jsx,tsx}'
     options:
       printWidth: 100
 
-  - files: "*.{css,scss,less}"
+  - files: '*.{css,scss,less}'
     options:
       singleQuote: false

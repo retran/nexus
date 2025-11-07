@@ -17,169 +17,169 @@ tasks:
   # === Development Commands (run locally with hot reload) ===
 
   dev:
-    desc: "Run frontend with Vite dev server (hot reload)"
+    desc: 'Run frontend with Vite dev server (hot reload)'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Starting Vite dev server with hot reload...\n"
-      - yarn dev
+      - npm run dev
 
   # === Test Commands (run locally) ===
 
   test:unit:
-    desc: "Run unit tests with Vitest"
+    desc: 'Run unit tests with Vitest'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Running unit tests with Vitest...\n"
-      - yarn test
+      - npm run test
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Unit tests complete\n"
 
   test:watch:
-    desc: "Run tests in watch mode"
+    desc: 'Run tests in watch mode'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Starting tests in watch mode...\n"
-      - yarn test:watch
+      - npm run test:watch
 
   test:coverage:
-    desc: "Run tests with coverage"
+    desc: 'Run tests with coverage'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Running tests with coverage...\n"
-      - yarn test:coverage
+      - npm run test:coverage
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Coverage report generated\n"
 
   test:ui:
-    desc: "Run tests with Vitest UI"
+    desc: 'Run tests with Vitest UI'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Starting Vitest UI...\n"
-      - yarn test:ui
+      - npm run test:ui
 
   # === Lint Commands ===
 
   lint:
-    desc: "Run ESLint"
+    desc: 'Run ESLint'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Running ESLint...\n"
-      - yarn lint
+      - npm run lint
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Linting complete\n"
 
   lint:fix:
-    desc: "Run ESLint with auto-fix"
+    desc: 'Run ESLint with auto-fix'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Running ESLint with auto-fix...\n"
-      - yarn lint:fix
+      - npm run lint:fix
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Auto-fix complete\n"
 
   # === Type Checking ===
 
   typecheck:
-    desc: "Run TypeScript type checking"
+    desc: 'Run TypeScript type checking'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Running TypeScript type checking...\n"
-      - yarn typecheck
+      - npm run typecheck
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Type checking complete\n"
 
   # === Format ===
 
   fmt:
-    desc: "Format code with Prettier"
+    desc: 'Format code with Prettier'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Formatting code with Prettier...\n"
-      - yarn format
+      - npm run format
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Code formatted\n"
 
   fmt:check:
-    desc: "Check code formatting"
+    desc: 'Check code formatting'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Checking code formatting...\n"
-      - yarn format:check
+      - npm run format:check
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Format check complete\n"
 
   # === Dependency Management ===
 
   deps:install:
-    desc: "Install dependencies with Yarn"
+    desc: 'Install dependencies with npm'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Installing dependencies with Yarn...\n"
-      - yarn install --frozen-lockfile
+        printf "{{.BLUE}}[INFO]{{.NC}} Installing dependencies with npm...\n"
+      - npm ci
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Dependencies installed\n"
 
   deps:update:
-    desc: "Update dependencies"
+    desc: 'Update dependencies'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Updating dependencies...\n"
-      - yarn upgrade-interactive
+      - npm update
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Dependencies updated\n"
 
   deps:audit:
-    desc: "Audit dependencies for vulnerabilities"
+    desc: 'Audit dependencies for vulnerabilities'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Auditing dependencies...\n"
-      - yarn audit
+      - npm audit
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Audit complete\n"
 
   deps:audit:fix:
-    desc: "Fix dependency vulnerabilities"
+    desc: 'Fix dependency vulnerabilities'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Fixing vulnerabilities...\n"
-      - yarn audit --fix
+      - npm audit fix
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Vulnerabilities fixed\n"
 
   # === Cleanup ===
 
   clean:
-    desc: "Clean build artifacts and dependencies"
+    desc: 'Clean build artifacts and dependencies'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Cleaning build artifacts...\n"
@@ -191,9 +191,9 @@ tasks:
         printf "{{.GREEN}}[OK]{{.NC}} Build artifacts cleaned\n"
 
   clean:cache:
-    desc: "Clean Vite cache only"
+    desc: 'Clean Vite cache only'
     silent: true
-    dir: "{{.ROOT_DIR}}/frontend"
+    dir: '{{.ROOT_DIR}}/frontend'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Cleaning Vite cache...\n"
@@ -202,9 +202,9 @@ tasks:
         printf "{{.GREEN}}[OK]{{.NC}} Cache cleaned\n"
 
   destroy:
-    desc: "Remove all frontend containers and images"
+    desc: 'Remove all frontend containers and images'
     silent: true
-    dir: "{{.ROOT_DIR}}"
+    dir: '{{.ROOT_DIR}}'
     cmds:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Removing frontend containers...\n"
