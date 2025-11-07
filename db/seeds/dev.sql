@@ -6,35 +6,40 @@
 -- See ory/seeds/*.json for identity definitions that trigger user creation.
 --
 -- Copyright 2025 Andrew Vasilyev. Licensed under the Apache License, Version 2.0.
-
 -- =============================================================================
 -- AUDIT LOGS (Sample Events)
 -- =============================================================================
 -- These are example audit events for testing.
 -- In reality, audit logs are created by application activity.
-
 -- System initialization event
-INSERT INTO audit_logs (
+INSERT INTO
+audit_logs (
   user_id,
   event_type,
   metadata,
   ip_address,
   user_agent,
   created_at
-) VALUES
-  (
-    NULL,
-    'settings_updated',
-    '{"component": "system", "changed_settings": ["timezone", "locale"], "values": {"timezone": "UTC", "locale": "en-US"}}'::JSONB,
-    '127.0.0.1',
-    'Nexus Internal',
-    NOW() - INTERVAL '30 days'
-  );
+)
+VALUES
+(
+  NULL,
+  'settings_updated',
+  CAST(
+    '{"component": "system", '
+    '"changed_settings": ["timezone", "locale"], '
+    '"values": {"timezone": "UTC", "locale": "en-US"}}'
+    AS JSONB
+  ),
+  '127.0.0.1',
+  'Nexus Internal',
+  NOW() - INTERVAL '30 days'
+);
+
 
 -- =============================================================================
 -- VERIFICATION
 -- =============================================================================
-
 DO $$
 DECLARE
   user_count INTEGER;

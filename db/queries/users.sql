@@ -1,67 +1,113 @@
 -- Copyright 2025 Andrew Vasilyev
 -- SPDX-License-Identifier: Apache-2.0
-
 -- name: GetUser :one
-SELECT * FROM users
-WHERE id = $1 LIMIT 1;
+SELECT *
+FROM
+  users
+WHERE
+  id = $1
+ORDER BY
+  id
+LIMIT
+  1;
+
 
 -- name: GetUserByEmail :one
-SELECT * FROM users
-WHERE email = $1 LIMIT 1;
+SELECT *
+FROM
+  users
+WHERE
+  email = $1
+ORDER BY
+  id
+LIMIT
+  1;
+
 
 -- name: GetUserByKratosID :one
-SELECT * FROM users
-WHERE kratos_identity_id = $1 LIMIT 1;
+SELECT *
+FROM
+  users
+WHERE
+  kratos_identity_id = $1
+ORDER BY
+  id
+LIMIT
+  1;
+
 
 -- name: ListUsers :many
-SELECT * FROM users
-ORDER BY created_at DESC
-LIMIT $1 OFFSET $2;
+SELECT *
+FROM
+  users
+ORDER BY
+  created_at DESC
+LIMIT
+  $1
+  OFFSET
+  $2;
+
 
 -- name: CreateUser :one
-INSERT INTO users (
+INSERT INTO
+users (
   kratos_identity_id,
   email,
   display_name,
   picture,
   user_role
-) VALUES (
-  $1, $2, $3, $4, $5
 )
-RETURNING *;
+VALUES
+($1, $2, $3, $4, $5)
+RETURNING
+  *;
+
 
 -- name: UpsertUser :one
-INSERT INTO users (
+INSERT INTO
+users (
   kratos_identity_id,
   email,
   display_name,
   picture,
   user_role
-) VALUES (
-  $1, $2, $3, $4, $5
 )
+VALUES
+($1, $2, $3, $4, $5)
 ON CONFLICT (kratos_identity_id) DO UPDATE
-SET
-  email = EXCLUDED.email,
-  display_name = EXCLUDED.display_name,
-  picture = EXCLUDED.picture,
-  user_role = EXCLUDED.user_role,
-  updated_at = NOW()
-RETURNING *;
+  SET
+    email = excluded.email,
+    display_name = excluded.display_name,
+    picture = excluded.picture,
+    user_role = excluded.user_role,
+    updated_at = NOW()
+RETURNING
+  *;
+
 
 -- name: UpdateUser :one
 UPDATE users
 SET
   display_name = COALESCE($2, display_name),
   picture = COALESCE($3, picture),
-  user_role = COALESCE(sqlc.narg('user_role')::user_role, user_role),
+  user_role = COALESCE(
+    CAST(sqlc.narg('user_role') AS USER_ROLE),
+    user_role
+  ),
   updated_at = NOW()
-WHERE id = $1
-RETURNING *;
+WHERE
+  id = $1
+RETURNING
+  *;
+
 
 -- name: DeleteUser :exec
 DELETE FROM users
-WHERE id = $1;
+WHERE
+  id = $1;
+
 
 -- name: CountUsers :one
-SELECT COUNT(*) FROM users;
+SELECT COUNT(*)
+FROM
+  users;

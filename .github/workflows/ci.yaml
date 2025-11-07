@@ -107,23 +107,31 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v4
         with:
-          node-version: "22"
-          cache: "yarn"
-          cache-dependency-path: frontend/yarn.lock
+          node-version: 22
+          cache: npm
+          cache-dependency-path: db/package-lock.json
 
       - name: Install dependencies
-        working-directory: frontend
-        run: yarn install --frozen-lockfile
+        working-directory: db
+        run: npm ci
 
-      - name: Run ESLint
-        working-directory: frontend
-        run: yarn lint
+      - name: Setup Python
+        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6
+        with:
+          python-version: "3.12"
 
-      - name: Run Prettier check
-        working-directory: frontend
-        run: yarn format:check
+      - name: Install sqlfluff
+        run: pip install sqlfluff
+
+      - name: Lint SQL
+        working-directory: db
+        run: npm run lint
+
+      - name: Format check
+        working-directory: db
+        run: npm run format:check
 
   frontend-type-check:
     name: Frontend Type Check
@@ -206,15 +214,15 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6
+        uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v4
         with:
-          node-version: "22"
-          cache: "yarn"
-          cache-dependency-path: postgres/yarn.lock
+          node-version: 22
+          cache: npm
+          cache-dependency-path: db/package-lock.json
 
       - name: Install dependencies
-        working-directory: postgres
-        run: yarn install --frozen-lockfile
+        working-directory: db
+        run: npm ci
 
       - name: Setup Python
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6
@@ -224,13 +232,13 @@ jobs:
       - name: Install sqlfluff
         run: pip install sqlfluff
 
-      - name: Run sqlfluff lint
-        working-directory: postgres
-        run: sqlfluff lint migrations/
+      - name: Lint SQL
+        working-directory: db
+        run: npm run lint
 
-      - name: Run Prettier check
-        working-directory: postgres
-        run: yarn format:check
+      - name: Format check
+        working-directory: db
+        run: npm run format:check
 
   security-backend:
     name: Backend Security

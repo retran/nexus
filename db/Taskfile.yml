@@ -57,29 +57,29 @@ tasks:
   # === SQL Linting & Formatting ===
 
   lint:
-    desc: "Lint SQL migrations with sqlfluff"
+    desc: "Lint SQL migrations, queries, and seeds with sqlfluff"
     silent: true
     dir: "{{.ROOT_DIR}}/db"
     cmds:
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Linting SQL migrations...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Linting SQL migrations, queries, and seeds...\n"
       - npm run lint
       - |
         printf "{{.GREEN}}[OK]{{.NC}} SQL linting complete\n"
 
   fmt:
-    desc: "Format SQL migrations with sqlfluff"
+    desc: "Format SQL migrations, queries, and seeds with sqlfluff"
     silent: true
     dir: "{{.ROOT_DIR}}/db"
     cmds:
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Formatting SQL migrations...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Formatting SQL migrations, queries, and seeds...\n"
       - npm run format
       - |
         printf "{{.GREEN}}[OK]{{.NC}} SQL formatting complete\n"
 
   fmt:check:
-    desc: "Check SQL formatting without modifying files"
+    desc: "Check SQL formatting for migrations, queries, and seeds without modifying files"
     silent: true
     dir: "{{.ROOT_DIR}}/db"
     cmds:

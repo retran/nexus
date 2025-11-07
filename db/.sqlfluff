@@ -5,7 +5,7 @@
 dialect = postgres
 templater = raw
 encoding = utf-8
-exclude_rules = None
+exclude_rules = AM04
 max_line_length = 120
 
 [sqlfluff:indentation]

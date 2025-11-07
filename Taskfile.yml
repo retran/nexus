@@ -435,7 +435,7 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Frontend code (ESLint)...\n"
       - task: frontend:lint
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations, queries, and seeds (sqlfluff)...\n"
       - task: db:lint
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (YAML/JSON)...\n"
@@ -453,7 +453,7 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Frontend (Prettier)...\n"
       - task: frontend:fmt:check
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations, queries, and seeds (sqlfluff)...\n"
       - task: db:fmt:check
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (Prettier)...\n"
@@ -523,7 +523,7 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Frontend (Prettier)...\n"
       - task: frontend:fmt
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations (sqlfluff)...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} SQL migrations, queries, and seeds (sqlfluff)...\n"
       - task: db:fmt
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Infrastructure configs (Prettier)...\n"
