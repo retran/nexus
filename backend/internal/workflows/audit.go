@@ -20,7 +20,6 @@ func AuditLogWorkflow(ctx workflow.Context, event *domain.AuditEvent) error {
 		return fmt.Errorf("audit event is nil")
 	}
 
-	// Configure activity options
 	activityOptions := workflow.ActivityOptions{
 		StartToCloseTimeout: 10 * time.Second,
 		RetryPolicy: &temporal.RetryPolicy{
@@ -32,10 +31,8 @@ func AuditLogWorkflow(ctx workflow.Context, event *domain.AuditEvent) error {
 	}
 	ctx = workflow.WithActivityOptions(ctx, activityOptions)
 
-	// Execute the audit logging activity
 	err := workflow.ExecuteActivity(ctx, "RecordAuditLog", event).Get(ctx, nil)
 	if err != nil {
-		// Log failure but don't fail the workflow - audit is important but not critical
 		workflow.GetLogger(ctx).Error("Failed to record audit log", "error", err, "event", event)
 		return fmt.Errorf("execute RecordAuditLog activity: %w", err)
 	}
@@ -57,7 +54,6 @@ func BatchAuditLogWorkflow(ctx workflow.Context, events []domain.AuditEvent) err
 	}
 	ctx = workflow.WithActivityOptions(ctx, activityOptions)
 
-	// Execute batch recording
 	err := workflow.ExecuteActivity(ctx, "RecordAuditLogBatch", events).Get(ctx, nil)
 	if err != nil {
 		workflow.GetLogger(ctx).Error("Failed to record audit log batch", "error", err, "count", len(events))

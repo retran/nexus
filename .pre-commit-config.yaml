@@ -85,25 +85,33 @@ repos:
         files: ^frontend/.*\.(ts|tsx)$
         pass_filenames: false
 
-      - id: sqlfluff-lint
-        name: SQLFluff lint
-        entry: bash -c 'cd postgres && sqlfluff lint migrations/'
-        language: system
-        files: ^postgres/migrations/.*\.sql$
-        pass_filenames: false
-
       - id: sqlfluff-fix
         name: SQLFluff fix
-        entry: bash -c 'cd postgres && sqlfluff fix --force migrations/'
+        entry: bash -c 'cd db && sqlfluff fix migrations/'
         language: system
-        files: ^postgres/migrations/.*\.sql$
+        files: ^db/migrations/.*\.sql$
         pass_filenames: false
 
       - id: sql-prettier
         name: Prettier (SQL)
-        entry: bash -c 'cd postgres && yarn format'
+        entry: bash -c 'cd db && npx prettier --write'
         language: system
-        files: ^postgres/migrations/.*\.sql$
+        files: ^db/migrations/.*\.sql$
+        pass_filenames: false
+
+      - id: sqlfluff-lint
+        name: SQLFluff lint
+        entry: bash -c 'cd db && sqlfluff lint migrations/'
+        language: system
+        files: ^db/migrations/.*\.sql$
+        pass_filenames: false
+
+      - id: infra-prettier
+        name: Prettier (infrastructure configs)
+        entry: bash -c 'cd infra && npx prettier --write "**/*.{yml,yaml,json,ts}" --ignore-path .prettierignore'
+        language: system
+        files: ^infra/.*\.(yml|yaml|json|ts)$
+        exclude: ^infra/.*\.jsonnet$
         pass_filenames: false
 
       - id: repo-prettier
@@ -111,7 +119,7 @@ repos:
         entry: npx prettier --write
         language: system
         files: ^(.*\.(md|ya?ml|json))|(\.github/.*\.(md|ya?ml))|(docs/.*\.md)$
-        exclude: ^(frontend/|backend/|postgres/)
+        exclude: ^(frontend/|backend/|db/|infra/)
 
   - repo: https://github.com/hadolint/hadolint
     rev: v2.12.0

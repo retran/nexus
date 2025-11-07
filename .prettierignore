@@ -1,12 +1,39 @@
 # Copyright 2025 Andrew Vasilyev
 # SPDX-License-Identifier: Apache-2.0
 
+# Dependencies
 node_modules/
+vendor/
+
+# Build outputs
 dist/
 build/
+bin/
+tmp/
+
+# Version control
 .git/
+
+# Minified files
 *.min.js
 *.min.css
+
+# Lock files
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
+go.sum
+
+# Atlas migration checksums
+**/atlas.sum
+
+# Jsonnet files (Ory Kratos templates)
+*.jsonnet
+
+# Generated code
+**/*.pb.go
+**/*.pb.ts
+**/sqlc/**
+
+# AI tools
+.meowg1k/**

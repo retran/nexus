@@ -1,0 +1,136 @@
+// Copyright 2025 Andrew Vasilyev
+// SPDX-License-Identifier: Apache-2.0
+
+// Grafana Agent Configuration (River format)
+// Collects traces and metrics, forwards to Tempo and Mimir
+
+// =============================================================================
+// TRACES: OTLP gRPC Receiver (modern services: Traefik, backend, Temporal)
+// =============================================================================
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+// =============================================================================
+// TRACES: Jaeger Receivers (legacy Ory stack compatibility)
+// =============================================================================
+otelcol.receiver.jaeger "default" {
+  protocols {
+    grpc {
+      endpoint = "0.0.0.0:14250"
+    }
+
+    thrift_http {
+      endpoint = "0.0.0.0:14268"
+    }
+
+    thrift_compact {
+      endpoint = "0.0.0.0:6831"
+    }
+
+    thrift_binary {
+      endpoint = "0.0.0.0:6832"
+    }
+  }
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+// =============================================================================
+// TRACES: Batch Processor (optimize trace export)
+// =============================================================================
+otelcol.processor.batch "default" {
+  timeout = "10s"
+  send_batch_size = 1024
+
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+// =============================================================================
+// TRACES: OTLP Exporter to Tempo
+// =============================================================================
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
+
+// =============================================================================
+// METRICS: Service Discovery for Docker containers
+// =============================================================================
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// =============================================================================
+// METRICS: Scrape Docker containers exposing /metrics
+// =============================================================================
+prometheus.scrape "docker_metrics" {
+  targets    = discovery.docker.containers.targets
+  forward_to = [prometheus.remote_write.mimir.receiver]
+
+  scrape_interval = "15s"
+  scrape_timeout  = "10s"
+
+  // Filter: only scrape containers with prometheus.io/scrape=true label
+  // Docker labels with dots and slashes are converted to underscores by Docker
+  relabel {
+    source_labels = ["__meta_docker_container_label_prometheus_io_scrape"]
+    regex         = "true"
+    action        = "keep"
+  }
+
+  // Use prometheus.io/port label if present
+  relabel {
+    source_labels = ["__address__", "__meta_docker_container_label_prometheus_io_port"]
+    regex         = "([^:]+)(?::\\d+)?;(\\d+)"
+    target_label  = "__address__"
+    replacement   = "${1}:${2}"
+  }
+
+  // Use prometheus.io/path label if present
+  relabel {
+    source_labels = ["__meta_docker_container_label_prometheus_io_path"]
+    regex         = "(.+)"
+    target_label  = "__metrics_path__"
+  }
+
+  // Add container name as job label (strip leading slash)
+  relabel {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/?(.+)"
+    target_label  = "job"
+  }
+
+  // Add service name from Docker Compose service label
+  relabel {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+// =============================================================================
+// METRICS: Remote Write to Mimir
+// =============================================================================
+prometheus.remote_write "mimir" {
+  endpoint {
+    url = "http://mimir:9009/api/v1/push"
+  }
+}

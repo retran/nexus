@@ -1,113 +1,284 @@
 # Copyright 2025 Andrew Vasilyev
 # SPDX-License-Identifier: Apache-2.0
 
-version: "3"
+version: '3'
 
 vars:
+  GO_VERSION: '1.23'
+  AIR_VERSION: 'v1.61.5'
+  GOLANGCI_LINT_VERSION: 'v2.2.0'
+  # Colors
   GREEN: \033[0;32m
+  YELLOW: \033[0;33m
+  BLUE: \033[0;34m
   RED: \033[0;31m
   NC: \033[0m
 
 tasks:
-  default:
-    cmds:
-      - task --list-all
+  # === Development Commands (run locally with hot reload) ===
 
-  build:
-    desc: "Build all backend binaries"
-    cmds:
-      - go build -o bin/api-server ./cmd/api-server
-      - go build -o bin/gateway ./cmd/gateway
-      - go build -o bin/worker ./cmd/worker
-      - printf "{{.GREEN}}[OK]{{.NC}} Built bin/api-server, bin/gateway, and bin/worker\n"
-
-  generate:
-    desc: "Generate all code (database + GraphQL server + GraphQL client)"
-    cmds:
-      - task: db:generate
-      - task: graphql:generate
-      - task: graphql:client:generate
-
-  db:generate:
-    desc: "Generate Go code from SQL queries using sqlc"
+  dev:data:
+    desc: "Run Data API service with hot reload (Air)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
     cmds:
       - |
-        if ! command -v sqlc >/dev/null; then
-          printf "{{.RED}}[ERROR]{{.NC}} sqlc not installed. Install: brew install sqlc or go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest\n"
-          exit 1
-        fi
-        sqlc generate
-        printf "{{.GREEN}}[OK]{{.NC}} Generated database code in internal/repository/postgres/\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Data API with hot reload...\n"
+      - air -c tools/.air.data.toml
 
-  graphql:generate:
-    desc: "Generate GraphQL server code using gqlgen"
+  dev:gateway:
+    desc: "Run Gateway service with hot reload (Air)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
     cmds:
       - |
-        if ! command -v gqlgen >/dev/null; then
-          printf "{{.RED}}[ERROR]{{.NC}} gqlgen not installed. Install: go install github.com/99designs/gqlgen@latest\n"
-          exit 1
-        fi
-        gqlgen generate
-        printf "{{.GREEN}}[OK]{{.NC}} Generated GraphQL server code in internal/api/graphql/\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Gateway with hot reload...\n"
+      - air -c tools/.air.gateway.toml
 
-  graphql:client:generate:
-    desc: "Generate GraphQL client code using genqlient"
+  dev:system:
+    desc: "Run System API service with hot reload (Air)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
     cmds:
       - |
-        go run github.com/Khan/genqlient
-        printf "{{.GREEN}}[OK]{{.NC}} Generated GraphQL client code in internal/graphql/\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting System API with hot reload...\n"
+      - air -c tools/.air.system.toml
 
-  format:
-    desc: "Format backend code"
-    cmds:
-      - gofmt -w .
-      - gofumpt -w .
-      - printf "{{.GREEN}}[OK]{{.NC}} Go code formatted\n"
-
-  format:check:
-    desc: "Check backend code formatting"
+  dev:worker:
+    desc: "Run Temporal Worker with hot reload (Air)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
     cmds:
       - |
-        if [ -n "$(gofmt -l .)" ]; then
-          printf "{{.RED}}[ERROR]{{.NC}} Go files are not formatted with gofmt:\n"
-          gofmt -l .
-          exit 1
-        fi
-        if [ -n "$(gofumpt -l .)" ]; then
-          printf "{{.RED}}[ERROR]{{.NC}} Go files are not formatted with gofumpt:\n"
-          gofumpt -l .
-          exit 1
-        fi
-        printf "{{.GREEN}}[OK]{{.NC}} Go code formatting is correct\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Temporal Worker with hot reload...\n"
+      - air -c tools/.air.worker.toml
 
-  lint:
-    desc: "Lint backend code"
-    cmds:
-      - golangci-lint run
+  # === Test Commands (run locally) ===
 
-  lint:fix:
-    desc: "Lint and auto-fix backend code"
+  test:unit:
+    desc: "Run unit tests"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
     cmds:
-      - golangci-lint run --fix
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running unit tests with race detector...\n"
+      - go test -v -race -coverprofile=coverage.out ./...
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Unit tests complete\n"
 
-  test:
-    desc: "Run backend tests"
+  test:integration:
+    desc: "Run integration tests"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
     cmds:
-      - go test -v ./...
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running integration tests...\n"
+      - go test -v -race -tags=integration ./...
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Integration tests complete\n"
 
   test:coverage:
-    desc: "Run backend tests with coverage"
-    cmds:
-      - go test -v -coverprofile=coverage.out ./...
-      - go tool cover -html=coverage.out -o coverage.html
-      - printf "{{.GREEN}}[OK]{{.NC}} Coverage report saved to backend/coverage.html\n"
-
-  vuln:check:
-    desc: "Check for vulnerabilities"
+    desc: "Show test coverage"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    deps:
+      - test:unit
     cmds:
       - |
-        if ! command -v govulncheck >/dev/null; then
-          printf "{{.YELLOW}}[INFO]{{.NC}} govulncheck not installed. Installing...\n"
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-        fi
-        govulncheck ./...
+        printf "{{.BLUE}}[INFO]{{.NC}} Opening coverage report...\n"
+      - go tool cover -html=coverage.out
+
+  # === Lint Commands ===
+
+  lint:
+    desc: "Run golangci-lint"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running golangci-lint (45 linters)...\n"
+      - golangci-lint run --timeout=5m
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Linting complete\n"
+
+  lint:fix:
+    desc: "Run golangci-lint with auto-fix"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running golangci-lint with auto-fix...\n"
+      - golangci-lint run --fix --timeout=5m
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Auto-fix complete\n"
+
+  # === Code Generation ===
+
+  gen:graphql:server:
+    desc: "Generate GraphQL server code (gqlgen)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    sources:
+      - "graphql/**/*.graphql"
+      - "tools/gqlgen.yml"
+    generates:
+      - "internal/api/data/generated.go"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Generating GraphQL server code (gqlgen)...\n"
+      - go run github.com/99designs/gqlgen generate --config tools/gqlgen.yml
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} GraphQL server code generated\n"
+
+  gen:graphql:client:
+    desc: "Generate GraphQL client code (genqlient)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    sources:
+      - "graphql/**/*.graphql"
+      - "tools/genqlient.yml"
+    generates:
+      - "internal/client/graphql/generated.go"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Generating GraphQL client code (genqlient)...\n"
+      - go run github.com/Khan/genqlient tools/genqlient.yml
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} GraphQL client code generated\n"
+
+  gen:sqlc:
+    desc: "Generate type-safe SQL code (sqlc)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    sources:
+      - "../db/queries/**/*.sql"
+      - "tools/sqlc.yml"
+    generates:
+      - "internal/repository/models.go"
+      - "internal/repository/queries.go"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Generating type-safe SQL code (sqlc)...\n"
+      - sqlc generate -f tools/sqlc.yml
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} SQL code generated\n"
+
+  gen:all:
+    desc: "Run all code generators"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running all code generators...\n"
+      - task: gen:graphql:server
+      - task: gen:graphql:client
+      - task: gen:sqlc
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All code generation complete\n"
+
+  # === Dependency Management ===
+
+  deps:install:
+    desc: "Install Go dependencies"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Downloading Go dependencies...\n"
+      - go mod download
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Dependencies installed\n"
+
+  deps:tidy:
+    desc: "Tidy Go dependencies"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Tidying Go dependencies...\n"
+      - go mod tidy
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Dependencies tidied\n"
+
+  deps:verify:
+    desc: "Verify Go dependencies"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Verifying Go dependencies...\n"
+      - go mod verify
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Dependencies verified\n"
+
+  deps:update:
+    desc: "Update all Go dependencies"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Updating Go dependencies...\n"
+      - go get -u ./...
+      - go mod tidy
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Dependencies updated\n"
+
+  # === Cleanup ===
+
+  clean:
+    desc: "Clean local build artifacts and test files"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Cleaning build artifacts...\n"
+      - rm -rf bin/
+      - rm -rf tmp/
+      - rm -f coverage.out
+      - rm -f *.test
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Build artifacts cleaned\n"
+
+  destroy:
+    desc: "Remove all backend containers and images"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing backend containers...\n"
+      - docker compose stop data gateway system worker 2>/dev/null || true
+      - docker compose rm -f data gateway system worker 2>/dev/null || true
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing backend Docker images...\n"
+      - docker rmi nexus/data:dev nexus/gateway:dev nexus/system:dev nexus/worker:dev 2>/dev/null || true
+      - docker rmi nexus/data:latest nexus/gateway:latest nexus/system:latest nexus/worker:latest 2>/dev/null || true
+      - task: clean
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Backend cleanup complete\n"
+
+  # === Format ===
+
+  fmt:
+    desc: "Format Go code"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Formatting Go code...\n"
+      - go fmt ./...
+      - goimports -w -local github.com/retran/nexus .
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Code formatted\n"
+
+  # === Security Checks ===
+
+  sec:scan:
+    desc: "Run security vulnerability scan"
+    silent: true
+    dir: "{{.ROOT_DIR}}/backend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running security scans...\n"
+      - gosec ./...
+      - govulncheck ./...
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Security scan complete\n"

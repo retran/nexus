@@ -8,7 +8,8 @@ tag_format = "v$version"
 version_files = [
     "backend/go.mod",
     "frontend/package.json",
-    "postgres/package.json"
+    "db/package.json",
+    "infra/package.json"
 ]
 style = [
     ["qmark", "fg:#ff9d00 bold"],
@@ -61,10 +62,12 @@ choices = [
     {value = "", name = "none"},
     {value = "backend", name = "backend: Backend/API changes"},
     {value = "frontend", name = "frontend: Frontend/UI changes"},
-    {value = "postgres", name = "postgres: Database/migrations changes"},
+    {value = "db", name = "db: Database/migrations changes"},
+    {value = "infra", name = "infra: Infrastructure configuration changes"},
     {value = "docker", name = "docker: Docker configuration changes"},
     {value = "ci", name = "ci: CI/CD pipeline changes"},
-    {value = "deps", name = "deps: Dependency updates"}
+    {value = "deps", name = "deps: Dependency updates"},
+    {value = "scripts", name = "scripts: Build and automation scripts"}
 ]
 
 [[tool.commitizen.customize.questions]]

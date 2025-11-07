@@ -105,11 +105,19 @@
     },
     {
       "description": "Database migrations tooling",
-      "matchFileNames": ["postgres/**"],
-      "groupName": "postgres tooling",
+      "matchFileNames": ["db/**"],
+      "groupName": "database tooling",
       "schedule": ["before 6am on Monday"],
       "semanticCommitType": "build",
-      "semanticCommitScope": "postgres"
+      "semanticCommitScope": "db"
+    },
+    {
+      "description": "Infrastructure tooling",
+      "matchFileNames": ["infra/**"],
+      "groupName": "infrastructure tooling",
+      "schedule": ["before 6am on Monday"],
+      "semanticCommitType": "build",
+      "semanticCommitScope": "infra"
     },
     {
       "description": "Docker images",

@@ -1,0 +1,193 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Kratos Configuration - DEVELOPMENT
+# For production, use kratos.prod.yml with stricter security settings
+
+version: v1.3.0
+
+# DSN configured via DSN env var
+dsn: memory
+
+serve:
+  public:
+    base_url: http://auth.nexus.local
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://nexus.local
+        - http://auth.nexus.local
+        - http://api.nexus.local
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+      allowed_headers:
+        - Authorization
+        - Cookie
+        - Content-Type
+      exposed_headers:
+        - Content-Type
+        - Set-Cookie
+      allow_credentials: true
+  admin:
+    base_url: http://localhost:4434
+
+# Cookies configuration overridden by env vars:
+# - COOKIES_DOMAIN
+# - COOKIES_SAME_SITE
+cookies:
+  domain: .nexus.local
+  path: /
+  same_site: Lax
+
+selfservice:
+  default_browser_return_url: http://nexus.local
+  allowed_return_urls:
+    - http://nexus.local
+    - http://auth.nexus.local
+    - http://api.nexus.local
+    - http://adminer.nexus.local
+    - http://redis.nexus.local
+    - http://mail.nexus.local
+    - http://vault.nexus.local
+    - http://temporal.nexus.local
+
+  methods:
+    password:
+      enabled: true
+      config:
+        haveibeenpwned_enabled: false
+        identifier_similarity_check_enabled: true
+        min_password_length: 8
+    totp:
+      config:
+        issuer: Nexus
+      enabled: true
+    lookup_secret:
+      enabled: true
+    link:
+      enabled: true
+    code:
+      enabled: true
+    oidc:
+      enabled: true
+      config:
+        providers:
+          - id: google
+            provider: google
+            client_id: "" # Overridden by SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_ID env var
+            client_secret: "" # Overridden by SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_SECRET env var
+            mapper_url: file:///etc/config/kratos/oidc.google.jsonnet
+            scope:
+              - email
+              - profile
+            requested_claims:
+              id_token:
+                email:
+                  essential: true
+                email_verified:
+                  essential: true
+                given_name:
+                  essential: true
+                family_name: null
+                hd: null
+
+  flows:
+    error:
+      ui_url: http://auth.nexus.local/error
+
+    settings:
+      ui_url: http://auth.nexus.local/settings
+      privileged_session_max_age: 15m
+      required_aal: highest_available
+
+    recovery:
+      enabled: true
+      ui_url: http://auth.nexus.local/recovery
+      use: code
+
+    verification:
+      enabled: true
+      ui_url: http://auth.nexus.local/verification
+      use: code
+      after:
+        default_browser_return_url: http://nexus.local
+
+    logout:
+      after:
+        default_browser_return_url: http://auth.nexus.local/login
+
+    login:
+      ui_url: http://auth.nexus.local/login
+      lifespan: 10m
+      after:
+        default_browser_return_url: http://nexus.local
+        hooks:
+          - hook: web_hook
+            config:
+              url: http://system:8082/webhooks/kratos/login
+              method: POST
+              body: file:///etc/config/kratos/webhook.jsonnet
+              auth:
+                type: api_key
+                config:
+                  name: X-Webhook-Secret
+                  value: "" # From KRATOS_WEBHOOK_SECRET env var (secret)
+                  in: header
+        oidc:
+          hooks:
+            - hook: web_hook
+              config:
+                url: http://system:8082/webhooks/kratos/login
+                method: POST
+                body: file:///etc/config/kratos/webhook.jsonnet
+                auth:
+                  type: api_key
+                  config:
+                    name: X-Webhook-Secret
+                    value: "" # From KRATOS_WEBHOOK_SECRET env var (secret)
+                    in: header
+
+    registration:
+      lifespan: 10m
+      ui_url: http://auth.nexus.local/registration
+      after:
+        password:
+          hooks:
+            - hook: web_hook
+              config:
+                url: http://system:8082/webhooks/kratos/registration
+                method: POST
+                body: file:///etc/config/kratos/webhook.jsonnet
+                auth:
+                  type: api_key
+                  config:
+                    name: X-Webhook-Secret
+                    value: "" # From KRATOS_WEBHOOK_SECRET env var (secret)
+                    in: header
+
+log:
+  level: debug
+  format: text
+  leak_sensitive_values: true
+
+ciphers:
+  algorithm: xchacha20-poly1305
+
+hashers:
+  algorithm: bcrypt
+  bcrypt:
+    cost: 8 # Dev: 8 (faster), Prod: 12+ (secure)
+
+identity:
+  default_schema_id: default
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/identity.schema.json
+
+courier:
+  smtp:
+    connection_uri: smtp://mailhog:1025/?skip_ssl_verify=true

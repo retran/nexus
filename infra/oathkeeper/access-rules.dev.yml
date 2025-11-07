@@ -1,0 +1,379 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Oathkeeper Access Rules - DEVELOPMENT Environment
+# Uses nexus.local for local development
+
+# API Gateway - Admin endpoints require admin role
+- id: "protected:api:admin"
+  match:
+    url: "<http|https>://api.nexus.local/api/admin<.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - HEAD
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: "http://keto:4466/relation-tuples/check"
+      payload: |
+        {
+          "namespace": "Role",
+          "object": "admin",
+          "relation": "members",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: header
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
+
+# API Gateway - Public API endpoints (authenticated users)
+- id: "protected:api"
+  match:
+    url: "<http|https>://api.nexus.local/api<.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - HEAD
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: header
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
+
+# Frontend - Temporary anonymous access (TODO: integrate Kratos auth in React app)
+- id: "public:frontend"
+  match:
+    url: "<http|https|ws|wss>://nexus.local<.*>"
+    methods:
+      - GET
+      - POST
+      - HEAD
+  authenticators:
+    - handler: anonymous
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+  errors:
+    - handler: json
+
+# Admin Tools - require admin role (development only)
+- id: "protected:adminer"
+  match:
+    url: "<http|https>://adminer.nexus.local<.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - HEAD
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: "http://keto:4466/relation-tuples/check"
+      payload: |
+        {
+          "namespace": "Role",
+          "object": "admin",
+          "relation": "members",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: noop
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
+
+- id: "protected:redis-ui"
+  match:
+    url: "<http|https>://redis.nexus.local<.*>"
+    methods:
+      - GET
+      - POST
+      - HEAD
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: "http://keto:4466/relation-tuples/check"
+      payload: |
+        {
+          "namespace": "Role",
+          "object": "admin",
+          "relation": "members",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: noop
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
+
+- id: "protected:mailhog"
+  match:
+    url: "<http|https>://mail.nexus.local<.*>"
+    methods:
+      - GET
+      - POST
+      - DELETE
+      - HEAD
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: "http://keto:4466/relation-tuples/check"
+      payload: |
+        {
+          "namespace": "Role",
+          "object": "admin",
+          "relation": "members",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: noop
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
+
+- id: "protected:vault-ui"
+  match:
+    url: "<http|https>://vault.nexus.local<.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - HEAD
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: "http://keto:4466/relation-tuples/check"
+      payload: |
+        {
+          "namespace": "Role",
+          "object": "admin",
+          "relation": "members",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: noop
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
+
+- id: "protected:grafana"
+  match:
+    url: "<http|https>://grafana.nexus.local<.*>"
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - HEAD
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: "http://keto:4466/relation-tuples/check"
+      payload: |
+        {
+          "namespace": "Role",
+          "object": "admin",
+          "relation": "members",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: noop
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
+
+- id: "protected:mimir"
+  match:
+    url: "<http|https>://mimir.nexus.local<.*>"
+    methods:
+      - GET
+      - POST
+      - HEAD
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: "http://keto:4466/relation-tuples/check"
+      payload: |
+        {
+          "namespace": "Role",
+          "object": "admin",
+          "relation": "members",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: noop
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
+
+- id: "protected:dozzle"
+  match:
+    url: "<http|https>://dozzle.nexus.local<.*>"
+    methods:
+      - GET
+      - POST
+      - HEAD
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: "http://keto:4466/relation-tuples/check"
+      payload: |
+        {
+          "namespace": "Role",
+          "object": "admin",
+          "relation": "members",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: noop
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html
+
+- id: "protected:temporal-ui"
+  match:
+    url: "<http|https>://temporal.nexus.local<.*>"
+    methods:
+      - GET
+      - POST
+      - HEAD
+  authenticators:
+    - handler: cookie_session
+  authorizer:
+    handler: remote_json
+    config:
+      remote: "http://keto:4466/relation-tuples/check"
+      payload: |
+        {
+          "namespace": "Role",
+          "object": "admin",
+          "relation": "members",
+          "subject_id": "{{ print .Subject }}"
+        }
+  mutators:
+    - handler: noop
+  errors:
+    - handler: redirect
+      config:
+        to: http://auth.nexus.local/login
+        when:
+          - error:
+              - unauthorized
+              - forbidden
+            request:
+              header:
+                accept:
+                  - text/html

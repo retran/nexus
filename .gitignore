@@ -1,12 +1,22 @@
-idea/
+# IDE and Editor
+.idea/
 .vscode/
 *.swp
 *~
+
+# OS
 .DS_Store
 Thumbs.db
-env
+
+# Environment
 .env
 !.env.example
+!.env.*.example
+
+# Docker
+docker-compose.override.yaml
+
+# Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/build/
@@ -16,19 +26,39 @@ frontend/yarn-debug.log*
 frontend/yarn-error.log*
 frontend/pnpm-debug.log*
 frontend/.vite/
+
+# Backend
 backend/tmp/
 backend/server
+backend/bin/
 *.exe
 *.out
 backend/*.log
 backend/air_build.log
 backend/vendor/
-postgres/node_modules/
-postgres/*.log
+
+# Database
+db/node_modules/
+db/*.log
 postgres_data/
 postgres_dev_data/
 postgres_prod_data/
+
+# Infrastructure
+infra/node_modules/
+infra/*.log
+
+# Portainer & Monitoring
 portainer_data/
 uptime_kuma_data/
+
+# Vault
+vault/.dev/
+vault/logs/
+vault/data/
+
+# Build Tools
 .task/
+
+# AI Tools
 .meowg1k/**

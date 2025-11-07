@@ -1,0 +1,38 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Docker Compose Root Configuration for Development
+#
+# This file orchestrates the entire Nexus development stack using a modular architecture:
+#
+# Architecture:
+# ├── compose/infra.yaml  - Core infrastructure + Observability (Traefik, Postgres, Redis, Vault, Temporal, Ory, Grafana, Tempo, Mimir, Alloy)
+# ├── compose/app.yaml    - Application services (data, gateway, system, worker, frontend)
+# └── compose/tools.yaml  - Admin tools & UIs (profile: 'tools')
+#
+# Usage:
+#   docker compose up -d                    # Start core + observability
+#   docker compose --profile tools up -d    # Start everything including admin tools
+#
+# Or use Task shortcuts:
+#   task dev:up      # Start core + observability
+#   task tools       # Start admin tools
+
+include:
+  - path: compose/infra.yaml # Core infrastructure + Observability (always starts)
+  - path: compose/app.yaml # Application services (always starts)
+  - path: compose/tools.yaml # Admin tools (profile: 'tools')
+
+# Shared volumes used across multiple services
+volumes:
+  postgres_data:
+  redis_data:
+  kratos_secrets:
+  mimir_data:
+  tempo_data:
+  grafana_data:
+
+# Default network for all services
+networks:
+  default:
+    name: nexus_network

@@ -10,4 +10,24 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    // Development server configuration for Traefik reverse proxy
+    // Production: will use different HMR settings for actual domain
+    host: true,
+    port: 3000,
+    allowedHosts: [
+      "frontend",
+      "nexus.local",
+      ".nexus.local",
+      "localhost",
+    ],
+    hmr: {
+      clientPort: 80,
+      protocol: "ws",
+      host: "nexus.local",  // Dev: .local domain; Prod: actual domain
+    },
+    watch: {
+      usePolling: true,
+    },
+  },
 });

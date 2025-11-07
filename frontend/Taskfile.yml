@@ -1,103 +1,219 @@
 # Copyright 2025 Andrew Vasilyev
 # SPDX-License-Identifier: Apache-2.0
 
-version: "3"
+version: '3'
 
 vars:
+  NODE_VERSION: '22'
+  VITE_VERSION: '^6.0.0'
+  # Colors
   GREEN: \033[0;32m
-  RED: \033[0;31m
   YELLOW: \033[0;33m
   BLUE: \033[0;34m
+  RED: \033[0;31m
   NC: \033[0m
 
-silent: true
-
 tasks:
-  default:
-    desc: "Show available frontend tasks"
-    cmds:
-      - task --list-all
-
-  deps:
-    desc: "Install frontend dependencies"
-    cmds:
-      - |
-        if [ ! -d node_modules ]; then
-          echo "Installing frontend dependencies..."
-          yarn install
-          printf "{{.GREEN}}[OK]{{.NC}} Frontend dependencies installed\n"
-        else
-          printf "{{.GREEN}}[OK]{{.NC}} Frontend dependencies already installed\n"
-        fi
+  # === Development Commands (run locally with hot reload) ===
 
   dev:
-    desc: "Start frontend development server"
+    desc: "Run frontend with Vite dev server (hot reload)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
     cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Vite dev server with hot reload...\n"
       - yarn dev
 
-  build:
-    desc: "Build frontend for production"
-    cmds:
-      - yarn build
-      - printf "{{.GREEN}}[OK]{{.NC}} Frontend built successfully\n"
+  # === Test Commands (run locally) ===
 
-  preview:
-    desc: "Preview production build"
+  test:unit:
+    desc: "Run unit tests with Vitest"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
     cmds:
-      - yarn preview
-
-  format:
-    desc: "Format frontend code"
-    cmds:
-      - yarn format
-
-  format:check:
-    desc: "Check frontend code formatting"
-    cmds:
-      - yarn format:check
-
-  lint:
-    desc: "Lint frontend code"
-    cmds:
-      - yarn lint
-
-  lint:fix:
-    desc: "Lint and auto-fix frontend code"
-    cmds:
-      - yarn lint:fix
-
-  type-check:
-    desc: "Type check frontend code"
-    cmds:
-      - yarn type-check
-
-  test:
-    desc: "Run frontend tests"
-    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running unit tests with Vitest...\n"
       - yarn test
-
-  test:coverage:
-    desc: "Run frontend tests with coverage"
-    cmds:
-      - yarn test --coverage
-      - printf "{{.GREEN}}[OK]{{.NC}} Coverage report at coverage/index.html\n"
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Unit tests complete\n"
 
   test:watch:
-    desc: "Run frontend tests in watch mode"
+    desc: "Run tests in watch mode"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
     cmds:
-      - yarn test --watch
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting tests in watch mode...\n"
+      - yarn test:watch
 
-  shell:
-    desc: "Open shell in frontend container"
+  test:coverage:
+    desc: "Run tests with coverage"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
     cmds:
-      - docker-compose -f ../docker-compose.dev.yaml exec ui sh
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running tests with coverage...\n"
+      - yarn test:coverage
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Coverage report generated\n"
+
+  test:ui:
+    desc: "Run tests with Vitest UI"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Vitest UI...\n"
+      - yarn test:ui
+
+  # === Lint Commands ===
+
+  lint:
+    desc: "Run ESLint"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running ESLint...\n"
+      - yarn lint
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Linting complete\n"
+
+  lint:fix:
+    desc: "Run ESLint with auto-fix"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running ESLint with auto-fix...\n"
+      - yarn lint:fix
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Auto-fix complete\n"
+
+  # === Type Checking ===
+
+  typecheck:
+    desc: "Run TypeScript type checking"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running TypeScript type checking...\n"
+      - yarn typecheck
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Type checking complete\n"
+
+  # === Format ===
+
+  fmt:
+    desc: "Format code with Prettier"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Formatting code with Prettier...\n"
+      - yarn format
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Code formatted\n"
+
+  fmt:check:
+    desc: "Check code formatting"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking code formatting...\n"
+      - yarn format:check
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Format check complete\n"
+
+  # === Dependency Management ===
+
+  deps:install:
+    desc: "Install dependencies with Yarn"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Installing dependencies with Yarn...\n"
+      - yarn install --frozen-lockfile
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Dependencies installed\n"
+
+  deps:update:
+    desc: "Update dependencies"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Updating dependencies...\n"
+      - yarn upgrade-interactive
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Dependencies updated\n"
+
+  deps:audit:
+    desc: "Audit dependencies for vulnerabilities"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Auditing dependencies...\n"
+      - yarn audit
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Audit complete\n"
+
+  deps:audit:fix:
+    desc: "Fix dependency vulnerabilities"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Fixing vulnerabilities...\n"
+      - yarn audit --fix
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Vulnerabilities fixed\n"
+
+  # === Cleanup ===
 
   clean:
-    desc: "Clean frontend build artifacts"
+    desc: "Clean build artifacts and dependencies"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
     cmds:
-      - rm -rf dist/ build/ .vite/ coverage/
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Cleaning build artifacts...\n"
+      - rm -rf dist/
+      - rm -rf node_modules/
+      - rm -rf .vite/
+      - rm -rf coverage/
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Build artifacts cleaned\n"
 
-  security:
-    desc: "Run security scan on frontend (yarn audit)"
+  clean:cache:
+    desc: "Clean Vite cache only"
+    silent: true
+    dir: "{{.ROOT_DIR}}/frontend"
     cmds:
-      - yarn audit --level moderate
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Cleaning Vite cache...\n"
+      - rm -rf .vite/
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Cache cleaned\n"
+
+  destroy:
+    desc: "Remove all frontend containers and images"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing frontend containers...\n"
+      - docker compose stop ui 2>/dev/null || true
+      - docker compose rm -f ui 2>/dev/null || true
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing frontend Docker images...\n"
+      - docker rmi nexus/ui:dev 2>/dev/null || true
+      - docker rmi nexus/ui:latest 2>/dev/null || true
+      - task: clean
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Frontend cleanup complete\n"

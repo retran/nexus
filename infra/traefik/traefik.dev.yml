@@ -1,0 +1,60 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Traefik Static Configuration - DEVELOPMENT
+# This file defines core Traefik settings: entrypoints, providers, API, logging
+
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false
+
+api:
+  dashboard: true
+  insecure: true # Allow dashboard access without auth on :8080 (dev only)
+
+ping:
+  entryPoint: "web"
+
+entryPoints:
+  web:
+    address: ":80"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    watch: true
+    network: "nexus_default"
+
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+log:
+  level: DEBUG
+  format: common
+
+accessLog:
+  format: common
+
+# Prometheus metrics
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addRoutersLabels: true
+    addServicesLabels: true
+    buckets:
+      - 0.1
+      - 0.3
+      - 1.0
+      - 3.0
+      - 10.0
+
+# OpenTelemetry tracing
+tracing:
+  otlp:
+    http:
+      endpoint: "http://alloy:4318"
+    grpc:
+      endpoint: "alloy:4317"
+      insecure: true

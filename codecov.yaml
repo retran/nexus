@@ -48,3 +48,7 @@ ignore:
   - "**/tmp/**"
   - "**/dist/**"
   - "**/build/**"
+  - "**/bin/**"
+  - "backend/repository/**"
+  - "**/*.pb.go"
+  - "**/*.pb.ts"

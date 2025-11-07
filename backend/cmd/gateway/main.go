@@ -6,54 +6,85 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/retran/nexus/backend/internal/api/rest"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/retran/nexus/backend/internal/api/gateway"
+	"github.com/retran/nexus/backend/internal/config"
+	"github.com/retran/nexus/backend/internal/tracing"
 )
 
 func main() {
-	cfg := rest.Config{
-		Port:               8080,
-		Host:               "0.0.0.0",
-		ReadTimeout:        10 * time.Second,
-		WriteTimeout:       10 * time.Second,
-		ShutdownTimeout:    30 * time.Second,
-		GraphQLEndpoint:    getEnv("GRAPHQL_ENDPOINT", "http://localhost:8081/graphql"),
-		AllowedOrigins:     getAllowedOrigins(),
-		DatabaseURL:        getDatabaseURL(),
-		RedisHost:          getEnv("REDIS_HOST", "localhost"),
-		RedisPort:          getEnvInt("REDIS_PORT", 6379),
-		RedisPassword:      getEnv("REDIS_PASSWORD", ""),
-		RedisDB:            getEnvInt("REDIS_DB", 0),
-		GoogleClientID:     getEnv("GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret: getEnv("GOOGLE_CLIENT_SECRET", ""),
-		GoogleRedirectURL:  getEnv("GOOGLE_REDIRECT_URL", "http://api.nexus.local/api/auth/google/callback"),
-		JWTSecret:          getEnv("JWT_SECRET", "change-me-in-production-use-a-strong-secret"),
-		FrontendURL:        getEnv("FRONTEND_URL", "http://nexus.local"),
-		TemporalHost:       getEnv("TEMPORAL_HOST", "localhost:7233"),
-		TemporalNamespace:  getEnv("TEMPORAL_NAMESPACE", "default"),
-		TemporalTaskQueue:  getEnv("TEMPORAL_TASK_QUEUE", "nexus-task-queue"),
-		// Rate limiting configuration (requests per minute)
-		RateLimitOAuth:  getEnvInt("RATE_LIMIT_OAUTH", 5),   // OAuth endpoints (per IP)
-		RateLimitHealth: getEnvInt("RATE_LIMIT_HEALTH", 60), // Health check (per IP)
-		RateLimitAPI:    getEnvInt("RATE_LIMIT_API", 300),   // Authenticated API (per user)
-		RateLimitAdmin:  getEnvInt("RATE_LIMIT_ADMIN", 100), // Admin endpoints (per user)
+	ctx := context.Background()
+
+	vaultClient, err := config.NewVaultClient()
+	if err != nil {
+		log.Fatalf("Failed to create Vault client: %v", err)
 	}
 
-	server, err := rest.New(&cfg)
+	redisPassword, err := vaultClient.GetRedisPassword(ctx)
 	if err != nil {
-		log.Fatalf("Failed to create server: %v", err)
+		log.Fatalf("Failed to load Redis password from Vault: %v", err)
+	}
+
+	shutdown, err2 := tracing.InitTracerProvider(ctx)
+	if err2 != nil {
+		log.Printf("Warning: Failed to initialize tracing: %v", err2)
+	} else {
+		defer func() {
+			if err := shutdown(ctx); err != nil {
+				log.Printf("Error shutting down tracer: %v", err)
+			}
+		}()
+	}
+
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		metricsServer := &http.Server{
+			Addr:              ":9092",
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		log.Println("Metrics server listening on :9092")
+		if err := metricsServer.ListenAndServe(); err != nil {
+			log.Printf("Metrics server error: %v", err)
+		}
+	}()
+
+	cfg := gateway.Config{
+		Port:            config.GetEnvInt("SERVER_PORT", 8080),
+		Host:            config.GetEnv("SERVER_HOST", "0.0.0.0"),
+		ReadTimeout:     10 * time.Second,
+		WriteTimeout:    10 * time.Second,
+		ShutdownTimeout: 30 * time.Second,
+		GraphQLEndpoint: config.MustGetEnv("DATA_API_ENDPOINT"),
+		AllowedOrigins:  config.MustGetEnvCSV("ALLOWED_ORIGINS"),
+		RedisHost:       config.MustGetEnv("REDIS_HOST"),
+		RedisPort:       config.MustGetEnvInt("REDIS_PORT"),
+		RedisPassword:   redisPassword,
+		RedisDB:         config.GetEnvInt("REDIS_DB", 0),
+		FrontendURL:     config.MustGetEnv("FRONTEND_URL"),
+		InternalAPIURL:  config.MustGetEnv("SYSTEM_API_ENDPOINT"),
+		KratosAdminURL:  config.MustGetEnv("KRATOS_ADMIN_URL"),
+	}
+
+	server, err := gateway.New(&cfg)
+	if err != nil {
+		log.Printf("Failed to create server: %v", err)
+		return
 	}
 
 	go func() {
 		log.Println("Starting REST API Gateway...")
 		if err := server.Start(); err != nil {
-			log.Fatalf("Failed to start server: %v", err)
+			log.Printf("Failed to start server: %v", err)
 		}
 	}()
 
@@ -71,73 +102,4 @@ func main() {
 	}
 
 	log.Println("Server exited")
-}
-
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		var result int
-		if _, err := fmt.Sscanf(value, "%d", &result); err == nil {
-			return result
-		}
-	}
-	return defaultValue
-}
-
-func getAllowedOrigins() []string {
-	// In development, allow localhost:3000 by default
-	// In production, set via ALLOWED_ORIGINS env var (comma-separated)
-	origins := getEnv("ALLOWED_ORIGINS", "http://localhost:3000")
-	if origins == "*" {
-		return []string{"*"}
-	}
-
-	result := []string{}
-	for _, origin := range splitByComma(origins) {
-		if origin != "" {
-			result = append(result, origin)
-		}
-	}
-	return result
-}
-
-func splitByComma(s string) []string {
-	result := []string{}
-	current := ""
-	for _, c := range s {
-		if c == ',' {
-			result = append(result, current)
-			current = ""
-		} else {
-			current += string(c)
-		}
-	}
-	if current != "" {
-		result = append(result, current)
-	}
-	return result
-}
-
-func getDatabaseURL() string {
-	if url := os.Getenv("DATABASE_URL"); url != "" {
-		return url
-	}
-
-	host := getEnv("POSTGRES_HOST", "localhost")
-	port := getEnv("POSTGRES_PORT", "5432")
-	user := getEnv("POSTGRES_USER", "admin")
-	password := getEnv("POSTGRES_PASSWORD", "")
-	dbname := getEnv("POSTGRES_DB", "nexus_db")
-	sslmode := getEnv("POSTGRES_SSLMODE", "disable")
-
-	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		user, password, host, port, dbname, sslmode,
-	)
 }

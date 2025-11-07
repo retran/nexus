@@ -1,0 +1,380 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+version: '3'
+
+vars:
+  POSTGRES_VERSION: '18'
+  ATLAS_VERSION: 'latest'
+  # Colors
+  GREEN: \033[0;32m
+  YELLOW: \033[0;33m
+  BLUE: \033[0;34m
+  RED: \033[0;31m
+  NC: \033[0m
+
+tasks:
+  # === Development Database ===
+
+  dev:up:
+    desc: "Start PostgreSQL in Docker for development"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting PostgreSQL...\n"
+      - docker compose up -d postgres
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} PostgreSQL started\n"
+
+  dev:down:
+    desc: "Stop PostgreSQL"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Stopping PostgreSQL...\n"
+      - docker compose stop postgres
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} PostgreSQL stopped\n"
+
+  logs:
+    desc: "Show PostgreSQL logs (use CLI_ARGS for filtering)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose logs -f {{.CLI_ARGS}} postgres
+
+  dev:psql:
+    desc: "Connect to development database with psql"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Connecting to PostgreSQL...\n"
+      - docker compose exec postgres psql -U admin -d nexus_db
+
+  # === SQL Linting & Formatting ===
+
+  lint:
+    desc: "Lint SQL migrations, queries, and seeds with sqlfluff"
+    silent: true
+    dir: "{{.ROOT_DIR}}/db"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Linting SQL migrations, queries, and seeds...\n"
+      - npm run lint
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} SQL linting complete\n"
+
+  fmt:
+    desc: "Format SQL migrations, queries, and seeds with sqlfluff"
+    silent: true
+    dir: "{{.ROOT_DIR}}/db"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Formatting SQL migrations, queries, and seeds...\n"
+      - npm run format
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} SQL formatting complete\n"
+
+  fmt:check:
+    desc: "Check SQL formatting for migrations, queries, and seeds without modifying files"
+    silent: true
+    dir: "{{.ROOT_DIR}}/db"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking SQL formatting...\n"
+      - npm run format:check
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} SQL format check complete\n"
+
+  # === Migration Commands ===
+
+  migrate:create:
+    desc: "Create a new migration file (usage: task db:migrate:create NAME=add_users_table)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/db"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Creating migration {{.NAME}}...\n"
+      - |
+        TIMESTAMP=$(date +%Y%m%d%H%M%S)
+        FILENAME="migrations/${TIMESTAMP}_{{.NAME}}.sql"
+        cat > $FILENAME <<EOF
+        -- Copyright 2025 Andrew Vasilyev
+        -- SPDX-License-Identifier: Apache-2.0
+
+        -- Migration: {{.NAME}}
+        -- Created: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+        -- Atlas native SQL migration (no goose directives)
+        -- For rollback: create a separate migration with reverse changes
+
+
+        EOF
+        printf "{{.GREEN}}[OK]{{.NC}} Created migration: $FILENAME\n"
+        printf "{{.YELLOW}}[TIP]{{.NC}} Use 'task db:migrate:diff NAME={{.NAME}}' to auto-generate from schema.hcl\n"
+    requires:
+      vars:
+        - NAME
+
+  migrate:diff:
+    desc: "Generate migration from schema.hcl diff (usage: task db:migrate:diff NAME=add_users_table)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Generating migration from schema.hcl...\n"
+      - |
+        docker compose run --rm atlas \
+          migrate diff {{.NAME}} \
+          --dir "file://migrations" \
+          --to "file://schema.hcl" \
+          --dev-url "postgres://admin:admin@postgres:5432/nexus_db?sslmode=disable"
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Generated migration from schema.hcl\n"
+      - |
+        printf "{{.YELLOW}}[TIP]{{.NC}} Review db/migrations/XXX_{{.NAME}}.sql and commit\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Regenerating migration hashes (atlas.sum) to keep hashes in sync...\n"
+      - task: migrate:hash
+    requires:
+      vars:
+        - NAME
+
+  migrate:up:
+    desc: "Run all pending migrations"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running pending migrations...\n"
+      - docker compose run --rm atlas migrate apply --env local
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Migrations applied\n"
+
+  migrate:down:
+    desc: "Rollback last migration"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.RED}}[WARN]{{.NC}} Rolling back last migration...\n"
+      - docker compose run --rm atlas migrate down --env local
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Migration rolled back\n"
+
+  migrate:status:
+    desc: "Show migration status"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking migration status...\n"
+      - docker compose run --rm atlas migrate status --env local
+
+  validate:
+    desc: "Validate migrations"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Validating migrations...\n"
+      - docker compose run --rm atlas migrate validate --env local
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Migrations are valid\n"
+
+  migrate:hash:
+    desc: "Regenerate migration hashes (after manual edits)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Regenerating migration hashes...\n"
+      - docker compose run --rm atlas migrate hash --env local
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Migration hashes regenerated\n"
+
+  # === Schema Management ===
+
+  schema:inspect:
+    desc: "Inspect current database schema"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Inspecting database schema...\n"
+      - docker compose run --rm atlas schema inspect --env local
+
+  schema:diff:
+    desc: "Show diff between schema file and database"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking schema diff...\n"
+      - docker compose run --rm atlas schema diff --env local
+
+  schema:apply:
+    desc: "Apply schema changes to database"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Applying schema changes...\n"
+      - docker compose run --rm atlas schema apply --env local --auto-approve
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Schema changes applied\n"
+
+  # === Backup & Restore ===
+
+  backup:
+    desc: "Create database backup (usage: task db:backup FILE=backup.sql)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Creating database backup...\n"
+      - |
+        BACKUP_FILE="${FILE:-backup_$(date +%Y%m%d_%H%M%S).sql}"
+        docker compose exec -T postgres \
+          pg_dump -U admin nexus_db > "db/backups/$BACKUP_FILE"
+        printf "{{.GREEN}}[OK]{{.NC}} Backup created: db/backups/$BACKUP_FILE\n"
+
+  restore:
+    desc: "Restore database from backup (usage: task db:restore FILE=backup.sql)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.RED}}[WARN]{{.NC}} Restoring database from backup...\n"
+      - |
+        if [ -z "{{.FILE}}" ]; then
+          printf "{{.RED}}[ERROR]{{.NC}} FILE parameter required\n"
+          exit 1
+        fi
+        docker compose exec -T postgres \
+          psql -U admin nexus_db < "db/backups/{{.FILE}}"
+        printf "{{.GREEN}}[OK]{{.NC}} Database restored from: db/backups/{{.FILE}}\n"
+    requires:
+      vars:
+        - FILE
+
+  # === Data Seeding ===
+
+  seed:dev:
+    desc: "Seed development data"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Seeding development data...\n"
+      - |
+        docker compose exec -T postgres \
+          psql -U admin nexus_db < db/seeds/dev.sql
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Development data seeded\n"
+
+  seed:test:
+    desc: "Seed test data"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Seeding test data...\n"
+      - |
+        docker compose exec -T postgres \
+          psql -U admin nexus_db < db/seeds/test.sql
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Test data seeded\n"
+
+  reset:data:
+    desc: "Fast reset: drop all data, re-run migrations and seeds (keeps container running)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    prompt: "This will DROP and recreate the database. Continue?"
+    cmds:
+      - |
+        printf "{{.YELLOW}}[WARN]{{.NC}} Resetting database (fast mode)...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Dropping database...\n"
+      - |
+        docker compose exec -T postgres \
+          psql -U admin postgres -c "DROP DATABASE IF EXISTS nexus_db;"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Creating fresh database...\n"
+      - |
+        docker compose exec -T postgres \
+          psql -U admin postgres -c "CREATE DATABASE nexus_db OWNER admin;"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running migrations...\n"
+      - task: migrate:up
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Seeding development data...\n"
+      - task: seed:dev
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Database reset complete \n"
+
+  # === Bootstrap ===
+
+  bootstrap:dev:
+    desc: "Bootstrap PostgreSQL for development (migrations + seeds)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Bootstrapping PostgreSQL for development...\n"
+      - docker compose up -d postgres
+      - sleep 5
+      - task: migrate:up
+      - task: seed:dev
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} PostgreSQL bootstrap complete\n"
+
+  # === Destroy ===
+
+  destroy:
+    desc: "Remove PostgreSQL container and volume"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing PostgreSQL container and data...\n"
+      - docker compose stop postgres 2>/dev/null || true
+      - docker compose rm -f -v postgres 2>/dev/null || true
+      - rm -rf db/backups/* 2>/dev/null || true
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} PostgreSQL cleanup complete\n"
+
+  # === Utilities ===
+
+  stats:
+    desc: "Show database statistics"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Retrieving database statistics...\n"
+      - |
+        docker compose exec postgres \
+          psql -U admin nexus_db -c "
+            SELECT
+              schemaname,
+              tablename,
+              pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
+            FROM pg_tables
+            WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+            ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+          "
+
+  vacuum:
+    desc: "Vacuum and analyze database"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running vacuum and analyze...\n"
+      - docker compose exec postgres vacuumdb -U admin -d nexus_db --analyze --verbose
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Vacuum and analyze complete\n"

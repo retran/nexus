@@ -5,38 +5,79 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 
 	"github.com/retran/nexus/backend/internal/activities"
-	gqlclient "github.com/retran/nexus/backend/internal/client/graphql"
+	gqlclient "github.com/retran/nexus/backend/internal/client/data"
+	"github.com/retran/nexus/backend/internal/config"
+	"github.com/retran/nexus/backend/internal/tracing"
 	"github.com/retran/nexus/backend/internal/workflows"
 )
 
 func main() {
-	temporalHost := getEnv("TEMPORAL_HOST", "localhost:7233")
-	namespace := getEnv("TEMPORAL_NAMESPACE", "default")
-	taskQueue := getEnv("TEMPORAL_TASK_QUEUE", "nexus-task-queue")
+	if err := run(); err != nil {
+		log.Fatalf("Worker failed: %v", err)
+	}
+}
+
+func run() error {
+	ctx := context.Background()
+
+	shutdown, err := tracing.InitTracerProvider(ctx)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize tracing: %v", err)
+	} else {
+		defer func() {
+			if err := shutdown(ctx); err != nil {
+				log.Printf("Error shutting down tracer: %v", err)
+			}
+		}()
+	}
+
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		metricsServer := &http.Server{
+			Addr:              ":9094",
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		log.Println("Metrics server listening on :9094")
+		if err := metricsServer.ListenAndServe(); err != nil {
+			log.Printf("Metrics server error: %v", err)
+		}
+	}()
+
+	temporalHost := config.MustGetEnv("TEMPORAL_HOST")
+	namespace := config.GetEnv("TEMPORAL_NAMESPACE", "default")
+	taskQueue := config.MustGetEnv("TEMPORAL_TASK_QUEUE")
 
 	log.Printf("Connecting to Temporal at %s...", temporalHost)
+
 	c, err := client.Dial(client.Options{
 		HostPort:  temporalHost,
 		Namespace: namespace,
 	})
 	if err != nil {
-		log.Fatalf("Failed to create Temporal client: %v", err)
+		return fmt.Errorf("failed to create Temporal client: %w", err)
 	}
 	defer c.Close()
 	log.Println("Connected to Temporal")
 
-	apiURL := getEnv("API_URL", "http://localhost:8081/graphql")
-	gqlClient := gqlclient.NewClient(apiURL)
-	log.Printf("Initialized GraphQL client for: %s", apiURL)
+	dataAPIEndpoint := config.MustGetEnv("DATA_API_ENDPOINT")
+	gqlClient := gqlclient.NewClient(dataAPIEndpoint)
+	log.Printf("Initialized Data API client for: %s", dataAPIEndpoint)
 
 	w := worker.New(c, taskQueue, worker.Options{})
 
@@ -67,11 +108,5 @@ func main() {
 	log.Println("Shutting down worker...")
 	w.Stop()
 	log.Println("Worker stopped")
-}
-
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
+	return nil
 }

@@ -1,0 +1,22 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+plugins:
+  - prettier-plugin-sql
+
+parser: sql
+language: postgresql
+tabWidth: 2
+useTabs: false
+printWidth: 120
+
+# SQL formatting rules (aligned with SQLFluff)
+keywordCase: upper
+dataTypeCase: upper
+functionCase: upper
+identifierCase: lower
+
+# Spacing and layout (match SQLFluff LT01 rule)
+# Ensure space between keywords and parentheses: "ENUM (" not "ENUM("
+expressionWidth: 50
+linesBetweenQueries: 2

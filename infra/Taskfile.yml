@@ -1,0 +1,553 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+version: "3"
+
+vars:
+  # Component versions
+  REDIS_VERSION: "8-alpine"
+  TEMPORAL_VERSION: "1.29.1"
+  KRATOS_VERSION: "v1.3.1"
+  KETO_VERSION: "v0.14.0"
+  OATHKEEPER_VERSION: "v0.40.9"
+  VAULT_VERSION: "1.21.0"
+
+  # Colors
+  GREEN: \033[0;32m
+  YELLOW: \033[0;33m
+  BLUE: \033[0;34m
+  RED: \033[0;31m
+  NC: \033[0m
+
+tasks:
+  # === Bootstrap ===
+
+  bootstrap:dev:
+    desc: "Bootstrap all infrastructure for development"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Bootstrapping infrastructure...\n"
+      - task: redis:up
+      - task: temporal:up
+      - task: vault:bootstrap:dev
+      - task: vault:secrets:seed
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Loading Kratos secrets from Vault...\n"
+      - docker compose up -d kratos-secrets
+      - docker compose wait kratos-secrets
+      - task: kratos:migrate
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Kratos, Keto, Oathkeeper...\n"
+      - docker compose up -d kratos keto oathkeeper
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Waiting for Ory services to be healthy...\n"
+      - |
+        max_wait=60
+        elapsed=0
+        while [ $elapsed -lt $max_wait ]; do
+          kratos_healthy=$(docker compose ps kratos --format json | jq -r 'select(.Health=="healthy") | .Service' | wc -l | tr -d ' ')
+          keto_healthy=$(docker compose ps keto --format json | jq -r 'select(.Health=="healthy") | .Service' | wc -l | tr -d ' ')
+          if [ "$kratos_healthy" = "1" ] && [ "$keto_healthy" = "1" ]; then
+            break
+          fi
+          sleep 2
+          elapsed=$((elapsed + 2))
+        done
+      - task: kratos:seed
+      - task: keto:seed
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Infrastructure bootstrap complete\n"
+
+  # === Redis ===
+
+  redis:up:
+    desc: "Start Redis and Redis Commander"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Redis...\n"
+      - docker compose up -d redis
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Redis started\n"
+
+  redis:down:
+    desc: "Stop Redis"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Stopping Redis...\n"
+      - docker compose stop redis redis-commander
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Redis stopped\n"
+
+  redis:logs:
+    desc: "Show Redis logs"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose logs -f {{.CLI_ARGS}} redis
+
+  redis:cli:
+    desc: "Connect to Redis CLI"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Connecting to Redis CLI...\n"
+      - docker compose exec redis redis-cli -a ${REDIS_PASSWORD}
+
+  redis:destroy:
+    desc: "Remove Redis containers and data"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing Redis containers...\n"
+      - docker compose stop redis redis-commander 2>/dev/null || true
+      - docker compose rm -f -v redis redis-commander 2>/dev/null || true
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Redis cleanup complete\n"
+
+  # === Temporal ===
+
+  temporal:up:
+    desc: "Start Temporal and Temporal UI"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Starting Temporal...\n"
+      - docker compose up -d temporal temporal-ui
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Temporal started\n"
+
+  temporal:down:
+    desc: "Stop Temporal"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Stopping Temporal...\n"
+      - docker compose stop temporal temporal-ui
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Temporal stopped\n"
+
+  temporal:logs:
+    desc: "Show Temporal logs"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose logs -f {{.CLI_ARGS}} temporal
+
+  temporal:ui:
+    desc: "Open Temporal UI in browser"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Opening Temporal UI at http://localhost:8088\n"
+      - open http://localhost:8088 || xdg-open http://localhost:8088 || echo "Please open http://localhost:8088"
+
+  temporal:destroy:
+    desc: "Remove Temporal containers and data"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing Temporal containers...\n"
+      - docker compose stop temporal temporal-ui 2>/dev/null || true
+      - docker compose rm -f -v temporal temporal-ui 2>/dev/null || true
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Temporal cleanup complete\n"
+
+  # === Kratos (Identity) ===
+
+  kratos:migrate:
+    desc: "Run Kratos database migrations"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running Kratos migrations...\n"
+      - docker compose run --rm kratos-migrate
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Kratos migrations complete\n"
+
+  kratos:seed:
+    desc: "Seed Kratos with dev identities"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/kratos"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Seeding Kratos identities...\n"
+      - |
+        for seed in seeds/*.json; do
+          printf "  - Importing $(basename $seed)...\n"
+          curl -s -X POST http://localhost:4434/admin/identities \
+            -H "Content-Type: application/json" \
+            -d @"$seed" > /dev/null 2>&1 || true
+        done
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Kratos seeding complete\n"
+
+  kratos:identities:clear:
+    desc: "Clear all test identities (preserves admin@nexus.local)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/kratos"
+    cmds:
+      - |
+        printf "{{.YELLOW}}[WARN]{{.NC}} Clearing all test identities...\n"
+      - chmod +x clear-identities.sh
+      - ./clear-identities.sh
+
+  kratos:identities:list:
+    desc: "List all Kratos identities"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose exec kratos kratos identities list --endpoint http://localhost:4434
+
+  kratos:identities:get:
+    desc: "Get identity by ID (usage: task infra:kratos:identities:get ID=<uuid>)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose exec kratos kratos identities get {{.ID}} --endpoint http://localhost:4434
+    requires:
+      vars:
+        - ID
+
+  kratos:identities:delete:
+    desc: "Delete identity by ID (usage: task infra:kratos:identities:delete ID=<uuid>)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    prompt: "This will permanently delete the identity. Continue?"
+    cmds:
+      - docker compose exec kratos kratos identities delete {{.ID}} --endpoint http://localhost:4434
+    requires:
+      vars:
+        - ID
+
+  kratos:logs:
+    desc: "Show Kratos logs"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose logs -f {{.CLI_ARGS}} kratos
+
+  kratos:validate:
+    desc: "Validate Kratos configuration"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/kratos"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Validating Kratos config...\n"
+      - docker run --rm -v $(pwd):/config oryd/kratos:{{.KRATOS_VERSION}} validate /config/kratos.yml
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Kratos config is valid\n"
+
+  # === Keto (Permissions) ===
+
+  keto:migrate:
+    desc: "Run Keto database migrations"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Running Keto migrations...\n"
+      - docker compose run --rm keto-migrate
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Keto migrations complete\n"
+
+  keto:seed:
+    desc: "Seed Keto with dev permissions"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/keto"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Seeding Keto permissions...\n"
+      - chmod +x seed-keto-tuples.sh
+      - ./seed-keto-tuples.sh
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Keto seeding complete\n"
+
+  keto:tuples:clear:
+    desc: "Clear all permission tuples from Keto"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/keto"
+    cmds:
+      - |
+        printf "{{.YELLOW}}[WARN]{{.NC}} Clearing all permission tuples...\n"
+      - chmod +x clear-tuples.sh
+      - ./clear-tuples.sh
+
+  keto:check:
+    desc: "Check permission (usage: task infra:keto:check -- <namespace> <object> <relation> <subject>)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose exec keto keto check {{.CLI_ARGS}}
+
+  keto:expand:
+    desc: "Expand subject set (usage: task infra:keto:expand -- <namespace> <object> <relation>)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose exec keto keto expand {{.CLI_ARGS}}
+
+  keto:relationtuple:create:
+    desc: "Create relation tuple (usage: task infra:keto:relationtuple:create -- args)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose exec keto keto relationtuple create {{.CLI_ARGS}}
+
+  keto:relationtuple:delete:
+    desc: "Delete relation tuple (usage: task infra:keto:relationtuple:delete -- args)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose exec keto keto relationtuple delete {{.CLI_ARGS}}
+
+  keto:relationtuple:list:
+    desc: "List relation tuples (usage: task infra:keto:relationtuple:list -- namespace)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose exec keto keto relationtuple get {{.CLI_ARGS}}
+
+  keto:logs:
+    desc: "Show Keto logs"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose logs -f {{.CLI_ARGS}} keto keto-read keto-write
+
+  # === Oathkeeper (API Gateway) ===
+
+  oathkeeper:logs:
+    desc: "Show Oathkeeper logs"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose logs -f {{.CLI_ARGS}} oathkeeper
+
+  oathkeeper:validate:
+    desc: "Validate Oathkeeper configuration"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/oathkeeper"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Validating Oathkeeper config...\n"
+      - docker run --rm -v $(pwd):/config oryd/oathkeeper:{{.OATHKEEPER_VERSION}} validate --config /config/oathkeeper.yml
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Oathkeeper config is valid\n"
+
+  # === Vault (Secrets) ===
+
+  vault:bootstrap:dev:
+    desc: "Bootstrap Vault for development"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/vault"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Bootstrapping Vault...\n"
+      - ./bootstrap-dev.sh
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Vault bootstrap complete\n"
+
+  vault:secrets:seed:
+    desc: "Seed Vault with dev secrets"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/vault"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Seeding Vault secrets...\n"
+      - ./seed-dev-secrets.sh
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Vault secrets seeded\n"
+
+  vault:secrets:verify:
+    desc: "Verify Vault secrets"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/vault"
+    cmds:
+      - ./verify-shared-secrets.sh
+
+  vault:secrets:rotate:
+    desc: "Rotate shared secrets in Vault"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/vault"
+    prompt: "This will rotate all shared secrets. Continue?"
+    cmds:
+      - ./rotate-shared-secrets.sh
+
+  vault:policies:init:
+    desc: "Initialize Vault policies (production only)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra/vault"
+    env:
+      VAULT_TOKEN: root
+      VAULT_ADDR: http://vault:8200
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Initializing Vault policies...\n"
+      - ./init-policies.sh
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Vault policies initialized\n"
+
+  vault:status:
+    desc: "Show Vault status"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose exec vault vault status
+
+  vault:logs:
+    desc: "Show Vault logs"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose logs -f {{.CLI_ARGS}} vault
+
+  vault:destroy:
+    desc: "Remove Vault container and data (WARNING: all secrets lost!)"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.RED}}[WARN]{{.NC}} Removing Vault will permanently delete ALL secrets!\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing Vault and secrets containers...\n"
+      - docker compose stop vault kratos-secrets 2>/dev/null || true
+      - docker compose rm -f -v vault kratos-secrets 2>/dev/null || true
+      - docker volume rm nexus_kratos_secrets 2>/dev/null || true
+      - rm -rf vault/.dev 2>/dev/null || true
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Vault cleanup complete\n"
+
+  # === Dependencies ===
+
+  deps:install:
+    desc: "Install infrastructure tooling dependencies (Prettier, etc.)"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Installing infrastructure dependencies...\n"
+      - npm install
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Dependencies installed\n"
+
+  deps:update:
+    desc: "Update infrastructure dependencies"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Updating infrastructure dependencies...\n"
+      - npm update
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Dependencies updated\n"
+
+  # === Linting & Formatting ===
+
+  lint:
+    desc: "Lint all infrastructure configuration files"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Linting infrastructure configs...\n"
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking YAML/JSON formatting with Prettier...\n"
+      - npx prettier --check "**/*.{yml,yaml,json,jsonnet,ts}"
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All configs are properly formatted\n"
+
+  lint:fix:
+    desc: "Lint and auto-fix all infrastructure configuration files"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Auto-fixing infrastructure configs...\n"
+      - npx prettier --write "**/*.{yml,yaml,json,jsonnet,ts}"
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All configs formatted\n"
+
+  fmt:
+    desc: "Format all infrastructure configuration files"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Formatting infrastructure configs...\n"
+      - npx prettier --write "**/*.{yml,yaml,json,jsonnet,ts}"
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All configs formatted\n"
+
+  fmt:check:
+    desc: "Check formatting without modifying files"
+    silent: true
+    dir: "{{.ROOT_DIR}}/infra"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Checking formatting...\n"
+      - npx prettier --check "**/*.{yml,yaml,json,jsonnet,ts}"
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Formatting check passed\n"
+
+  validate:
+    desc: "Validate all infrastructure configurations"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Validating all infrastructure configurations...\n"
+      - task: kratos:validate
+      - task: oathkeeper:validate
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} All configurations are valid\n"
+
+  # === Traefik ===
+
+  traefik:logs:
+    desc: "Show Traefik logs"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose logs -f {{.CLI_ARGS}} traefik
+
+  traefik:dashboard:
+    desc: "Open Traefik dashboard in browser"
+    silent: true
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Opening Traefik dashboard at http://localhost:8080\n"
+      - open http://localhost:8080 || xdg-open http://localhost:8080 || echo "Please open http://localhost:8080"
+
+  # === Global Operations ===
+
+  logs:
+    desc: "Show logs from all infrastructure services"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - docker compose logs -f {{.CLI_ARGS}} redis temporal vault kratos keto oathkeeper traefik
+
+  destroy:
+    desc: "Remove all infrastructure containers and data"
+    silent: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Removing all infrastructure containers...\n"
+      - docker compose stop redis temporal vault kratos keto oathkeeper traefik redis-commander temporal-ui mailhog kratos-ui adminer kratos-secrets kratos-migrate 2>/dev/null || true
+      - docker compose rm -f -v redis temporal vault kratos keto oathkeeper traefik redis-commander temporal-ui mailhog kratos-ui adminer kratos-secrets kratos-migrate 2>/dev/null || true
+      - docker volume rm nexus_kratos_secrets 2>/dev/null || true
+      - rm -rf vault/.dev 2>/dev/null || true
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Infrastructure cleanup complete\n"

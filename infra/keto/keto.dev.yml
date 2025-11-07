@@ -1,0 +1,61 @@
+# Copyright 2025 Andrew Vasilyev
+# SPDX-License-Identifier: Apache-2.0
+
+# Ory Keto Configuration - DEVELOPMENT
+# For production, use keto.prod.yml with stricter CORS and logging
+
+version: v0.14.0
+
+# DSN configured via DSN env var
+dsn: memory
+
+serve:
+  read:
+    host: 0.0.0.0
+    port: 4466
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://nexus.local
+        - http://api.nexus.local
+        - http://oathkeeper:4455
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+      allowed_headers:
+        - Authorization
+        - Content-Type
+      exposed_headers:
+        - Content-Type
+      allow_credentials: true
+  write:
+    host: 0.0.0.0
+    port: 4467
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://nexus.local
+        - http://api.nexus.local
+        - http://oathkeeper:4455
+      allowed_methods:
+        - POST
+        - GET
+        - PUT
+        - PATCH
+        - DELETE
+      allowed_headers:
+        - Authorization
+        - Content-Type
+      exposed_headers:
+        - Content-Type
+      allow_credentials: true
+
+namespaces:
+  location: file:///etc/config/keto/namespaces.ts
+
+log:
+  level: debug
+  format: text

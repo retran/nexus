@@ -10,7 +10,7 @@
 *.ts text eol=lf
 *.jsx text eol=lf
 *.tsx text eol=lf
-*.proto text eol=lf
+*.graphql text eol=lf
 *.sql text eol=lf
 *.json text eol=lf
 *.yaml text eol=lf
@@ -66,6 +66,6 @@ pnpm-lock.yaml -text
 *.go diff=go
 *.js diff=javascript
 *.ts diff=typescript
-*.proto diff=proto
+*.graphql diff=graphql
 *.sql diff=sql
 *.md diff=markdown
