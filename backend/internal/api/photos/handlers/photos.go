@@ -33,6 +33,7 @@ type PhotoResponse struct {
 	ImageURL         string `json:"imageUrl"`
 	PhotographerName string `json:"photographerName"`
 	PhotographerLink string `json:"photographerLink"`
+	Source           string `json:"source"`
 }
 
 // PhotosResponse represents the response containing photos for both themes.
@@ -128,6 +129,7 @@ func getFallbackPhoto() *PhotoResponse {
 		ImageURL:         "https://picsum.photos/3840/2160",
 		PhotographerName: "Picsum",
 		PhotographerLink: "https://picsum.photos/",
+		Source:           "picsum",
 	}
 }
 
@@ -250,6 +252,7 @@ func parseUnsplashResponse(body []byte) ([]PhotoResponse, error) {
 				ImageURL:         p.URLs.Regular + "&w=3840&h=2160&fit=crop",
 				PhotographerName: p.User.Name,
 				PhotographerLink: p.User.Links.HTML,
+				Source:           "unsplash",
 			}
 		}
 		return res, nil
@@ -263,5 +266,6 @@ func parseUnsplashResponse(body []byte) ([]PhotoResponse, error) {
 		ImageURL:         single.URLs.Regular + "&w=3840&h=2160&fit=crop",
 		PhotographerName: single.User.Name,
 		PhotographerLink: single.User.Links.HTML,
+		Source:           "unsplash",
 	}}, nil
 }
