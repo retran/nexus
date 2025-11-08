@@ -18,6 +18,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
+	"github.com/retran/nexus/backend/internal/api/common/middleware"
 	"github.com/retran/nexus/backend/internal/api/photos/handlers"
 	"github.com/retran/nexus/backend/internal/config"
 	"github.com/retran/nexus/backend/internal/tracing"
@@ -94,6 +95,8 @@ func healthHandler(w http.ResponseWriter, _ *http.Request) {
 }
 
 func newHTTPServer(port string, handler http.Handler) *http.Server {
+	// Add CORS middleware
+	handler = middleware.CORS([]string{"http://localhost:3000", "http://nexus.local", "http://api.nexus.local"})(handler)
 	// Wrap handler with OpenTelemetry middleware for distributed tracing
 	wrappedHandler := otelhttp.NewHandler(handler, "nexus-photos")
 

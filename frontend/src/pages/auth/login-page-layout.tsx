@@ -1,5 +1,5 @@
 import React from 'react';
-import { DynamicBackground } from '@/components/layout/dynamic-background';
+import { DynamicBackground } from '@/components/auth/dynamic-background';
 import { ThemeToggle } from '@/components/toggle/theme-toggle';
 import { LanguageToggle } from '@/components/toggle/language-toggle';
 import { GlassPanel } from '@/components/auth/glass-panel';
