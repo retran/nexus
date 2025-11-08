@@ -229,12 +229,8 @@ else
 fi
 
 # Photos service Unsplash API key (optional, may be empty)
-if [ -n "${UNSPLASH_ACCESS_KEY:-}" ]; then
-  put_secret "services/photos/unsplash" \
-    access_key="${UNSPLASH_ACCESS_KEY}"
-  echo "[INFO] Seeded kv/services/photos/unsplash"
-else
-  echo "[INFO] Skipping Unsplash API key (not provided)"
-fi
+# Always create the secret, even if empty
+vault_exec "${ROOT_TOKEN}" vault kv put "kv/services/photos/unsplash" access_key="${UNSPLASH_ACCESS_KEY:-}" >/dev/null
+echo "[INFO] Seeded kv/services/photos/unsplash"
 
 echo "[SUCCESS] Vault dev secrets seeded from ${ENV_FILE}"

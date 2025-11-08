@@ -20,6 +20,9 @@ tasks:
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Generating .env file...\n"
       - ./scripts/generate-env.sh
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} .env file generated successfully!\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Run 'task up' to complete the environment setup\n"
     preconditions:
       - sh: test -f .env.example
         msg: |
@@ -76,7 +79,7 @@ tasks:
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Pre-commit hooks installed\n"
 
-  setup:bootstrap:
+  up:
     desc: "Bootstrap ALL services for development (one-command setup)"
     silent: true
     cmds:
@@ -84,8 +87,9 @@ tasks:
         printf "{{.BLUE}}[INFO]{{.NC}} Bootstrapping entire Nexus development environment...\n"
       - |
         if [ ! -f .env ]; then
-          printf "{{.YELLOW}}[WARN]{{.NC}} .env file not found, generating...\n"
-          ./scripts/generate-env.sh
+          printf "{{.YELLOW}}[WARN]{{.NC}} .env file not found\n"
+          printf "{{.BLUE}}[INFO]{{.NC}} Run 'task setup:env' to generate environment configuration\n"
+          exit 1
         fi
       - |
         printf "{{.BLUE}}[INFO]{{.NC}} Step 1/6: Infrastructure services (Vault, Redis, Temporal, Ory)...\n"
@@ -112,25 +116,26 @@ tasks:
   # DEV - Daily development commands
   # ============================================================================
 
-  dev:up:
-    desc: "Start ALL services in Docker"
+  down:
+    desc: "⚠️  Stop and destroy ALL services, volumes, and data - IRREVERSIBLE!"
     silent: true
+    prompt: "This will DESTROY ALL containers, volumes, and data across the entire stack. Continue?"
     cmds:
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Starting all services in Docker...\n"
-      - docker compose up -d
+        printf "{{.RED}}[WARN]{{.NC}} Stopping and destroying entire Nexus stack...\n"
       - |
-        printf "{{.GREEN}}[OK]{{.NC}} All services started\n"
-
-  dev:stop:
-    desc: "Stop all services"
-    silent: true
-    cmds:
+        printf "{{.BLUE}}[INFO]{{.NC}} Stopping and removing all containers with volumes...\n"
+      - docker compose down -v --remove-orphans
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Stopping all services...\n"
-      - docker compose stop
+        printf "{{.BLUE}}[INFO]{{.NC}} Cleaning backend build artifacts...\n"
+      - task: backend:clean
       - |
-        printf "{{.GREEN}}[OK]{{.NC}} All services stopped\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Cleaning frontend build artifacts...\n"
+      - task: frontend:clean
+      - |
+        printf "{{.GREEN}}[OK]{{.NC}} Complete destruction finished\n"
+      - |
+        printf "{{.YELLOW}}[TIP]{{.NC}} Run 'task up' to start fresh\n"
 
   # ============================================================================
   # TOOLS - Admin Tools Profile (Adminer, Redis Commander, etc.)
@@ -349,14 +354,13 @@ tasks:
         printf "{{.BLUE}}═══════════════════════════════════════════════════════════════{{.NC}}\n"
         printf "\n"
         printf "{{.GREEN}}SETUP (First-time):{{.NC}}\n"
-        printf "  task setup:bootstrap  - Bootstrap entire dev environment (one-command)\n"
         printf "  task setup:env        - Generate .env with secure secrets\n"
         printf "  task setup:hosts      - Add *.nexus.local to /etc/hosts\n"
         printf "  task setup:hooks      - Install pre-commit Git hooks\n"
         printf "\n"
         printf "{{.GREEN}}DEV (Daily):{{.NC}}\n"
-        printf "  task dev:up           - Start ALL services\n"
-        printf "  task dev:stop         - Stop all services\n"
+        printf "  task up               - Bootstrap entire dev environment (one-command)\n"
+        printf "  task down             - Stop and destroy all services\n"
         printf "  task dev:reset        - Fast reset: clear all data (keeps containers running)\n"
         printf "  task dev:logs         - Show logs from all services\n"
         printf "  task dev:status       - Show service status\n"
@@ -377,7 +381,6 @@ tasks:
         printf "\n"
         printf "{{.GREEN}}CLEANUP:{{.NC}}\n"
         printf "  task clean            - Clean build artifacts (safe)\n"
-        printf "  task destroy          - Destroy everything (IRREVERSIBLE!)\n"
         printf "\n"
         printf "{{.GREEN}}COMPONENT HELP:{{.NC}}\n"
         printf "  task dev:help:backend     - Backend commands\n"
@@ -603,27 +606,6 @@ tasks:
       - task: frontend:clean
       - |
         printf "{{.GREEN}}[OK]{{.NC}} Cleanup complete\n"
-
-  destroy:
-    desc: "⚠️  DESTROY EVERYTHING (containers, volumes, data) - IRREVERSIBLE!"
-    silent: true
-    prompt: "This will DESTROY ALL containers, volumes, and data across the entire stack. Continue?"
-    cmds:
-      - |
-        printf "{{.RED}}[WARN]{{.NC}} Destroying entire Nexus stack...\n"
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Stopping and removing all containers with volumes...\n"
-      - docker compose down -v --remove-orphans
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Cleaning backend build artifacts...\n"
-      - task: backend:clean
-      - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Cleaning frontend build artifacts...\n"
-      - task: frontend:clean
-      - |
-        printf "{{.GREEN}}[OK]{{.NC}} Complete destruction finished\n"
-      - |
-        printf "{{.YELLOW}}[TIP]{{.NC}} Run 'task setup:bootstrap' to start fresh\n"
 
   default:
     desc: "Show available commands"

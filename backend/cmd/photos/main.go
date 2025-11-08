@@ -78,7 +78,7 @@ func run() error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", healthHandler)
-	mux.HandleFunc("GET /api/photos", photosHandler.GetPhotos)
+	mux.HandleFunc("GET /photos", photosHandler.GetRandomPhoto)
 
 	server := newHTTPServer(port, mux)
 	log.Printf("Starting Photos API on port %s", port)

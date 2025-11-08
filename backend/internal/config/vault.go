@@ -142,6 +142,10 @@ func (vc *VaultClient) GetOathkeeperSecret(ctx context.Context) (string, error) 
 }
 
 // GetUnsplashAccessKey retrieves the Unsplash access key from service secrets.
+// Returns empty string if not found or empty (optional secret).
 func (vc *VaultClient) GetUnsplashAccessKey(ctx context.Context) (string, error) {
-	return vc.GetServiceSecret(ctx, "photos/unsplash", "access_key")
+	if value, err := vc.GetServiceSecret(ctx, "photos/unsplash", "access_key"); err == nil {
+		return value, nil
+	}
+	return "", nil
 }

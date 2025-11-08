@@ -205,7 +205,7 @@ services:
       - "prometheus.io/port=9091"
       - "prometheus.io/path=/metrics"
       - "traefik.enable=true"
-      - "traefik.http.routers.photos.rule=Host(`api.nexus.local`) && Path(`/api/photos`)"
+      - "traefik.http.routers.photos.rule=Host(`api.nexus.local`) && Path(`/photos`)"
       - "traefik.http.routers.photos.entrypoints=web"
       - "traefik.http.services.photos.loadbalancer.server.port=8084"
     healthcheck:

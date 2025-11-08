@@ -76,7 +76,7 @@
 # Photos API - Public access (no authentication required)
 - id: "public:photos"
   match:
-    url: "<http|https>://api.nexus.local/api/photos"
+    url: "<http|https>://api.nexus.local/photos"
     methods:
       - GET
   authenticators:
