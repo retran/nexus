@@ -14,19 +14,19 @@ export const EmailLoginForm = () => {
 
   const glassLabelStyle = cn('text-sm text-black/90 dark:text-white/90');
 
+  const glassButtonStyle = cn(
+    'flex h-10 w-full items-center justify-center gap-2',
+    'rounded-lg border border-violet-500/30 dark:border-violet-400/30',
+    'bg-violet-600/80 backdrop-blur-sm dark:bg-violet-500/70',
+    'font-semibold text-white/90 hover:text-white/90',
+    'hover:bg-violet-600 dark:hover:bg-violet-500',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400'
+  );
+
   const glassCheckboxStyle = cn(
     'border-white/10 bg-white/20 dark:bg-black/20',
     'data-[state=checked]:border-white/30 data-[state=checked]:bg-white/30',
     'focus-visible:ring-1 focus-visible:ring-black/30 dark:focus-visible:ring-white/30'
-  );
-
-  const glassButtonStyle = cn(
-    'flex h-10 w-full items-center justify-center gap-2',
-    'rounded-lg border border-white/10',
-    'bg-white/20 dark:bg-black/20',
-    'font-semibold text-black/90 dark:text-white/90',
-    'hover:bg-white/30 hover:text-black dark:hover:bg-black/30 dark:hover:text-white/90',
-    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-black/30 dark:focus-visible:ring-white/30'
   );
 
   return (

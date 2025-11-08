@@ -74,7 +74,7 @@ export const DynamicBackground: React.FC = () => {
                   href={currentPhoto.photographerLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-semibold underline decoration-1 underline-offset-2 transition-colors hover:text-white/80"
+                  className="font-semibold underline decoration-1 underline-offset-2 transition-colors hover:text-black dark:hover:text-white"
                 >
                   {currentPhoto.photographerName}
                 </a>
@@ -83,7 +83,7 @@ export const DynamicBackground: React.FC = () => {
                   href="https://unsplash.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline decoration-1 underline-offset-2 opacity-90 transition-colors hover:text-white/80"
+                  className="underline decoration-1 underline-offset-2 opacity-90 transition-colors hover:text-black dark:hover:text-white"
                 >
                   Unsplash
                 </a>
@@ -95,7 +95,7 @@ export const DynamicBackground: React.FC = () => {
                   href="https://picsum.photos"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline decoration-1 underline-offset-2 opacity-90 transition-colors hover:text-white/80"
+                  className="underline decoration-1 underline-offset-2 opacity-90 transition-colors hover:text-black dark:hover:text-white"
                 >
                   Picsum
                 </a>
