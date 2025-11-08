@@ -140,3 +140,8 @@ func (vc *VaultClient) GetWebhookSecret(ctx context.Context) (string, error) {
 func (vc *VaultClient) GetOathkeeperSecret(ctx context.Context) (string, error) {
 	return vc.GetSharedSecret(ctx, "oathkeeper")
 }
+
+// GetUnsplashAccessKey retrieves the Unsplash access key from service secrets.
+func (vc *VaultClient) GetUnsplashAccessKey(ctx context.Context) (string, error) {
+	return vc.GetServiceSecret(ctx, "photos/unsplash", "access_key")
+}

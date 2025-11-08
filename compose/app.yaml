@@ -173,13 +173,55 @@ services:
       retries: 3
       start_period: 30s
 
+  photos:
+    build:
+      context: ../backend
+      dockerfile: docker/Dockerfile.photos.dev
+    restart: always
+    ports:
+      - "8084:8084" # Photos API
+      - "9094:9091" # Prometheus metrics (mapped to 9094 on host to avoid conflicts)
+      - "2349:2345" # Delve debug port
+    volumes:
+      - ../backend:/app
+      - /app/bin
+      - /app/tmp
+    env_file: ../.env
+    environment:
+      # Service identification
+      - SERVICE_NAME=nexus-photos
+      - SERVICE_VERSION=dev
+      # Air hot-reload configuration
+      - SERVER_PORT=8084
+      - AIR_PROXY_PORT=8084
+      - AIR_BUILD_DIR=/app/tmp
+      # OpenTelemetry configuration
+      - OTEL_EXPORTER_OTLP_ENDPOINT=alloy:4317
+      # Vault configuration
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9091"
+      - "prometheus.io/path=/metrics"
+      - "traefik.enable=true"
+      - "traefik.http.routers.photos.rule=Host(`api.nexus.local`) && Path(`/api/photos`)"
+      - "traefik.http.routers.photos.entrypoints=web"
+      - "traefik.http.services.photos.loadbalancer.server.port=8084"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8084/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
   worker:
     build:
       context: ../backend
       dockerfile: docker/Dockerfile.worker.dev
     restart: always
     ports:
-      - "9094:9091" # Prometheus metrics (mapped to 9094 on host to avoid conflicts)
+      - "9096:9091" # Prometheus metrics (mapped to 9096 on host to avoid conflicts)
       - "2348:2345" # Delve debug port
     volumes:
       - ../backend:/app

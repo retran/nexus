@@ -73,6 +73,21 @@
                 accept:
                   - text/html
 
+# Photos API - Public access (no authentication required)
+- id: "public:photos"
+  match:
+    url: "<http|https>://api.nexus.local/api/photos"
+    methods:
+      - GET
+  authenticators:
+    - handler: anonymous
+  authorizer:
+    handler: allow
+  mutators:
+    - handler: noop
+  errors:
+    - handler: json
+
 # Frontend - Temporary anonymous access (TODO: integrate Kratos auth in React app)
 - id: "public:frontend"
   match:

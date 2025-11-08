@@ -228,4 +228,13 @@ else
   echo "[INFO] Skipping Google OIDC (credentials not provided)"
 fi
 
+# Photos service Unsplash API key (optional, may be empty)
+if [ -n "${UNSPLASH_ACCESS_KEY:-}" ]; then
+  put_secret "services/photos/unsplash" \
+    access_key="${UNSPLASH_ACCESS_KEY}"
+  echo "[INFO] Seeded kv/services/photos/unsplash"
+else
+  echo "[INFO] Skipping Unsplash API key (not provided)"
+fi
+
 echo "[SUCCESS] Vault dev secrets seeded from ${ENV_FILE}"
