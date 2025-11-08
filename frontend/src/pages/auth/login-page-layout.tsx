@@ -1,7 +1,7 @@
 import React from 'react';
 import { DynamicBackground } from '@/components/layout/dynamic-background';
-import { ThemeToggle } from '@/components/layout/theme-toggle';
-import { LanguageToggle } from '@/components/layout/language-toggle';
+import { ThemeToggle } from '@/components/toggle/theme-toggle';
+import { LanguageToggle } from '@/components/toggle/language-toggle';
 import { GlassPanel } from '@/components/auth/glass-panel';
 
 import { SocialLoginButton } from '@/components/auth/social-login-button';

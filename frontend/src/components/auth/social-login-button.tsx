@@ -16,14 +16,11 @@ export const SocialLoginButton: React.FC<SocialLoginButtonProps> = ({
   onClick,
   className,
 }) => {
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const iconSrc = provider === 'google' ? googleIcon : appleIcon;
   const label =
     provider === 'google' ? 'Sign in with Google' : 'Sign in with Apple';
-  const isDark =
-    theme === 'dark' ||
-    (theme === 'system' &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const isDark = resolvedTheme === 'dark';
   const iconClass =
     'h-4 w-4 shrink-0 object-contain align-middle' +
     (provider === 'apple' ? ' -mt-0.5' : '');
