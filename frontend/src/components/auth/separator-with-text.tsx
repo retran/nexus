@@ -2,6 +2,11 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { useTheme } from '@/components/themes';
+import {
+  glassTextSecondary,
+  glassSeparator,
+  glassSeparatorText,
+} from '@/lib/glass-styles';
 
 interface SeparatorWithTextProps {
   text: string;
@@ -15,7 +20,7 @@ export const SeparatorWithText: React.FC<SeparatorWithTextProps> = ({
   const { resolvedTheme } = useTheme();
 
   return (
-    <div className={cn('relative w-full max-w-[280px]', className)}>
+    <div className={cn(glassSeparator, className)}>
       <div className="absolute inset-0 flex items-center">
         <Separator
           className={cn(
@@ -24,13 +29,7 @@ export const SeparatorWithText: React.FC<SeparatorWithTextProps> = ({
         />
       </div>
       <div className="relative flex justify-center text-xs uppercase">
-        <span
-          className={cn(
-            'px-2',
-            'bg-white/10 dark:bg-black/10',
-            'text-black/60 dark:text-white/60'
-          )}
-        >
+        <span className={cn(glassSeparatorText, glassTextSecondary)}>
           {text}
         </span>
       </div>

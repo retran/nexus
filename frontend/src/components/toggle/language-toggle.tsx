@@ -3,6 +3,8 @@
 import * as React from 'react';
 import { Languages } from 'lucide-react';
 import { ToggleDropdown } from '@/components/toggle/toggle-dropdown';
+import { cn } from '@/lib/utils';
+import { glassText } from '@/lib/glass-styles';
 
 const languages = [
   { code: 'en', label: 'English' },
@@ -12,9 +14,7 @@ const languages = [
 export const LanguageToggle: React.FC = () => {
   const [language, setLanguage] = React.useState('en');
 
-  const triggerChildren = (
-    <Languages className="h-4 w-4 text-black/90 dark:text-white/90" />
-  );
+  const triggerChildren = <Languages className={cn('h-4 w-4', glassText)} />;
 
   return (
     <ToggleDropdown

@@ -1,4 +1,10 @@
 import { cn } from '@/lib/utils';
+import {
+  glassText,
+  glassHeader,
+  glassHeaderIcon,
+  glassHeaderTitle,
+} from '@/lib/glass-styles';
 import { House } from 'lucide-react';
 
 interface HeaderProps {
@@ -7,19 +13,12 @@ interface HeaderProps {
 
 export const Header = ({ className }: HeaderProps) => {
   return (
-    <div
-      className={cn(
-        'flex flex-col items-center justify-center space-y-3',
-        className
-      )}
-    >
+    <div className={cn(glassHeader, className)}>
       <div className={cn('flex items-center justify-center')}>
-        <House className="h-16 w-16 text-black/90 dark:text-white/90" />
+        <House className={cn(glassHeaderIcon, glassText)} />
       </div>
 
-      <h1 className="text-2xl font-semibold text-black/90 dark:text-white/90">
-        Nexus
-      </h1>
+      <h1 className={cn(glassHeaderTitle, glassText)}>Nexus</h1>
     </div>
   );
 };

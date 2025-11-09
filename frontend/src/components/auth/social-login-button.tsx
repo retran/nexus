@@ -1,20 +1,18 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { useTheme } from '@/components/themes';
+import { secondaryCTA } from '@/lib/glass-styles';
 import googleIcon from '@/assets/google.svg';
 import appleIcon from '@/assets/apple.svg';
+import { useTheme } from '@/components/themes';
 
 interface SocialLoginButtonProps {
   provider: 'google' | 'apple';
   onClick?: () => void;
-  className?: string;
 }
 
 export const SocialLoginButton: React.FC<SocialLoginButtonProps> = ({
   provider,
   onClick,
-  className,
 }) => {
   const { resolvedTheme } = useTheme();
   const iconSrc = provider === 'google' ? googleIcon : appleIcon;
@@ -25,19 +23,7 @@ export const SocialLoginButton: React.FC<SocialLoginButtonProps> = ({
     'h-4 w-4 shrink-0 object-contain align-middle' +
     (provider === 'apple' ? ' -mt-0.5' : '');
   return (
-    <Button
-      variant="ghost"
-      onClick={onClick}
-      className={cn(
-        'flex h-10 w-full max-w-[280px] items-center justify-center gap-2',
-        'rounded-lg border border-white/10',
-        'bg-white/20 dark:bg-black/20',
-        'font-semibold text-black/90 dark:text-white/90',
-        'hover:bg-white/30 hover:text-black/90 dark:hover:bg-black/30 dark:hover:text-white/90',
-        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
-        className
-      )}
-    >
+    <Button variant="ghost" onClick={onClick} className={secondaryCTA}>
       <img
         src={iconSrc}
         alt={`${provider} icon`}
