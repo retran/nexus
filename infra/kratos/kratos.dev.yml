@@ -11,7 +11,7 @@ dsn: memory
 
 serve:
   public:
-    base_url: http://auth.nexus.local
+    base_url: http://auth.nexus.local/
     cors:
       enabled: true
       allowed_origins:

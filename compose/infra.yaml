@@ -184,9 +184,9 @@ services:
         kratos serve -c /etc/config/kratos/kratos.dev.yml --watch-courier --dev
     labels:
       - "traefik.enable=true"
-      # Kratos public API (self-service endpoints)
       - "traefik.http.routers.kratos-api.rule=Host(`auth.nexus.local`) && PathPrefix(`/self-service`)"
       - "traefik.http.routers.kratos-api.entrypoints=web"
+      - "traefik.http.routers.kratos-api.service=kratos-api"
       - "traefik.http.services.kratos-api.loadbalancer.server.port=4433"
       - "traefik.http.routers.kratos-api.priority=200"
     depends_on:

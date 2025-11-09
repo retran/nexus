@@ -92,29 +92,36 @@ tasks:
           exit 1
         fi
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 1/6: Infrastructure services (Vault, Redis, Temporal, Ory)...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 1/7: Infrastructure services (Vault, Redis, Temporal, Ory)...\n"
       - task: infra:bootstrap:dev
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 2/6: PostgreSQL (migrations + seeds)...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 2/7: PostgreSQL (migrations + seeds)...\n"
       - task: db:bootstrap:dev
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 3/6: Infrastructure tooling dependencies...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 3/7: Infrastructure tooling dependencies...\n"
       - task: infra:deps:install
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 4/6: Backend dependencies...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 4/7: Backend dependencies...\n"
       - task: backend:deps:install
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 5/6: Frontend dependencies...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 5/7: Frontend dependencies...\n"
       - task: frontend:deps:install
       - |
-        printf "{{.BLUE}}[INFO]{{.NC}} Step 6/6: Starting all application services...\n"
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 6/7: Starting all application services...\n"
       - docker compose up -d
       - |
+        printf "{{.BLUE}}[INFO]{{.NC}} Step 7/7: Starting admin tools...\n"
+      - task: tools:up
+      - |
         printf "{{.GREEN}}[OK]{{.NC}} Nexus development environment ready!\n"
-
-  # ============================================================================
-  # DEV - Daily development commands
-  # ============================================================================
+        printf "\n{{.BLUE}}Available services:{{.NC}}\n"
+        printf "  • Frontend:        http://nexus.local\n"
+        printf "  • API:             http://api.nexus.local\n"
+        printf "  • Kratos UI:       http://auth.nexus.local\n"
+        printf "  • Adminer:         http://adminer.nexus.local\n"
+        printf "  • Mailhog:         http://mail.nexus.local\n"
+        printf "  • Temporal UI:     http://temporal.nexus.local\n"
+        printf "  • Traefik:         http://traefik.nexus.local\n"
 
   down:
     desc: "⚠️  Stop and destroy ALL services, volumes, and data - IRREVERSIBLE!"
