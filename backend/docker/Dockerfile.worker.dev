@@ -1,7 +1,7 @@
 # Copyright 2025 Andrew Vasilyev
 # SPDX-License-Identifier: Apache-2.0
 
-FROM golang:1.25-alpine AS development
+FROM golang:1.27-alpine AS development
 
 RUN go install github.com/air-verse/air@latest
 
