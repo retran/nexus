@@ -20,7 +20,7 @@ COPY . .
 RUN yarn build
 
 # Stage 2: Serve with nginx
-FROM nginx:1.27-alpine
+FROM nginx:1.31-alpine
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
