@@ -1,5 +1,15 @@
 # Nexus
 
+> [!IMPORTANT]
+> **This project is archived and no longer maintained.**
+>
+> Nexus has evolved into **[retran/meowhub](https://github.com/retran/meowhub)**
+> — please follow the work there. (The new repository is not published yet; the
+> link will start working once it is.)
+>
+> This repository is kept read-only for historical reference. Issues and pull
+> requests are closed.
+
 **Private, self-hosted Integrated Operations Platform** — the central nervous
 system for your household.
 
